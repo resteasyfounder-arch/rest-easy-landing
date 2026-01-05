@@ -8,6 +8,7 @@ interface FindabilityQuestionProps {
   totalQuestions: number;
   selectedAnswer: AnswerValue | undefined;
   onAnswer: (answer: AnswerValue) => void;
+  direction: "forward" | "backward";
 }
 
 const answerOptions: { value: AnswerValue; label: string; icon: typeof Check }[] = [
@@ -22,10 +23,16 @@ const FindabilityQuestionComponent = ({
   totalQuestions,
   selectedAnswer,
   onAnswer,
+  direction,
 }: FindabilityQuestionProps) => {
   return (
-    <div className="flex-1 flex flex-col justify-center p-6 max-w-2xl mx-auto w-full">
-      <div className="space-y-8 animate-fade-up">
+    <div 
+      className={cn(
+        "flex-1 flex flex-col justify-center p-6 max-w-2xl mx-auto w-full",
+        direction === "forward" ? "animate-slide-in-right" : "animate-slide-in-left"
+      )}
+    >
+      <div className="space-y-6">
         {/* Question header */}
         <div className="text-center space-y-4">
           <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-body font-medium">
@@ -34,9 +41,6 @@ const FindabilityQuestionComponent = ({
           <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight">
             {question.question}
           </h2>
-          <p className="text-sm text-muted-foreground font-body italic">
-            {question.insight}
-          </p>
         </div>
 
         {/* Answer options */}
@@ -79,6 +83,13 @@ const FindabilityQuestionComponent = ({
               </button>
             );
           })}
+        </div>
+
+        {/* Why we ask - supportive text below answers */}
+        <div className="pt-4 border-t border-border/30">
+          <p className="text-sm text-muted-foreground font-body text-center italic">
+            {question.whyWeAsk}
+          </p>
         </div>
       </div>
     </div>

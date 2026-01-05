@@ -20,6 +20,7 @@ const Assessment = () => {
   const [step, setStep] = useState<Step>("intro");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
 
   const totalQuestions = findabilityQuestions.length;
   const currentQuestion = findabilityQuestions[currentQuestionIndex];
@@ -36,6 +37,7 @@ const Assessment = () => {
     // Auto-advance after brief delay
     setTimeout(() => {
       if (currentQuestionIndex < totalQuestions - 1) {
+        setDirection("forward");
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
         // Save to localStorage for future use
@@ -52,6 +54,7 @@ const Assessment = () => {
 
   const handleBack = () => {
     if (step === "questions" && currentQuestionIndex > 0) {
+      setDirection("backward");
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     } else if (step === "questions" && currentQuestionIndex === 0) {
       setStep("intro");
@@ -155,6 +158,7 @@ const Assessment = () => {
           totalQuestions={totalQuestions}
           selectedAnswer={answers[currentQuestion.id]}
           onAnswer={handleAnswer}
+          direction={direction}
         />
       </div>
     </div>
