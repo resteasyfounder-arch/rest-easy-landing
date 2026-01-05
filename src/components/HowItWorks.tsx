@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Sparkles, Camera, CheckCircle2, ArrowRight, FolderLock } from "lucide-react";
+import { AnimatedSection, AnimatedItem } from "@/hooks/useScrollAnimation";
 
 const steps = [
   {
@@ -41,7 +42,7 @@ const HowItWorks = () => {
     <section id="how-it-works" className="py-20 lg:py-32 bg-background">
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        <AnimatedSection className="text-center max-w-3xl mx-auto mb-16">
           <Badge className="mb-4 bg-accent text-accent-foreground border-0 font-body">
             Simple Process
           </Badge>
@@ -51,7 +52,7 @@ const HowItWorks = () => {
           <p className="font-body text-lg text-muted-foreground leading-relaxed">
             Progress accumulates quietly and consistently as your preparedness improves.
           </p>
-        </div>
+        </AnimatedSection>
 
         {/* Mobile Accordion View */}
         <div className="lg:hidden max-w-md mx-auto">
@@ -88,8 +89,10 @@ const HowItWorks = () => {
           <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border -translate-x-1/2" />
 
           {steps.map((step, index) => (
-            <div 
+            <AnimatedItem 
               key={index}
+              animation={index % 2 === 0 ? "fade-right" : "fade-left"}
+              delay={index * 100}
               className={`relative flex gap-12 mb-12 last:mb-0 ${
                 index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'
               }`}
@@ -122,7 +125,7 @@ const HowItWorks = () => {
 
               {/* Empty space for alternating layout */}
               <div className="w-1/2" />
-            </div>
+            </AnimatedItem>
           ))}
         </div>
       </div>

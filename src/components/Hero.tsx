@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Shield, Heart } from "lucide-react";
+import { AnimatedSection, AnimatedItem } from "@/hooks/useScrollAnimation";
 import heartIcon from "@/assets/rest-easy-heart.png";
 
 const Hero = () => {
@@ -19,45 +20,55 @@ const Hero = () => {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Left content */}
           <div className="text-center lg:text-left space-y-6 lg:space-y-8">
-            <Badge variant="secondary" className="font-body">
-              <Shield className="w-4 h-4 mr-2" />
-              Life Readiness Platform
-            </Badge>
+            <AnimatedItem animation="fade-up" delay={0}>
+              <Badge variant="secondary" className="font-body">
+                <Shield className="w-4 h-4 mr-2" />
+                Life Readiness Platform
+              </Badge>
+            </AnimatedItem>
 
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
-              So the people you love aren't left{" "}
-              <span className="text-primary">guessing</span>
-            </h1>
+            <AnimatedItem animation="fade-up" delay={100}>
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
+                So the people you love aren't left{" "}
+                <span className="text-primary">guessing</span>
+              </h1>
+            </AnimatedItem>
 
-            <p className="font-body text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              Rest Easy helps you achieve Life Readiness — organizing your affairs for any unexpected moment, not just end-of-life.
-            </p>
+            <AnimatedItem animation="fade-up" delay={200}>
+              <p className="font-body text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Rest Easy helps you achieve Life Readiness — organizing your affairs for any unexpected moment, not just end-of-life.
+              </p>
+            </AnimatedItem>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button size="lg" className="font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-shadow">
-                Take Your Free Assessment
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button variant="outline" size="lg" className="font-body text-base px-8 py-6">
-                Learn More
-              </Button>
-            </div>
+            <AnimatedItem animation="fade-up" delay={300}>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <Button size="lg" className="font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-shadow">
+                  Take Your Free Assessment
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button variant="outline" size="lg" className="font-body text-base px-8 py-6">
+                  Learn More
+                </Button>
+              </div>
+            </AnimatedItem>
 
             {/* Trust indicators */}
-            <div className="flex flex-wrap gap-6 justify-center lg:justify-start pt-4">
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-primary" />
-                <span className="font-body text-sm text-muted-foreground">Trusted by families</span>
+            <AnimatedItem animation="fade-up" delay={400}>
+              <div className="flex flex-wrap gap-6 justify-center lg:justify-start pt-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  <span className="font-body text-sm text-muted-foreground">Trusted by families</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <span className="font-body text-sm text-muted-foreground">Bank-level security</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                <span className="font-body text-sm text-muted-foreground">Bank-level security</span>
-              </div>
-            </div>
+            </AnimatedItem>
           </div>
 
           {/* Right content - Floating heart illustration */}
-          <div className="relative flex justify-center lg:justify-end">
+          <AnimatedItem animation="scale" delay={200} className="relative flex justify-center lg:justify-end">
             <div className="relative">
               {/* Glowing background */}
               <div className="absolute inset-0 bg-gradient-sage rounded-full blur-3xl opacity-20 scale-150" />
@@ -103,7 +114,7 @@ const Hero = () => {
                 </CardContent>
               </Card>
             </div>
-          </div>
+          </AnimatedItem>
         </div>
       </div>
     </section>

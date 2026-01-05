@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Activity, ArrowRight, Sparkles, Clock, TrendingUp, CheckCircle2 } from "lucide-react";
+import { AnimatedSection, AnimatedItem } from "@/hooks/useScrollAnimation";
 
 const scores = [
   {
@@ -35,7 +36,7 @@ const Solution = () => {
     <section id="solution" className="py-20 lg:py-32 bg-secondary/30">
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        <AnimatedSection className="text-center max-w-3xl mx-auto mb-16">
           <Badge className="mb-4 bg-primary/10 text-primary border-0 font-body">
             <Sparkles className="w-3 h-3 mr-1" />
             Our Solution
@@ -46,7 +47,7 @@ const Solution = () => {
           <p className="font-body text-lg text-muted-foreground leading-relaxed">
             Rest Easy uses two complementary scores to guide you from immediate action to sustained preparedness.
           </p>
-        </div>
+        </AnimatedSection>
 
         {/* Mobile Tabs View */}
         <div className="lg:hidden max-w-md mx-auto">
@@ -65,13 +66,15 @@ const Solution = () => {
 
         {/* Desktop Cards View */}
         <div className="hidden lg:grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {scores.map((score) => (
-            <ScoreCard key={score.id} score={score} />
+          {scores.map((score, index) => (
+            <AnimatedItem key={score.id} animation={index === 0 ? "fade-right" : "fade-left"} delay={index * 150}>
+              <ScoreCard score={score} />
+            </AnimatedItem>
           ))}
         </div>
 
         {/* How they work together */}
-        <div className="mt-16 text-center">
+        <AnimatedSection animation="fade-up" delay={300} className="mt-16 text-center">
           <Card className="inline-flex items-center gap-4 p-6 shadow-soft border-border/50">
             <CardContent className="flex items-center gap-4 p-0">
               <div className="flex items-center gap-2">
@@ -88,7 +91,7 @@ const Solution = () => {
           <p className="font-body text-muted-foreground mt-4">
             Findability gets you in the door. Life Readiness keeps things working over time.
           </p>
-        </div>
+        </AnimatedSection>
       </div>
     </section>
   );
@@ -102,7 +105,7 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
   const BadgeIcon = score.badgeIcon;
   
   return (
-    <Card className="border-border/50 shadow-card hover:shadow-elevated transition-all">
+    <Card className="border-border/50 shadow-card hover:shadow-elevated transition-all h-full">
       <CardHeader>
         <div className="flex items-start gap-4 mb-2">
           <div className="w-14 h-14 rounded-2xl bg-gradient-sage flex items-center justify-center shrink-0">

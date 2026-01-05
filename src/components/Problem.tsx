@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileQuestion, MapPin, Zap, AlertCircle } from "lucide-react";
+import { AnimatedSection, AnimatedItem } from "@/hooks/useScrollAnimation";
 
 const stats = [
   { value: "76%", label: "Americans without any estate planning documents" },
@@ -32,7 +33,7 @@ const Problem = () => {
     <section id="problem" className="py-20 lg:py-32 bg-background">
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        <AnimatedSection className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4 border-destructive/30 text-destructive font-body">
             <AlertCircle className="w-3 h-3 mr-1" />
             The Challenge
@@ -43,17 +44,19 @@ const Problem = () => {
           <p className="font-body text-lg text-muted-foreground leading-relaxed">
             Most people aren't uninformed; they're overloaded. Nothing feels clearly started or clearly done, leaving vital information scattered and decisions partial.
           </p>
-        </div>
+        </AnimatedSection>
 
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-6 mb-16">
           {stats.map((stat, index) => (
-            <Card key={index} className="text-center border-border/50 shadow-card hover:shadow-elevated transition-shadow">
-              <CardContent className="p-8">
-                <p className="font-display text-4xl lg:text-5xl font-bold text-primary mb-3">{stat.value}</p>
-                <p className="font-body text-sm text-muted-foreground">{stat.label}</p>
-              </CardContent>
-            </Card>
+            <AnimatedItem key={index} animation="fade-up" delay={index * 100}>
+              <Card className="text-center border-border/50 shadow-card hover:shadow-elevated transition-shadow h-full">
+                <CardContent className="p-8">
+                  <p className="font-display text-4xl lg:text-5xl font-bold text-primary mb-3">{stat.value}</p>
+                  <p className="font-body text-sm text-muted-foreground">{stat.label}</p>
+                </CardContent>
+              </Card>
+            </AnimatedItem>
           ))}
         </div>
 
@@ -62,26 +65,28 @@ const Problem = () => {
         {/* Challenges */}
         <div className="grid md:grid-cols-3 gap-8">
           {challenges.map((challenge, index) => (
-            <Card key={index} className="group bg-secondary/50 hover:bg-secondary transition-colors border-0">
-              <CardHeader>
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <challenge.icon className="w-7 h-7 text-primary" />
-                </div>
-                <CardTitle className="font-display text-xl text-foreground">{challenge.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-body text-muted-foreground leading-relaxed">{challenge.description}</p>
-              </CardContent>
-            </Card>
+            <AnimatedItem key={index} animation="fade-up" delay={index * 150}>
+              <Card className="group bg-secondary/50 hover:bg-secondary transition-colors border-0 h-full">
+                <CardHeader>
+                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                    <challenge.icon className="w-7 h-7 text-primary" />
+                  </div>
+                  <CardTitle className="font-display text-xl text-foreground">{challenge.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-body text-muted-foreground leading-relaxed">{challenge.description}</p>
+                </CardContent>
+              </Card>
+            </AnimatedItem>
           ))}
         </div>
 
         {/* Bottom message */}
-        <div className="mt-16 text-center">
+        <AnimatedSection animation="fade" delay={200} className="mt-16 text-center">
           <p className="font-body text-lg text-muted-foreground max-w-2xl mx-auto italic">
             "Families don't struggle because someone didn't care. They struggle because the pathway to Life Readiness was unclear."
           </p>
-        </div>
+        </AnimatedSection>
       </div>
     </section>
   );
