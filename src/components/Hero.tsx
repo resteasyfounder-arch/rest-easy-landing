@@ -1,4 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Shield, Heart } from "lucide-react";
 import heartIcon from "@/assets/rest-easy-heart.png";
 
@@ -16,10 +19,10 @@ const Hero = () => {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Left content */}
           <div className="text-center lg:text-left space-y-6 lg:space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-secondary rounded-full">
-              <Shield className="w-4 h-4 text-primary" />
-              <span className="font-body text-sm font-medium text-secondary-foreground">Life Readiness Platform</span>
-            </div>
+            <Badge variant="secondary" className="font-body">
+              <Shield className="w-4 h-4 mr-2" />
+              Life Readiness Platform
+            </Badge>
 
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
               So the people you love aren't left{" "}
@@ -69,29 +72,36 @@ const Hero = () => {
               </div>
 
               {/* Floating cards */}
-              <div className="absolute -top-4 -left-8 bg-card p-4 rounded-xl shadow-card animate-float" style={{ animationDelay: "1s" }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-lg">📋</span>
+              <Card className="absolute -top-4 -left-8 shadow-card animate-float border-border/50" style={{ animationDelay: "1s" }}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-lg">📋</span>
+                    </div>
+                    <div>
+                      <p className="font-body text-xs text-muted-foreground">Findability Score</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-display text-lg font-semibold text-primary">87%</p>
+                        <Progress value={87} className="w-12 h-1.5" />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-body text-xs text-muted-foreground">Findability Score</p>
-                    <p className="font-display text-lg font-semibold text-primary">87%</p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              <div className="absolute -bottom-4 -right-8 bg-card p-4 rounded-xl shadow-card animate-float" style={{ animationDelay: "3s" }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                    <span className="text-lg">✓</span>
+              <Card className="absolute -bottom-4 -right-8 shadow-card animate-float border-border/50" style={{ animationDelay: "3s" }}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                      <span className="text-lg">✓</span>
+                    </div>
+                    <div>
+                      <p className="font-body text-xs text-muted-foreground">Life Readiness</p>
+                      <Badge variant="default" className="mt-1 text-xs">Active</Badge>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-body text-xs text-muted-foreground">Life Readiness</p>
-                    <p className="font-display text-lg font-semibold text-primary">Active</p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

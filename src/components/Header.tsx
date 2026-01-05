@@ -1,10 +1,23 @@
 import { useState } from "react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+} from "@/components/ui/navigation-menu";
 import logo from "@/assets/rest-easy-logo.png";
 
+const navLinks = [
+  { href: "#problem", label: "The Problem" },
+  { href: "#solution", label: "Our Solution" },
+  { href: "#how-it-works", label: "How It Works" },
+];
+
 const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -16,54 +29,58 @@ const Header = () => {
           </a>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#problem" className="font-body text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              The Problem
-            </a>
-            <a href="#solution" className="font-body text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Our Solution
-            </a>
-            <a href="#how-it-works" className="font-body text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              How It Works
-            </a>
-          </nav>
+          <NavigationMenu className="hidden md:flex">
+            <NavigationMenuList className="gap-1">
+              {navLinks.map((link) => (
+                <NavigationMenuItem key={link.href}>
+                  <NavigationMenuLink asChild>
+                    <Button 
+                      variant="ghost" 
+                      asChild 
+                      className="font-body text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    >
+                      <a href={link.href}>{link.label}</a>
+                    </Button>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              ))}
+            </NavigationMenuList>
+          </NavigationMenu>
 
-          {/* CTA Button */}
+          {/* Desktop CTA */}
           <div className="hidden md:block">
             <Button variant="default" size="lg" className="font-body">
               Get Started
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 text-foreground"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-border/50">
-            <nav className="flex flex-col gap-4">
-              <a href="#problem" className="font-body text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                The Problem
-              </a>
-              <a href="#solution" className="font-body text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Our Solution
-              </a>
-              <a href="#how-it-works" className="font-body text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                How It Works
-              </a>
-              <Button variant="default" size="lg" className="font-body mt-2 w-full">
-                Get Started
+          {/* Mobile Menu */}
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="icon" aria-label="Toggle menu">
+                <Menu className="h-6 w-6" />
               </Button>
-            </nav>
-          </div>
-        )}
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] bg-background">
+              <nav className="flex flex-col gap-4 mt-8">
+                {navLinks.map((link) => (
+                  <Button
+                    key={link.href}
+                    variant="ghost"
+                    asChild
+                    className="justify-start font-body text-base"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <a href={link.href}>{link.label}</a>
+                  </Button>
+                ))}
+                <Button variant="default" size="lg" className="font-body mt-4 w-full">
+                  Get Started
+                </Button>
+              </nav>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );

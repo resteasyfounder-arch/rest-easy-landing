@@ -1,3 +1,6 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Sparkles, Camera, CheckCircle2, ArrowRight, FolderLock } from "lucide-react";
 
 const steps = [
@@ -39,7 +42,9 @@ const HowItWorks = () => {
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="font-body text-sm font-semibold text-primary uppercase tracking-wider">How It Works</span>
+          <Badge className="mb-4 bg-accent text-accent-foreground border-0 font-body">
+            Simple Process
+          </Badge>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mt-4 mb-6 text-balance">
             Five simple steps to Life Readiness
           </h2>
@@ -48,41 +53,75 @@ const HowItWorks = () => {
           </p>
         </div>
 
-        {/* Steps */}
-        <div className="relative max-w-4xl mx-auto">
+        {/* Mobile Accordion View */}
+        <div className="lg:hidden max-w-md mx-auto">
+          <Accordion type="single" collapsible className="space-y-4">
+            {steps.map((step, index) => (
+              <AccordionItem 
+                key={index} 
+                value={`step-${index}`}
+                className="border rounded-xl bg-card shadow-soft px-4"
+              >
+                <AccordionTrigger className="hover:no-underline py-4">
+                  <div className="flex items-center gap-4">
+                    <Badge className="bg-primary/10 text-primary border-0 font-display font-bold">
+                      {step.number}
+                    </Badge>
+                    <span className="font-display text-base font-semibold text-foreground text-left">
+                      {step.title}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pb-4">
+                  <p className="font-body text-muted-foreground leading-relaxed pl-14">
+                    {step.description}
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+
+        {/* Desktop Timeline View */}
+        <div className="hidden lg:block relative max-w-4xl mx-auto">
           {/* Connecting line */}
-          <div className="absolute left-8 lg:left-1/2 top-0 bottom-0 w-px bg-border hidden md:block" />
+          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border -translate-x-1/2" />
 
           {steps.map((step, index) => (
             <div 
               key={index}
-              className={`relative flex flex-col md:flex-row gap-6 md:gap-12 mb-12 last:mb-0 ${
-                index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
+              className={`relative flex gap-12 mb-12 last:mb-0 ${
+                index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'
               }`}
             >
               {/* Step number indicator */}
-              <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-primary items-center justify-center z-10">
+              <div className="absolute left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-primary flex items-center justify-center z-10">
                 <span className="font-display text-lg font-bold text-primary-foreground">{step.number}</span>
               </div>
 
               {/* Content */}
-              <div className={`md:w-1/2 ${index % 2 === 0 ? 'md:pr-20 md:text-right' : 'md:pl-20'}`}>
-                <div className={`bg-card p-6 lg:p-8 rounded-2xl shadow-card border border-border/50 hover:shadow-elevated transition-shadow ${
-                  index % 2 === 0 ? 'md:ml-auto' : ''
+              <div className={`w-1/2 ${index % 2 === 0 ? 'pr-20 text-right' : 'pl-20'}`}>
+                <Card className={`border-border/50 shadow-card hover:shadow-elevated transition-shadow ${
+                  index % 2 === 0 ? 'ml-auto' : ''
                 }`}>
-                  <div className={`flex items-center gap-4 mb-4 ${index % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
-                    <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center shrink-0 md:hidden">
-                      <step.icon className="w-6 h-6 text-primary" />
+                  <CardHeader className="pb-2">
+                    <div className={`flex items-center gap-4 mb-2 ${index % 2 === 0 ? 'flex-row-reverse' : ''}`}>
+                      <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center shrink-0">
+                        <step.icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <CardTitle className="font-display text-xl text-foreground">{step.title}</CardTitle>
                     </div>
-                    <div className="md:hidden font-display text-sm font-bold text-primary">{step.number}</div>
-                    <h3 className="font-display text-xl font-semibold text-foreground">{step.title}</h3>
-                  </div>
-                  <p className="font-body text-muted-foreground leading-relaxed">{step.description}</p>
-                </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="font-body text-muted-foreground leading-relaxed">
+                      {step.description}
+                    </CardDescription>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Empty space for alternating layout */}
-              <div className="hidden md:block md:w-1/2" />
+              <div className="w-1/2" />
             </div>
           ))}
         </div>
