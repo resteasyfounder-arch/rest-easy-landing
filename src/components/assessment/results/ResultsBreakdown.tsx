@@ -23,18 +23,13 @@ const answerLabels: Record<AnswerValue, string> = {
 
 const ResultsBreakdown = ({ answers }: ResultsBreakdownProps) => {
   return (
-    <div className="space-y-4">
-      <div className="text-center">
-        <h2 className="font-display text-xl font-semibold text-foreground mb-2">
-          Your Breakdown
-        </h2>
-        <p className="font-body text-sm text-muted-foreground">
-          See how you scored in each area
-        </p>
-      </div>
+    <div className="space-y-3">
+      <h2 className="font-display text-base font-semibold text-foreground text-center">
+        Your Breakdown
+      </h2>
 
-      <Accordion type="multiple" className="space-y-2">
-        {findabilityQuestions.map((question, index) => {
+      <Accordion type="single" collapsible className="space-y-1.5">
+        {findabilityQuestions.map((question) => {
           const answer = answers[question.id];
           const guidance = answer ? question.guidance[answer] : "";
 
@@ -43,48 +38,40 @@ const ResultsBreakdown = ({ answers }: ResultsBreakdownProps) => {
               key={question.id}
               value={question.id}
               className={cn(
-                "border rounded-xl px-4 overflow-hidden transition-colors",
+                "border rounded-lg px-3 overflow-hidden transition-colors",
                 answer === "yes" && "bg-green-500/5 border-green-500/20",
                 answer === "somewhat" && "bg-amber-500/5 border-amber-500/20",
                 answer === "no" && "bg-red-400/5 border-red-400/20"
               )}
             >
-              <AccordionTrigger className="hover:no-underline py-4">
-                <div className="flex items-center gap-3 text-left">
+              <AccordionTrigger className="hover:no-underline py-2.5">
+                <div className="flex items-center gap-2 text-left">
                   {/* Status icon */}
                   <div
                     className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
+                      "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
                       answer === "yes" && "bg-green-500 text-white",
                       answer === "somewhat" && "bg-amber-500 text-white",
                       answer === "no" && "bg-red-400 text-white"
                     )}
                   >
-                    {answer === "yes" && <Check className="w-4 h-4" />}
-                    {answer === "somewhat" && <AlertCircle className="w-3 h-3" />}
-                    {answer === "no" && <X className="w-4 h-4" />}
+                    {answer === "yes" && <Check className="w-3 h-3" />}
+                    {answer === "somewhat" && <AlertCircle className="w-2.5 h-2.5" />}
+                    {answer === "no" && <X className="w-3 h-3" />}
                   </div>
 
-                  {/* Question info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-body font-medium text-foreground text-sm">
-                      {question.categoryLabel}
-                    </p>
-                    <p className="font-body text-xs text-muted-foreground">
-                      You answered: {answer ? answerLabels[answer] : "—"}
-                    </p>
-                  </div>
+                  {/* Question info - single line */}
+                  <p className="font-body font-medium text-foreground text-sm flex-1">
+                    {question.categoryLabel}
+                  </p>
                 </div>
               </AccordionTrigger>
 
-              <AccordionContent className="pb-4">
-                <div className="pl-9 space-y-3">
-                  <p className="font-body text-sm text-foreground/80">
-                    {question.question}
-                  </p>
+              <AccordionContent className="pb-3">
+                <div className="pl-7">
                   <div
                     className={cn(
-                      "p-3 rounded-lg text-sm font-body",
+                      "p-2.5 rounded-lg text-sm font-body",
                       answer === "yes" && "bg-green-500/10 text-green-800",
                       answer === "somewhat" && "bg-amber-500/10 text-amber-800",
                       answer === "no" && "bg-red-400/10 text-red-800"

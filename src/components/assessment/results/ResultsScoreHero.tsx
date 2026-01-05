@@ -49,28 +49,24 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
   }, [score]);
 
   return (
-    <div className="text-center space-y-6 py-8">
-      {/* Score circle */}
-      <div className="relative mx-auto">
+    <div className="text-center space-y-4 py-6">
+      {/* Score circle + badge inline */}
+      <div className="flex flex-col items-center gap-3">
         <div
           className={cn(
-            "w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center border-4 mx-auto transition-all duration-500",
+            "w-24 h-24 rounded-full flex items-center justify-center border-4 transition-all duration-500",
             tier.color === "green" && "border-green-500 bg-green-500/10",
             tier.color === "amber" && "border-amber-500 bg-amber-500/10",
             tier.color === "red" && "border-red-400 bg-red-400/10"
           )}
         >
-          <span className="font-display text-4xl md:text-5xl font-bold text-foreground">
+          <span className="font-display text-3xl font-bold text-foreground">
             {displayScore}
           </span>
         </div>
-      </div>
-
-      {/* Tier badge */}
-      <div>
         <span
           className={cn(
-            "inline-block px-4 py-2 rounded-full text-sm font-body font-medium",
+            "inline-block px-3 py-1 rounded-full text-xs font-body font-medium",
             tier.color === "green" && "bg-green-500/20 text-green-700",
             tier.color === "amber" && "bg-amber-500/20 text-amber-700",
             tier.color === "red" && "bg-red-400/20 text-red-700"
@@ -81,23 +77,18 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
       </div>
 
       {/* Personalized headlines */}
-      <div className="space-y-2">
-        <h1 className="font-display text-2xl md:text-3xl font-semibold text-foreground">
+      <div className="space-y-1">
+        <h1 className="font-display text-xl md:text-2xl font-semibold text-foreground">
           {tierHeadlines[tierKey]}
         </h1>
-        <p className="font-body text-lg text-muted-foreground">
+        <p className="font-body text-base text-muted-foreground">
           {tierSubheadlines[tierKey]}
         </p>
       </div>
 
-      {/* Tier description */}
-      <p className="font-body text-sm text-muted-foreground max-w-md mx-auto">
+      {/* Tier description + disclaimer combined */}
+      <p className="font-body text-sm text-muted-foreground max-w-sm mx-auto">
         {tierDescriptions[tierKey]}
-      </p>
-
-      {/* Disclaimer */}
-      <p className="text-xs text-muted-foreground/70 font-body">
-        This score measures access and clarity — not legal validity.
       </p>
     </div>
   );
