@@ -5,10 +5,11 @@ import Solution from "@/components/Solution";
 import HowItWorks from "@/components/HowItWorks";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
+import AppLayout from "@/components/layout/AppLayout";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <AppLayout>
       <Header />
       <main>
         <Hero />
@@ -18,7 +19,7 @@ const Index = () => {
         <CTA />
       </main>
       <Footer />
-    </div>
+    </AppLayout>
   );
 };
 
