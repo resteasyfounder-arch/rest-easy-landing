@@ -9,7 +9,6 @@ import FindabilityResults from "@/components/assessment/FindabilityResults";
 import {
   findabilityQuestions,
   calculateScore,
-  getBiggestRisk,
   type AnswerValue,
 } from "@/data/findabilityQuestions";
 
@@ -42,10 +41,9 @@ const Assessment = () => {
       } else {
         // Save to localStorage for future use
         const score = calculateScore(newAnswers);
-        const biggestRisk = getBiggestRisk(newAnswers);
         localStorage.setItem(
           "findabilityResults",
-          JSON.stringify({ score, biggestRisk, answers: newAnswers, completedAt: new Date().toISOString() })
+          JSON.stringify({ score, answers: newAnswers, completedAt: new Date().toISOString() })
         );
         setStep("results");
       }
@@ -92,10 +90,15 @@ const Assessment = () => {
     );
   }
 
+  const handleRetake = () => {
+    setAnswers({});
+    setCurrentQuestionIndex(0);
+    setStep("intro");
+  };
+
   // Results screen
   if (step === "results") {
     const score = calculateScore(answers);
-    const biggestRisk = getBiggestRisk(answers);
 
     return (
       <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-top safe-area-bottom">
@@ -114,7 +117,7 @@ const Assessment = () => {
           </Button>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <FindabilityResults score={score} biggestRisk={biggestRisk} />
+          <FindabilityResults score={score} answers={answers} onRetake={handleRetake} />
         </div>
       </div>
     );
