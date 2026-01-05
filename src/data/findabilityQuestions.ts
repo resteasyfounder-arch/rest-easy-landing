@@ -1,7 +1,7 @@
 export interface FindabilityQuestion {
   id: string;
   question: string;
-  insight: string;
+  whyWeAsk: string;
   riskLabel: string;
 }
 
@@ -9,49 +9,49 @@ export const findabilityQuestions: FindabilityQuestion[] = [
   {
     id: "someone-test",
     question: "Is there at least one person who would know they're supposed to step in if something happened to you?",
-    insight: "This reveals whether you have role clarity — someone who knows they're the one.",
+    whyWeAsk: "Having someone who knows they're your person can make all the difference when it matters most.",
     riskLabel: "The right person may not know they're supposed to step in.",
   },
   {
     id: "location-test",
     question: "Would that person know where to look first to find your important information?",
-    insight: "This exposes the 'it's in my head' risk — when knowledge isn't accessible.",
+    whyWeAsk: "Even the most organized plans can fall apart if no one knows where to start looking.",
     riskLabel: "The right person may not know where to start looking.",
   },
   {
     id: "access-test",
     question: "Could that person actually access what they find (logins, passwords, physical access)?",
-    insight: "This separates 'I told them' from 'they can actually act.'",
+    whyWeAsk: "Knowing where something is and being able to use it are two very different things.",
     riskLabel: "The right person may find things but cannot actually access them.",
   },
   {
     id: "document-reality",
     question: "Are your most important documents stored somewhere intentionally — not just scattered across email, drawers, or devices?",
-    insight: "Most people think they're organized. This gently exposes chaos.",
+    whyWeAsk: "A little intentional organization now saves a lot of stress for the people you care about.",
     riskLabel: "Important documents are scattered and hard to find under stress.",
   },
   {
     id: "healthcare-moment",
     question: "If you were in an emergency room, could someone quickly show proof of who can speak for you medically?",
-    insight: "A concrete, high-stakes scenario that cuts through vague thinking.",
+    whyWeAsk: "In medical moments, having the right paperwork accessible can prevent delays and confusion.",
     riskLabel: "Medical decisions could be delayed when seconds matter most.",
   },
   {
     id: "money-monday",
     question: "Could someone pay critical bills or manage basic finances for the first few weeks without major confusion?",
-    insight: "Bills and utilities are immediate pain points that can't wait.",
+    whyWeAsk: "Bills don't pause for difficult times. A little clarity here goes a long way.",
     riskLabel: "Critical bills could go unpaid, creating cascading problems.",
   },
   {
     id: "phone-problem",
     question: "If your phone or computer were unavailable, could someone still find what they need?",
-    insight: "A modern, underrated risk. So much lives only on our devices.",
+    whyWeAsk: "So much of our lives live on our devices now. It's worth thinking about a backup plan.",
     riskLabel: "Too much critical information is locked in inaccessible devices.",
   },
   {
     id: "only-you-know",
     question: "Are there important details only you know that others would struggle to figure out quickly?",
-    insight: "This catches hidden obligations — service providers, routines, and more.",
+    whyWeAsk: "We all carry little details that would be hard for others to piece together. That's completely normal.",
     riskLabel: "Important details live only in your head and would be lost.",
   },
 ];
