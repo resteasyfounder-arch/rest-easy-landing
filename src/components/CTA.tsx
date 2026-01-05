@@ -16,7 +16,7 @@ const CTA = () => {
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
         <AnimatedSection animation="scale">
-          <Card className="max-w-4xl mx-auto bg-white/10 backdrop-blur-sm border-white/20 shadow-elevated">
+          <Card className="max-w-4xl mx-auto bg-sage-800/90 backdrop-blur-sm border-sage-700/50 shadow-elevated">
             <CardContent className="p-8 lg:p-12 text-center">
               {/* Icon */}
               <div className="mb-8 flex justify-center">
