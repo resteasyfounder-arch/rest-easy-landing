@@ -40,9 +40,12 @@ const CTA = () => {
                   size="lg" 
                   variant="secondary"
                   className="font-body text-base px-8 py-6 bg-white text-primary hover:bg-white/90 shadow-elevated"
+                  asChild
                 >
-                  Take Free Assessment
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <a href="/assessment">
+                    Get Your Findability Score
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </a>
                 </Button>
                 
                 <Badge variant="secondary" className="bg-white/20 text-primary-foreground border-0 px-4 py-2">

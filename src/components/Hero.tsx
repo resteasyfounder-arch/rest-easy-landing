@@ -42,9 +42,11 @@ const Hero = () => {
 
             <AnimatedItem animation="fade-up" delay={300}>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Button size="lg" className="font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-shadow">
-                  Take Your Free Assessment
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                <Button size="lg" className="font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-shadow" asChild>
+                  <a href="/assessment">
+                    Get Your Findability Score
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </a>
                 </Button>
                 <Button variant="outline" size="lg" className="font-body text-base px-8 py-6">
                   Learn More

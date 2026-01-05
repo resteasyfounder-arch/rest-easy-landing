@@ -1,4 +1,4 @@
-import { Home, ClipboardList, BarChart3, Settings, LogIn, Sparkles } from "lucide-react";
+import { Home, ClipboardList, BarChart3, Settings, LogIn } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -20,8 +20,7 @@ import logo from "@/assets/rest-easy-logo.png";
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
-  { title: "Try Sample", url: "/sample", icon: Sparkles },
-  { title: "Full Assessment", url: "/assessment", icon: ClipboardList },
+  { title: "Findability Score", url: "/assessment", icon: ClipboardList },
   { title: "Results", url: "/results", icon: BarChart3 },
 ];
 
