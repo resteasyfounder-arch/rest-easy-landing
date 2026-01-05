@@ -1,35 +1,56 @@
 import { Button } from "@/components/ui/button";
-import {
-  NavigationMenu,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-} from "@/components/ui/navigation-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Link } from "react-router-dom";
 import logo from "@/assets/rest-easy-logo.png";
 
-const navLinks = [
-  { href: "#problem", label: "The Problem" },
-  { href: "#solution", label: "Our Solution" },
-  { href: "#how-it-works", label: "How It Works" },
-];
+interface HeaderProps {
+  isAuthenticated?: boolean;
+}
 
-const Header = () => {
+const Header = ({ isAuthenticated = false }: HeaderProps) => {
   const isMobile = useIsMobile();
 
-  // Hide header on desktop (sidebar handles nav) and mobile (bottom nav handles it)
-  if (!isMobile) {
+  // Authenticated users don't need this header (sidebar handles nav)
+  if (isAuthenticated) {
     return null;
   }
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   // Mobile: Show minimal header with logo only (bottom nav handles navigation)
+  if (isMobile) {
+    return (
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-center h-14">
+            <button onClick={scrollToTop} className="flex items-center">
+              <img src={logo} alt="Rest Easy" className="h-10 w-auto" />
+            </button>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  // Desktop: Full navbar with logo left, buttons right
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-center h-14">
-          <a href="/" className="flex items-center">
+        <div className="flex items-center justify-between h-16">
+          <button onClick={scrollToTop} className="flex items-center">
             <img src={logo} alt="Rest Easy" className="h-10 w-auto" />
-          </a>
+          </button>
+          
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild>
+              <Link to="/login">Log In</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/sample">Take Assessment</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </header>
