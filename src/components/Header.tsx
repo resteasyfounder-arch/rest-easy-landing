@@ -28,7 +28,7 @@ const Header = () => {
             <img src={logo} alt="Rest Easy" className="h-12 lg:h-14 w-auto" />
           </a>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - hidden on mobile (uses bottom nav) */}
           <NavigationMenu className="hidden md:flex">
             <NavigationMenuList className="gap-1">
               {navLinks.map((link) => (
@@ -47,39 +47,17 @@ const Header = () => {
             </NavigationMenuList>
           </NavigationMenu>
 
-          {/* Desktop CTA */}
+          {/* Desktop CTA - hidden on mobile */}
           <div className="hidden md:block">
-            <Button variant="default" size="lg" className="font-body">
+            <Button variant="default" size="lg" className="font-body press-effect">
               Get Started
             </Button>
           </div>
 
-          {/* Mobile Menu */}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon" aria-label="Toggle menu">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] bg-background">
-              <nav className="flex flex-col gap-4 mt-8">
-                {navLinks.map((link) => (
-                  <Button
-                    key={link.href}
-                    variant="ghost"
-                    asChild
-                    className="justify-start font-body text-base"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <a href={link.href}>{link.label}</a>
-                  </Button>
-                ))}
-                <Button variant="default" size="lg" className="font-body mt-4 w-full">
-                  Get Started
-                </Button>
-              </nav>
-            </SheetContent>
-          </Sheet>
+          {/* Mobile Menu - Hidden since we use bottom nav */}
+          <div className="md:hidden">
+            {/* Spacer to maintain header balance */}
+          </div>
         </div>
       </div>
     </header>
