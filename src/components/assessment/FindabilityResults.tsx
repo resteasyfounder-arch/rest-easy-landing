@@ -15,7 +15,7 @@ interface FindabilityResultsProps {
 const FindabilityResults = ({ score, answers, onRetake }: FindabilityResultsProps) => {
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20">
-      <div className="max-w-lg mx-auto px-4 pb-8 space-y-8">
+      <div className="max-w-lg mx-auto px-4 pb-6 space-y-5">
         {/* Score Hero */}
         <ResultsScoreHero score={score} />
 
