@@ -30,6 +30,41 @@ const steps = [{
   description: "Safely store all your critical information in one accessible location. Your data is preserved and easily retrievable when needed."
 }];
 const HowItWorks = () => {
-  return;
+  return (
+    <section className="py-16 md:py-24 bg-background">
+      <div className="container mx-auto px-4">
+        <AnimatedSection className="text-center mb-12">
+          <Badge variant="outline" className="mb-4">How It Works</Badge>
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            Five Simple Steps to Peace of Mind
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Our guided process makes organizing your life affairs straightforward and stress-free.
+          </p>
+        </AnimatedSection>
+
+        <div className="max-w-3xl mx-auto">
+          <Accordion type="single" collapsible className="w-full">
+            {steps.map((step, index) => (
+              <AnimatedItem key={index} delay={index * 0.1}>
+                <AccordionItem value={`step-${index}`}>
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-4 text-left">
+                      <span className="text-sm font-mono text-primary">{step.number}</span>
+                      <step.icon className="w-5 h-5 text-primary" />
+                      <span className="font-semibold">{step.title}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <p className="text-muted-foreground pl-16">{step.description}</p>
+                  </AccordionContent>
+                </AccordionItem>
+              </AnimatedItem>
+            ))}
+          </Accordion>
+        </div>
+      </div>
+    </section>
+  );
 };
 export default HowItWorks;
