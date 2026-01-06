@@ -26,7 +26,7 @@ const scores = [
     question: "See your strengths and gaps across all nine areas",
     time: "20-40 minutes (incremental)",
     focus: "Measures sustained preparedness — roles defined, documents in place, gaps prioritized",
-    cta: "Your personalized Readiness Score and clear action plan",
+    cta: "Are you ready for your personalized Readiness Score and clear action plan?",
     badge: "Comprehensive",
     badgeIcon: TrendingUp,
     isPrimary: false,
