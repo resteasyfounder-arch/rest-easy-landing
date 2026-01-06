@@ -188,7 +188,7 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
             </a>
           </Button>
         ) : (
-          <Button className="w-full font-body" size="lg" variant="outline" asChild>
+          <Button className="w-full font-body bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border" size="lg" asChild>
             <a href="/login">
               Sign Up or Log In
               <ArrowRight className="ml-2 w-4 h-4" />
