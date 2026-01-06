@@ -180,10 +180,17 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
           </CardContent>
         </Card>
 
-        {score.isPrimary && (
+        {score.isPrimary ? (
           <Button className="w-full font-body" size="lg" asChild>
             <a href="/assessment">
               Take Free Assessment
+              <ArrowRight className="ml-2 w-4 h-4" />
+            </a>
+          </Button>
+        ) : (
+          <Button className="w-full font-body" size="lg" variant="outline" asChild>
+            <a href="/login">
+              Sign Up or Log In
               <ArrowRight className="ml-2 w-4 h-4" />
             </a>
           </Button>
