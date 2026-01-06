@@ -15,7 +15,7 @@ const scores = [
     cta: "If something unexpected happened tomorrow, could the right people find what they need?",
     badge: "Free Assessment",
     badgeIcon: Clock,
-    features: ["Immediate results", "No commitment", "Actionable insights"]
+    features: ["Immediate results", "No commitment", "Actionable insights"],
   },
   {
     id: "readiness",
@@ -27,7 +27,7 @@ const scores = [
     cta: "Life changes. Your readiness should keep up.",
     badge: "Comprehensive",
     badgeIcon: TrendingUp,
-    features: ["Complete assessment", "Ongoing guidance", "Progress tracking"]
+    features: ["Complete assessment", "Ongoing guidance", "Progress tracking"],
   },
 ];
 
@@ -42,10 +42,11 @@ const Solution = () => {
             Our Solution
           </Badge>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mt-4 mb-6 text-balance">
-            Two Scores. Two Moments. One System.
+            Get your Readiness Score. Protect your family. Start today without the overwhelm.
           </h2>
           <p className="font-body text-lg text-muted-foreground leading-relaxed">
-            Rest Easy uses two complementary scores to guide you from immediate action to sustained preparedness.
+            Rest Easy assesses your preparedness across nine key areas—so you know exactly where you stand and what to
+            do next.
           </p>
         </AnimatedSection>
 
@@ -53,8 +54,12 @@ const Solution = () => {
         <div className="lg:hidden max-w-md mx-auto">
           <Tabs defaultValue="findability" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="findability" className="font-body">Findability</TabsTrigger>
-              <TabsTrigger value="readiness" className="font-body">Life Readiness</TabsTrigger>
+              <TabsTrigger value="findability" className="font-body">
+                Findability
+              </TabsTrigger>
+              <TabsTrigger value="readiness" className="font-body">
+                Life Readiness
+              </TabsTrigger>
             </TabsList>
             {scores.map((score) => (
               <TabsContent key={score.id} value={score.id}>
@@ -98,12 +103,12 @@ const Solution = () => {
 };
 
 interface ScoreCardProps {
-  score: typeof scores[0];
+  score: (typeof scores)[0];
 }
 
 const ScoreCard = ({ score }: ScoreCardProps) => {
   const BadgeIcon = score.badgeIcon;
-  
+
   return (
     <Card className="border-border/50 shadow-card hover:shadow-elevated transition-all h-full">
       <CardHeader>
@@ -122,13 +127,11 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
             <p className="font-body text-sm text-muted-foreground mt-1">{score.time}</p>
           </div>
         </div>
-        <CardDescription className="font-display text-lg text-primary italic">
-          "{score.question}"
-        </CardDescription>
+        <CardDescription className="font-display text-lg text-primary italic">"{score.question}"</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="font-body text-muted-foreground leading-relaxed">{score.focus}</p>
-        
+
         <ul className="space-y-2">
           {score.features.map((feature, index) => (
             <li key={index} className="flex items-center gap-2">
