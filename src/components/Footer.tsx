@@ -26,17 +26,10 @@ const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
           {/* Brand Column */}
           <div className="lg:col-span-2">
-            <img 
-              src={logo} 
-              alt="Rest Easy" 
-              className="h-12 w-auto brightness-0 invert opacity-90 mb-6"
-            />
+            <img src={logo} alt="Rest Easy" className="h-12 w-auto brightness-0 invert opacity-90 mb-6" />
             <p className="font-body text-primary-foreground/70 leading-relaxed max-w-sm mb-6">
               Life readiness for every family. Organize, protect, and share what matters most.
             </p>
-            <Button variant="outline" className="font-body border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10">
-              Get Started Free
-            </Button>
           </div>
 
           {/* Product Links */}
@@ -45,7 +38,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.href + link.label}>
-                  <a 
+                  <a
                     href={link.href}
                     className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
                   >
@@ -62,7 +55,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.href + link.label}>
-                  <a 
+                  <a
                     href={link.href}
                     className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
                   >
@@ -79,7 +72,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.href + link.label}>
-                  <a 
+                  <a
                     href={link.href}
                     className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
                   >
@@ -97,9 +90,7 @@ const Footer = () => {
           <p className="font-body text-sm text-primary-foreground/50">
             © {new Date().getFullYear()} Rest Easy. All rights reserved.
           </p>
-          <p className="font-body text-sm text-primary-foreground/50">
-            Made with care for families everywhere.
-          </p>
+          <p className="font-body text-sm text-primary-foreground/50">Made with care for families everywhere.</p>
         </div>
       </div>
     </footer>
