@@ -5,14 +5,14 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Shield, Heart } from "lucide-react";
 import { AnimatedSection, AnimatedItem } from "@/hooks/useScrollAnimation";
 import heartIcon from "@/assets/rest-easy-heart.png";
-
 const Hero = () => {
-  return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero pt-20">
+  return <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-hero pt-20">
       {/* Decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 right-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 left-10 w-80 h-80 bg-accent/30 rounded-full blur-3xl animate-float" style={{ animationDelay: "2s" }} />
+        <div className="absolute bottom-20 left-10 w-80 h-80 bg-accent/30 rounded-full blur-3xl animate-float" style={{
+        animationDelay: "2s"
+      }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-mint/10 rounded-full blur-3xl" />
       </div>
 
@@ -30,7 +30,7 @@ const Hero = () => {
             <AnimatedItem animation="fade-up" delay={100}>
               <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
                 So the people you love aren't left{" "}
-                <span className="text-primary">guessing</span>
+                <span className="text-primary">Rest Easy</span>
               </h1>
             </AnimatedItem>
 
@@ -77,15 +77,13 @@ const Hero = () => {
               
               {/* Heart logo */}
               <div className="relative animate-float">
-                <img 
-                  src={heartIcon} 
-                  alt="Rest Easy Heart" 
-                  className="w-64 h-64 lg:w-80 lg:h-80 object-contain drop-shadow-2xl"
-                />
+                <img src={heartIcon} alt="Rest Easy Heart" className="w-64 h-64 lg:w-80 lg:h-80 object-contain drop-shadow-2xl" />
               </div>
 
               {/* Floating cards */}
-              <Card className="absolute -top-4 -left-8 shadow-card animate-float border-border/50" style={{ animationDelay: "1s" }}>
+              <Card className="absolute -top-4 -left-8 shadow-card animate-float border-border/50" style={{
+              animationDelay: "1s"
+            }}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -102,7 +100,9 @@ const Hero = () => {
                 </CardContent>
               </Card>
 
-              <Card className="absolute -bottom-4 -right-8 shadow-card animate-float border-border/50" style={{ animationDelay: "3s" }}>
+              <Card className="absolute -bottom-4 -right-8 shadow-card animate-float border-border/50" style={{
+              animationDelay: "3s"
+            }}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
@@ -119,8 +119,6 @@ const Hero = () => {
           </AnimatedItem>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default Hero;
