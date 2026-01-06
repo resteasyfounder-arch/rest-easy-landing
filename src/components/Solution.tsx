@@ -23,7 +23,7 @@ const scores = [
     id: "readiness",
     icon: Activity,
     title: "Life Readiness Score",
-    question: "Is your life actually ready beyond just finding things?",
+    question: "See your strengths and gaps across all nine areas",
     time: "20-40 minutes (incremental)",
     focus: "Measures sustained preparedness — roles defined, documents in place, gaps prioritized",
     cta: "Life changes. Your readiness should keep up.",
@@ -57,11 +57,17 @@ const Solution = () => {
         <div className="lg:hidden max-w-md mx-auto">
           <Tabs defaultValue="findability" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6 h-12">
-              <TabsTrigger value="findability" className="font-body data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger
+                value="findability"
+                className="font-body data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
                 <Search className="w-4 h-4 mr-2" />
                 Findability
               </TabsTrigger>
-              <TabsTrigger value="readiness" className="font-body data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger
+                value="readiness"
+                className="font-body data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
                 <Activity className="w-4 h-4 mr-2" />
                 Life Readiness
               </TabsTrigger>
@@ -125,7 +131,9 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
   const BadgeIcon = score.badgeIcon;
 
   return (
-    <Card className={`border-border/50 shadow-card hover:shadow-elevated transition-all h-full relative overflow-hidden ${score.isPrimary ? 'ring-2 ring-primary/20' : ''}`}>
+    <Card
+      className={`border-border/50 shadow-card hover:shadow-elevated transition-all h-full relative overflow-hidden ${score.isPrimary ? "ring-2 ring-primary/20" : ""}`}
+    >
       {score.isPrimary && (
         <div className="absolute top-0 right-0">
           <div className="bg-primary text-primary-foreground text-xs font-body font-medium px-3 py-1 rounded-bl-lg flex items-center gap-1">
@@ -134,14 +142,20 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
           </div>
         </div>
       )}
-      
+
       <CardHeader className="pb-4">
         <div className="flex items-start gap-4 mb-3">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${score.isPrimary ? 'bg-gradient-sage' : 'bg-muted'}`}>
-            <score.icon className={`w-8 h-8 ${score.isPrimary ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+          <div
+            className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${score.isPrimary ? "bg-gradient-sage" : "bg-muted"}`}
+          >
+            <score.icon
+              className={`w-8 h-8 ${score.isPrimary ? "text-primary-foreground" : "text-muted-foreground"}`}
+            />
           </div>
           <div className="flex-1 pt-1">
-            <Badge className={`mb-2 border-0 font-body text-xs ${score.isPrimary ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+            <Badge
+              className={`mb-2 border-0 font-body text-xs ${score.isPrimary ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+            >
               <BadgeIcon className="w-3 h-3 mr-1" />
               {score.badge}
             </Badge>
@@ -153,12 +167,12 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
           {score.time}
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-5">
         <CardDescription className="font-display text-lg text-primary italic border-l-2 border-primary/30 pl-4">
           "{score.question}"
         </CardDescription>
-        
+
         <p className="font-body text-muted-foreground leading-relaxed">{score.focus}</p>
 
         <ul className="space-y-3">
@@ -188,7 +202,11 @@ const ScoreCard = ({ score }: ScoreCardProps) => {
             </a>
           </Button>
         ) : (
-          <Button className="w-full font-body bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border" size="lg" asChild>
+          <Button
+            className="w-full font-body bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border"
+            size="lg"
+            asChild
+          >
             <a href="/login">
               Sign Up or Log In
               <ArrowRight className="ml-2 w-4 h-4" />
