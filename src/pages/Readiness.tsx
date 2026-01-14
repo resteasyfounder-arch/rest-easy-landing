@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import AssessmentProgress from "@/components/assessment/AssessmentProgress";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ArrowLeft, X, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
 
 type AnswerValue = "yes" | "partial" | "no" | "not_sure" | "na";
 
@@ -124,9 +127,6 @@ const setNestedValue = (
 };
 
 const getAgentUrl = () => {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.");
-  }
   return `${SUPABASE_URL}/functions/v1/agent`;
 };
 
@@ -149,7 +149,78 @@ const callAgent = async (payload: Record<string, unknown>) => {
   return data;
 };
 
+// Loading skeleton component
+const LoadingSkeleton = () => (
+  <AppLayout hideBottomNav>
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="px-4 py-4 border-b border-border/50 flex items-center justify-between">
+        <Skeleton className="h-10 w-16" />
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-10 w-10" />
+      </header>
+      <div className="px-6 py-2">
+        <Skeleton className="h-2 w-full rounded-full" />
+      </div>
+      <main className="flex-1 px-6 py-8 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-3/4" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+        </div>
+      </main>
+      <footer className="px-6 py-5 border-t border-border/50">
+        <Skeleton className="h-12 w-full rounded-md" />
+      </footer>
+    </div>
+  </AppLayout>
+);
+
+// Error state component
+const ErrorState = ({ 
+  error, 
+  onRetry, 
+  onExit 
+}: { 
+  error: string; 
+  onRetry: () => void; 
+  onExit: () => void;
+}) => (
+  <AppLayout hideBottomNav>
+    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
+      <div className="text-center space-y-6 max-w-sm">
+        <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-destructive" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="font-display text-2xl font-semibold text-foreground">
+            Unable to load assessment
+          </h1>
+          <p className="text-muted-foreground font-body text-sm leading-relaxed">
+            {error}
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Button onClick={onRetry} className="w-full gap-2">
+            <RefreshCw className="w-4 h-4" />
+            Try Again
+          </Button>
+          <Button variant="outline" onClick={onExit} className="w-full">
+            Go Back Home
+          </Button>
+        </div>
+      </div>
+    </div>
+  </AppLayout>
+);
+
 const Readiness = () => {
+  const navigate = useNavigate();
   const [schema, setSchema] = useState<Schema | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -181,39 +252,39 @@ const Readiness = () => {
   const [saving, setSaving] = useState(false);
   const [scoreSaved, setScoreSaved] = useState(false);
 
-  useEffect(() => {
-    const bootstrap = async () => {
-      setLoading(true);
-      setFatalError(null);
-      try {
-        const [schemaResponse, sessionResponse] = await Promise.all([
-          callAgent({
-            action: "get_schema",
-            assessment_id: ASSESSMENT_ID,
-            schema_version: SCHEMA_VERSION,
-          }),
-          callAgent({
-            subject_id: subjectId ?? undefined,
-            assessment_id: ASSESSMENT_ID,
-          }),
-        ]);
+  const bootstrap = useCallback(async () => {
+    setLoading(true);
+    setFatalError(null);
+    try {
+      const [schemaResponse, sessionResponse] = await Promise.all([
+        callAgent({
+          action: "get_schema",
+          assessment_id: ASSESSMENT_ID,
+          schema_version: SCHEMA_VERSION,
+        }),
+        callAgent({
+          subject_id: subjectId ?? undefined,
+          assessment_id: ASSESSMENT_ID,
+        }),
+      ]);
 
-        setSchema(schemaResponse.schema as Schema);
-        if (sessionResponse?.subject_id) {
-          setSubjectId(sessionResponse.subject_id);
-          localStorage.setItem(STORAGE_KEYS.subjectId, sessionResponse.subject_id);
-        }
-        if (sessionResponse?.assessment_id) {
-          setAssessmentId(sessionResponse.assessment_id);
-          localStorage.setItem(STORAGE_KEYS.assessmentId, sessionResponse.assessment_id);
-        }
-      } catch (err) {
-        setFatalError(err instanceof Error ? err.message : "Unable to load readiness.");
-      } finally {
-        setLoading(false);
+      setSchema(schemaResponse.schema as Schema);
+      if (sessionResponse?.subject_id) {
+        setSubjectId(sessionResponse.subject_id);
+        localStorage.setItem(STORAGE_KEYS.subjectId, sessionResponse.subject_id);
       }
-    };
+      if (sessionResponse?.assessment_id) {
+        setAssessmentId(sessionResponse.assessment_id);
+        localStorage.setItem(STORAGE_KEYS.assessmentId, sessionResponse.assessment_id);
+      }
+    } catch (err) {
+      setFatalError(err instanceof Error ? err.message : "Unable to load readiness.");
+    } finally {
+      setLoading(false);
+    }
+  }, [subjectId]);
 
+  useEffect(() => {
     bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -264,27 +335,43 @@ const Readiness = () => {
     return schema.profile_questions.length + applicableQuestions.length;
   }, [schema, applicableQuestions]);
 
-  const getNextStepId = useCallback(() => {
-    if (!schema) {
+  const getNextStepId = useCallback(
+    (
+      currentProfileAnswers: Record<string, "yes" | "no">,
+      currentAnswers: Record<string, AnswerRecord>,
+      currentProfile: Record<string, unknown>
+    ) => {
+      if (!schema) {
+        return null;
+      }
+
+      const nextProfile = schema.profile_questions.find(
+        (question) => !currentProfileAnswers[question.id]
+      );
+      if (nextProfile) {
+        return `profile:${nextProfile.id}`;
+      }
+
+      // Recalculate applicable questions with current state
+      const currentAnswerValues = Object.fromEntries(
+        Object.entries(currentAnswers).map(([key, value]) => [key, value.answer_value])
+      ) as Record<string, AnswerValue>;
+
+      const currentApplicable = schema.questions.filter((question) =>
+        evaluateCondition(question.applies_if, currentProfile, currentAnswerValues)
+      );
+
+      const nextQuestion = currentApplicable.find(
+        (question) => !currentAnswers[question.id]
+      );
+      if (nextQuestion) {
+        return `question:${nextQuestion.id}`;
+      }
+
       return null;
-    }
-
-    const nextProfile = schema.profile_questions.find(
-      (question) => !profileAnswers[question.id]
-    );
-    if (nextProfile) {
-      return `profile:${nextProfile.id}`;
-    }
-
-    const nextQuestion = applicableQuestions.find(
-      (question) => !answers[question.id]
-    );
-    if (nextQuestion) {
-      return `question:${nextQuestion.id}`;
-    }
-
-    return null;
-  }, [schema, profileAnswers, applicableQuestions, answers]);
+    },
+    [schema]
+  );
 
   const isStepApplicable = useCallback(
     (stepId: string) => {
@@ -312,11 +399,11 @@ const Readiness = () => {
       return;
     }
     if (!currentStepId) {
-      setCurrentStepId(getNextStepId());
+      setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
       return;
     }
     if (!isStepApplicable(currentStepId)) {
-      setCurrentStepId(getNextStepId());
+      setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
     }
   }, [
     schema,
@@ -324,6 +411,7 @@ const Readiness = () => {
     currentStepId,
     profileAnswers,
     answers,
+    profile,
     applicableQuestions,
     getNextStepId,
     isStepApplicable,
@@ -387,15 +475,19 @@ const Readiness = () => {
     setSaving(true);
     setSaveError(null);
     try {
+      let nextProfileAnswers = profileAnswers;
+      let nextProfile = profile;
+      let nextAnswers = answers;
+
       if (currentStepId.startsWith("profile:") && currentProfileQuestion) {
         const mapped = currentProfileQuestion.value_map[
           pendingValue as "yes" | "no"
         ];
-        const nextProfileAnswers = {
+        nextProfileAnswers = {
           ...profileAnswers,
           [currentProfileQuestion.id]: pendingValue as "yes" | "no",
         };
-        const nextProfile = setNestedValue(profile, currentProfileQuestion.field, mapped);
+        nextProfile = setNestedValue(profile, currentProfileQuestion.field, mapped);
         setProfileAnswers(nextProfileAnswers);
         setProfile(nextProfile);
 
@@ -429,7 +521,7 @@ const Readiness = () => {
           question_text: currentQuestion.prompt,
           question_meta: currentQuestion.question_meta,
         };
-        const nextAnswers = { ...answers, [currentQuestion.id]: answerRecord };
+        nextAnswers = { ...answers, [currentQuestion.id]: answerRecord };
         setAnswers(nextAnswers);
 
         if (subjectId) {
@@ -442,7 +534,9 @@ const Readiness = () => {
       }
 
       setStepHistory((prev) => [...prev, currentStepId]);
-      setCurrentStepId(getNextStepId());
+      // Use the updated state for finding the next step
+      const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
+      setCurrentStepId(nextStep);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Unable to save response.");
     } finally {
@@ -454,16 +548,14 @@ const Readiness = () => {
     if (stepHistory.length === 0) {
       return;
     }
-    for (let i = stepHistory.length - 1; i >= 0; i -= 1) {
-      const candidate = stepHistory[i];
-      if (isStepApplicable(candidate)) {
-        setStepHistory(stepHistory.slice(0, i));
-        setCurrentStepId(candidate);
-        return;
-      }
-    }
-    setStepHistory([]);
-    setCurrentStepId(getNextStepId());
+    // Go back to the previous step in history
+    const previousStep = stepHistory[stepHistory.length - 1];
+    setStepHistory(stepHistory.slice(0, -1));
+    setCurrentStepId(previousStep);
+  };
+
+  const handleExit = () => {
+    navigate("/");
   };
 
   const resetFlow = () => {
@@ -545,28 +637,16 @@ const Readiness = () => {
   }, [isComplete, results, subjectId, scoreSaved]);
 
   if (loading) {
-    return (
-      <AppLayout hideBottomNav>
-        <div className="min-h-screen flex items-center justify-center">
-          <p className="text-muted-foreground font-body">Loading readiness assessment...</p>
-        </div>
-      </AppLayout>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (fatalError) {
     return (
-      <AppLayout hideBottomNav>
-        <div className="min-h-screen flex items-center justify-center px-6">
-          <div className="text-center space-y-3">
-            <h1 className="font-display text-2xl font-semibold text-foreground">
-              Unable to load assessment
-            </h1>
-            <p className="text-muted-foreground font-body">{fatalError}</p>
-            <Button onClick={() => window.location.reload()}>Try Again</Button>
-          </div>
-        </div>
-      </AppLayout>
+      <ErrorState 
+        error={fatalError} 
+        onRetry={bootstrap} 
+        onExit={handleExit} 
+      />
     );
   }
 
@@ -578,7 +658,14 @@ const Readiness = () => {
     <AppLayout hideBottomNav>
       <div className="min-h-screen flex flex-col bg-background">
         <header className="px-4 py-4 border-b border-border/50 flex items-center justify-between">
-          <Button variant="ghost" onClick={handleBack} disabled={stepHistory.length === 0}>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={handleBack} 
+            disabled={stepHistory.length === 0}
+            className="gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
           <div className="text-center">
@@ -586,7 +673,14 @@ const Readiness = () => {
               Life Readiness
             </p>
           </div>
-          <div className="w-16" />
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleExit}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-5 h-5" />
+          </Button>
         </header>
 
         {currentStepId && totalSteps > 0 && (
@@ -595,7 +689,7 @@ const Readiness = () => {
 
         <main className="flex-1 px-6 py-8">
           {currentProfileQuestion && (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
                 <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
                   Profile Setup
@@ -605,6 +699,7 @@ const Readiness = () => {
                 </h2>
               </div>
               <RadioGroup
+                key={`profile-${currentProfileQuestion.id}`}
                 value={pendingValue ?? ""}
                 onValueChange={setPendingValue}
                 className="space-y-3"
@@ -613,10 +708,10 @@ const Readiness = () => {
                   <label
                     key={option.value}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border border-border/60 px-4 py-3 transition-colors",
+                      "flex items-center gap-3 rounded-lg border border-border/60 px-4 py-3 transition-all cursor-pointer",
                       pendingValue === option.value
-                        ? "border-primary/50 bg-primary/5"
-                        : "hover:border-primary/30"
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "hover:border-primary/30 hover:bg-muted/30"
                     )}
                   >
                     <RadioGroupItem value={option.value} />
@@ -625,13 +720,16 @@ const Readiness = () => {
                 ))}
               </RadioGroup>
               {saveError && (
-                <p className="text-sm text-destructive font-body">{saveError}</p>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                  <p className="text-sm text-destructive font-body">{saveError}</p>
+                </div>
               )}
             </div>
           )}
 
           {currentQuestion && (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
                 {currentSection && (
                   <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
@@ -643,18 +741,19 @@ const Readiness = () => {
                 </h2>
               </div>
               <RadioGroup
+                key={`question-${currentQuestion.id}`}
                 value={pendingValue ?? ""}
                 onValueChange={setPendingValue}
                 className="space-y-3"
               >
                 {currentQuestion.options.map((option) => (
                   <label
-                    key={`${currentQuestion.id}-${option.value}`}
+                    key={option.value}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border border-border/60 px-4 py-3 transition-colors",
+                      "flex items-center gap-3 rounded-lg border border-border/60 px-4 py-3 transition-all cursor-pointer",
                       pendingValue === option.value
-                        ? "border-primary/50 bg-primary/5"
-                        : "hover:border-primary/30"
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "hover:border-primary/30 hover:bg-muted/30"
                     )}
                   >
                     <RadioGroupItem value={option.value} />
@@ -663,13 +762,16 @@ const Readiness = () => {
                 ))}
               </RadioGroup>
               {saveError && (
-                <p className="text-sm text-destructive font-body">{saveError}</p>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                  <p className="text-sm text-destructive font-body">{saveError}</p>
+                </div>
               )}
             </div>
           )}
 
           {isComplete && results && (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
               <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
                 <CardHeader>
                   <CardTitle className="font-display text-lg">
@@ -709,9 +811,14 @@ const Readiness = () => {
                 })}
               </div>
 
-              <Button variant="outline" onClick={resetFlow} className="w-full">
-                Start Over
-              </Button>
+              <div className="flex flex-col gap-3 pt-4">
+                <Button variant="outline" onClick={resetFlow} className="w-full">
+                  Start Over
+                </Button>
+                <Button variant="ghost" onClick={handleExit} className="w-full">
+                  Return Home
+                </Button>
+              </div>
             </div>
           )}
         </main>
@@ -720,10 +827,11 @@ const Readiness = () => {
           <footer className="px-6 py-5 border-t border-border/50 bg-background">
             <Button
               size="lg"
-              className="w-full font-body"
+              className="w-full font-body gap-2"
               onClick={handleContinue}
               disabled={!pendingValue || saving}
             >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {saving ? "Saving..." : "Continue"}
             </Button>
           </footer>
