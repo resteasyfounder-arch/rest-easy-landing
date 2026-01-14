@@ -13,6 +13,7 @@ interface DesktopLayoutProps {
 const routeTitles: Record<string, string> = {
   "/": "Home",
   "/assessment": "Findability Score",
+  "/readiness": "Life Readiness",
   "/results": "Your Results",
   "/menu": "Settings",
   "/login": "Sign In",

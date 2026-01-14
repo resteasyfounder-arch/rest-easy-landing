@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/AuthContext";
-import { ClipboardList, TrendingUp, FileText, LogOut } from "lucide-react";
+import { ClipboardList, TrendingUp, FileText, LogOut, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 
@@ -44,7 +44,7 @@ const Dashboard = () => {
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card className="hover:border-primary/50 transition-colors cursor-pointer">
             <CardContent className="p-6 flex flex-col items-center text-center gap-3">
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -56,6 +56,21 @@ const Dashboard = () => {
               </p>
               <Button asChild variant="outline" size="sm">
                 <Link to="/assessment">Start</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+            <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-display font-semibold">Life Readiness</h3>
+              <p className="text-sm text-muted-foreground font-body">
+                Complete your full readiness assessment
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/readiness">Start</Link>
               </Button>
             </CardContent>
           </Card>
