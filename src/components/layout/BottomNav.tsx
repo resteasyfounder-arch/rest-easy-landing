@@ -26,14 +26,26 @@ const BottomNav = () => {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 px-4 py-2 min-w-[64px] touch-target press-effect transition-colors",
+                "relative flex flex-col items-center justify-center gap-1 px-4 py-2 min-w-[64px] touch-target press-effect transition-all duration-200",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
-              <span className="text-xs font-medium font-body">{item.label}</span>
+              {/* Active indicator pill */}
+              <div className={cn(
+                "absolute -top-1 left-1/2 -translate-x-1/2 h-1 rounded-full bg-primary transition-all duration-300 ease-out",
+                isActive ? "w-8 opacity-100" : "w-0 opacity-0"
+              )} />
+              
+              <Icon className={cn(
+                "h-5 w-5 transition-all duration-200",
+                isActive && "stroke-[2.5] scale-110"
+              )} />
+              <span className={cn(
+                "text-xs font-body transition-all duration-200",
+                isActive ? "font-semibold" : "font-medium"
+              )}>{item.label}</span>
             </button>
           );
         })}
