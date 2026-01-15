@@ -1,4 +1,4 @@
-import { Sparkles, Clock, UserCircle } from "lucide-react";
+import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ProfileIntroProps {
@@ -9,51 +9,29 @@ interface ProfileIntroProps {
 const ProfileIntro = ({ totalQuestions, onStart }: ProfileIntroProps) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center animate-fade-up">
-      {/* Icon */}
-      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-        <UserCircle className="w-10 h-10 text-primary" />
+      {/* Icon - warm and human */}
+      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-8">
+        <Heart className="w-10 h-10 text-primary" />
       </div>
 
-      {/* Heading */}
-      <h1 className="font-display text-3xl font-semibold text-foreground mb-3">
-        Let's Personalize Your Assessment
+      {/* Heading - personal, not procedural */}
+      <h1 className="font-display text-3xl font-semibold text-foreground mb-4">
+        Before we begin
       </h1>
 
-      {/* Description */}
-      <p className="font-body text-muted-foreground text-base leading-relaxed max-w-sm mb-8">
-        We'll ask a few quick questions about your situation to customize the assessment for you.
+      {/* Description - warm, reassuring, human */}
+      <p className="font-body text-muted-foreground text-lg leading-relaxed max-w-sm mb-4">
+        We'd like to understand a little about your life — your family, your home, what matters to you.
       </p>
 
-      {/* Info cards */}
-      <div className="w-full max-w-sm space-y-3 mb-8">
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50 border border-border/50">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Clock className="w-5 h-5 text-primary" />
-          </div>
-          <div className="text-left">
-            <p className="font-body text-sm font-medium text-foreground">
-              {totalQuestions} quick questions
-            </p>
-            <p className="font-body text-xs text-muted-foreground">
-              About 1-2 minutes to complete
-            </p>
-          </div>
-        </div>
+      <p className="font-body text-muted-foreground text-base leading-relaxed max-w-sm mb-8">
+        There are no right or wrong answers. Just answer honestly, and skip anything that doesn't feel relevant.
+      </p>
 
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50 border border-border/50">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5 text-primary" />
-          </div>
-          <div className="text-left">
-            <p className="font-body text-sm font-medium text-foreground">
-              Personalized experience
-            </p>
-            <p className="font-body text-xs text-muted-foreground">
-              Questions tailored to your situation
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Helper text - reassuring */}
+      <p className="font-body text-sm text-muted-foreground/70 mb-6">
+        Takes about a minute. You can always change your answers later.
+      </p>
 
       {/* CTA Button */}
       <Button
@@ -61,7 +39,7 @@ const ProfileIntro = ({ totalQuestions, onStart }: ProfileIntroProps) => {
         onClick={onStart}
         className="w-full max-w-sm font-body press-effect"
       >
-        Get Started
+        Let's Begin
       </Button>
     </div>
   );
