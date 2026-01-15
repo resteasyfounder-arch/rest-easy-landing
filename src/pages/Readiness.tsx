@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
-import AssessmentProgress from "@/components/assessment/AssessmentProgress";
+import ProfileIntro from "@/components/assessment/ProfileIntro";
+import ProfileReview from "@/components/assessment/ProfileReview";
+import ReadinessProgress from "@/components/assessment/ReadinessProgress";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, X, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
+
+type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "complete";
 
 type AnswerValue = "yes" | "partial" | "no" | "not_sure" | "na";
 
@@ -78,6 +82,7 @@ const STORAGE_KEYS = {
   profile: "rest-easy.readiness.profile_json",
   profileAnswers: "rest-easy.readiness.profile_answers",
   answers: "rest-easy.readiness.answers",
+  flowPhase: "rest-easy.readiness.flow_phase",
 };
 
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
@@ -226,6 +231,12 @@ const Readiness = () => {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Flow phase state
+  const [flowPhase, setFlowPhase] = useState<FlowPhase>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.flowPhase);
+    return (stored as FlowPhase) || "intro";
+  });
+
   const [subjectId, setSubjectId] = useState<string | null>(
     localStorage.getItem(STORAGE_KEYS.subjectId)
   );
@@ -251,6 +262,11 @@ const Readiness = () => {
   const [pendingValue, setPendingValue] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [scoreSaved, setScoreSaved] = useState(false);
+
+  // Persist flow phase
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.flowPhase, flowPhase);
+  }, [flowPhase]);
 
   const bootstrap = useCallback(async () => {
     setLoading(true);
@@ -328,12 +344,17 @@ const Readiness = () => {
     return Object.keys(answers).filter((key) => applicableIds.has(key)).length;
   }, [answers, applicableQuestions]);
 
-  const totalSteps = useMemo(() => {
-    if (!schema) {
-      return 0;
-    }
-    return schema.profile_questions.length + applicableQuestions.length;
-  }, [schema, applicableQuestions]);
+  // Progress calculations
+  const profileProgress = useMemo(() => {
+    if (!schema || schema.profile_questions.length === 0) return 0;
+    const completed = Object.keys(profileAnswers).length;
+    return Math.round((completed / schema.profile_questions.length) * 100);
+  }, [schema, profileAnswers]);
+
+  const assessmentProgress = useMemo(() => {
+    if (applicableQuestions.length === 0) return 0;
+    return Math.round((completedQuestionCount / applicableQuestions.length) * 100);
+  }, [applicableQuestions.length, completedQuestionCount]);
 
   const getNextStepId = useCallback(
     (
@@ -394,29 +415,39 @@ const Readiness = () => {
     [schema, profile, answerValues]
   );
 
+  // Initialize current step when entering profile or assessment phase
   useEffect(() => {
     if (!schema || loading) {
       return;
     }
-    if (!currentStepId) {
-      setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
-      return;
+
+    if (flowPhase === "profile" && !currentStepId) {
+      const firstProfileStep = schema.profile_questions[0];
+      if (firstProfileStep) {
+        setCurrentStepId(`profile:${firstProfileStep.id}`);
+      }
     }
-    if (!isStepApplicable(currentStepId)) {
+
+    if (flowPhase === "assessment" && !currentStepId) {
+      setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
+    }
+
+    if (currentStepId && !isStepApplicable(currentStepId)) {
       setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
     }
   }, [
     schema,
     loading,
+    flowPhase,
     currentStepId,
     profileAnswers,
     answers,
     profile,
-    applicableQuestions,
     getNextStepId,
     isStepApplicable,
   ]);
 
+  // Update pending value when step changes
   useEffect(() => {
     if (!currentStepId) {
       setPendingValue(null);
@@ -432,17 +463,6 @@ const Readiness = () => {
       setPendingValue(answers[id]?.answer_value ?? null);
     }
   }, [currentStepId, profileAnswers, answers]);
-
-  const currentStepIndex = useMemo(() => {
-    if (!schema || totalSteps === 0) {
-      return 0;
-    }
-    const completedProfile = Object.keys(profileAnswers).length;
-    const completed = profileComplete
-      ? schema.profile_questions.length + completedQuestionCount
-      : completedProfile;
-    return Math.min(completed, totalSteps - 1);
-  }, [schema, totalSteps, profileAnswers, profileComplete, completedQuestionCount]);
 
   const currentProfileQuestion = useMemo(() => {
     if (!schema || !currentStepId?.startsWith("profile:")) {
@@ -466,6 +486,38 @@ const Readiness = () => {
     }
     return schema.sections.find((section) => section.id === currentQuestion.section_id) ?? null;
   }, [schema, currentQuestion]);
+
+  // Profile review data
+  const profileReviewData = useMemo(() => {
+    if (!schema) return [];
+    return schema.profile_questions
+      .filter((q) => profileAnswers[q.id])
+      .map((q) => {
+        const answerValue = profileAnswers[q.id];
+        const option = q.options.find((o) => o.value === answerValue);
+        return {
+          questionId: q.id,
+          question: q.prompt,
+          answer: option?.label || answerValue,
+        };
+      });
+  }, [schema, profileAnswers]);
+
+  const handleStartProfile = () => {
+    setFlowPhase("profile");
+  };
+
+  const handleContinueToAssessment = () => {
+    setFlowPhase("assessment");
+    setCurrentStepId(null);
+    setStepHistory([]);
+  };
+
+  const handleEditProfileQuestion = (questionId: string) => {
+    setCurrentStepId(`profile:${questionId}`);
+    setFlowPhase("profile");
+    setStepHistory([]);
+  };
 
   const handleContinue = async () => {
     if (!schema || !currentStepId || !pendingValue) {
@@ -501,6 +553,17 @@ const Readiness = () => {
             },
           });
         }
+
+        // Check if profile is now complete
+        const isProfileNowComplete = schema.profile_questions.every(
+          (q) => Boolean(nextProfileAnswers[q.id])
+        );
+
+        if (isProfileNowComplete) {
+          setFlowPhase("profile-review");
+          setCurrentStepId(null);
+          return;
+        }
       }
 
       if (currentStepId.startsWith("question:") && currentQuestion) {
@@ -534,9 +597,15 @@ const Readiness = () => {
       }
 
       setStepHistory((prev) => [...prev, currentStepId]);
-      // Use the updated state for finding the next step
       const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
-      setCurrentStepId(nextStep);
+      
+      if (nextStep) {
+        setCurrentStepId(nextStep);
+      } else {
+        // Assessment complete
+        setFlowPhase("complete");
+        setCurrentStepId(null);
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Unable to save response.");
     } finally {
@@ -546,9 +615,13 @@ const Readiness = () => {
 
   const handleBack = () => {
     if (stepHistory.length === 0) {
+      // If in profile phase with no history, go back to intro
+      if (flowPhase === "profile") {
+        setFlowPhase("intro");
+        setCurrentStepId(null);
+      }
       return;
     }
-    // Go back to the previous step in history
     const previousStep = stepHistory[stepHistory.length - 1];
     setStepHistory(stepHistory.slice(0, -1));
     setCurrentStepId(previousStep);
@@ -559,15 +632,14 @@ const Readiness = () => {
   };
 
   const resetFlow = () => {
-    localStorage.removeItem(STORAGE_KEYS.profile);
-    localStorage.removeItem(STORAGE_KEYS.profileAnswers);
-    localStorage.removeItem(STORAGE_KEYS.answers);
+    Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
     setProfile({});
     setProfileAnswers({});
     setAnswers({});
     setCurrentStepId(null);
     setStepHistory([]);
     setScoreSaved(false);
+    setFlowPhase("intro");
   };
 
   const results = useMemo(() => {
@@ -612,10 +684,9 @@ const Readiness = () => {
     return { overallScore, sectionScores };
   }, [schema, answers, applicableQuestions]);
 
-  const isComplete = profileComplete && currentStepId === null;
-
+  // Persist score when complete
   useEffect(() => {
-    if (!isComplete || !results || !subjectId || scoreSaved) {
+    if (flowPhase !== "complete" || !results || !subjectId || scoreSaved) {
       return;
     }
     const persistScore = async () => {
@@ -634,7 +705,7 @@ const Readiness = () => {
       }
     };
     persistScore();
-  }, [isComplete, results, subjectId, scoreSaved]);
+  }, [flowPhase, results, subjectId, scoreSaved]);
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -654,20 +725,29 @@ const Readiness = () => {
     return null;
   }
 
+  // Determine if we should show header back/exit buttons
+  const showNavigation = flowPhase !== "intro" && flowPhase !== "complete";
+  const canGoBack = stepHistory.length > 0 || flowPhase === "profile";
+
   return (
     <AppLayout hideBottomNav>
       <div className="min-h-screen flex flex-col bg-background">
+        {/* Header */}
         <header className="px-4 py-4 border-b border-border/50 flex items-center justify-between">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={handleBack} 
-            disabled={stepHistory.length === 0}
-            className="gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
+          {showNavigation ? (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleBack} 
+              disabled={!canGoBack}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Button>
+          ) : (
+            <div className="w-16" />
+          )}
           <div className="text-center">
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-body">
               Life Readiness
@@ -683,16 +763,42 @@ const Readiness = () => {
           </Button>
         </header>
 
-        {currentStepId && totalSteps > 0 && (
-          <AssessmentProgress currentStep={currentStepIndex} totalSteps={totalSteps} />
+        {/* Progress */}
+        {flowPhase !== "intro" && flowPhase !== "complete" && (
+          <ReadinessProgress
+            phase={flowPhase}
+            profileProgress={profileProgress}
+            assessmentProgress={assessmentProgress}
+          />
         )}
 
-        <main className="flex-1 px-6 py-8">
-          {currentProfileQuestion && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          {/* Intro Phase */}
+          {flowPhase === "intro" && (
+            <ProfileIntro
+              totalQuestions={schema.profile_questions.length}
+              onStart={handleStartProfile}
+            />
+          )}
+
+          {/* Profile Review Phase */}
+          {flowPhase === "profile-review" && (
+            <ProfileReview
+              answers={profileReviewData}
+              applicableQuestionCount={applicableQuestions.length}
+              totalQuestionCount={schema.questions.length}
+              onEdit={handleEditProfileQuestion}
+              onContinue={handleContinueToAssessment}
+            />
+          )}
+
+          {/* Profile Questions Phase */}
+          {flowPhase === "profile" && currentProfileQuestion && (
+            <div className="px-6 py-8 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
                 <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
-                  Profile Setup
+                  Profile Setup • Question {Object.keys(profileAnswers).length + 1} of {schema.profile_questions.length}
                 </p>
                 <h2 className="text-2xl font-display font-semibold text-foreground mt-2">
                   {currentProfileQuestion.prompt}
@@ -728,12 +834,13 @@ const Readiness = () => {
             </div>
           )}
 
-          {currentQuestion && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+          {/* Assessment Questions Phase */}
+          {flowPhase === "assessment" && currentQuestion && (
+            <div className="px-6 py-8 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
                 {currentSection && (
                   <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
-                    {currentSection.label}
+                    {currentSection.label} • Question {completedQuestionCount + 1} of {applicableQuestions.length}
                   </p>
                 )}
                 <h2 className="text-2xl font-display font-semibold text-foreground mt-2">
@@ -770,8 +877,9 @@ const Readiness = () => {
             </div>
           )}
 
-          {isComplete && results && (
-            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
+          {/* Complete Phase - Results */}
+          {flowPhase === "complete" && results && (
+            <div className="px-6 py-8 space-y-6 animate-in fade-in zoom-in-95 duration-500">
               <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
                 <CardHeader>
                   <CardTitle className="font-display text-lg">
@@ -823,7 +931,8 @@ const Readiness = () => {
           )}
         </main>
 
-        {!isComplete && (
+        {/* Footer - only for profile and assessment phases */}
+        {(flowPhase === "profile" || flowPhase === "assessment") && (
           <footer className="px-6 py-5 border-t border-border/50 bg-background">
             <Button
               size="lg"
