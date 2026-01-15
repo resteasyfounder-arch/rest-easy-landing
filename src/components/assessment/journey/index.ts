@@ -4,4 +4,5 @@ export { default as SectionNode } from "./SectionNode";
 export { default as JourneyHeader } from "./JourneyHeader";
 export { default as JourneyDrawer } from "./JourneyDrawer";
 export { default as AnimatedQuestionCard } from "./AnimatedQuestionCard";
+export { default as SectionComplete } from "./SectionComplete";
 export type { SectionStatus } from "./SectionNode";
