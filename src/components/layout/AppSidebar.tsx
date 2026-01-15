@@ -59,14 +59,18 @@ const AppSidebar = () => {
                     onClick={() => navigate(item.url)}
                     isActive={isActive(item.url)}
                     tooltip={item.title}
-                    className={`font-body transition-colors ${
+                    className={`font-body transition-all duration-200 ${
                       isActive(item.url) 
-                        ? "bg-primary/10 text-primary hover:bg-primary/15" 
-                        : "hover:bg-accent"
+                        ? "bg-primary/10 text-primary hover:bg-primary/15 shadow-sm shadow-primary/5" 
+                        : "hover:bg-accent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.title}</span>
+                    <item.icon className={`h-5 w-5 transition-transform duration-200 ${
+                      isActive(item.url) ? "scale-110" : ""
+                    }`} />
+                    <span className={`transition-all duration-200 ${
+                      isActive(item.url) ? "font-medium" : ""
+                    }`}>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
