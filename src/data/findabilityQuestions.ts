@@ -17,13 +17,24 @@ export interface FindabilityQuestion {
     no: string;
   };
   rescueMission: RescueMission;
+  // New metadata for the calming assessment experience
+  reflectionText?: Record<AnswerValue, string>;
+  pauseAfter?: boolean;
+  sectionEnd?: boolean;
 }
+
+// Answer options with warmer labels
+export const answerLabels: Record<AnswerValue, string> = {
+  yes: "Yes, I have this covered",
+  somewhat: "I'm working on it",
+  no: "Not yet",
+};
 
 export const findabilityQuestions: FindabilityQuestion[] = [
   {
     id: "someone-test",
-    question: "Is there at least one person who would know they're supposed to step in if something happened to you?",
-    whyWeAsk: "Having someone who knows they're your person can make all the difference when it matters most.",
+    question: "Is there someone who knows they'd be the one to step in if you couldn't?",
+    whyWeAsk: "Having someone who knows they're your person — that's the foundation everything else builds on.",
     riskLabel: "The right person may not know they're supposed to step in.",
     category: "access",
     categoryLabel: "Your Person",
@@ -40,11 +51,16 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Have the conversation about their role",
         "Document their contact information"
       ]
+    },
+    reflectionText: {
+      yes: "Having someone who knows — that's the foundation.",
+      somewhat: "Knowing who to ask is the first step.",
+      no: "Most people start exactly here."
     }
   },
   {
     id: "location-test",
-    question: "Would that person know where to look first to find your important information?",
+    question: "Would that person know where to look first for your important information?",
     whyWeAsk: "Even the most organized plans can fall apart if no one knows where to start looking.",
     riskLabel: "The right person may not know where to start looking.",
     category: "documents",
@@ -66,7 +82,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
   },
   {
     id: "access-test",
-    question: "Could that person actually access what they find (logins, passwords, physical access)?",
+    question: "Could that person actually access what they find — logins, passwords, keys?",
     whyWeAsk: "Knowing where something is and being able to use it are two very different things.",
     riskLabel: "The right person may find things but cannot actually access them.",
     category: "access",
@@ -84,11 +100,12 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Document where critical credentials live",
         "Test that your person can actually log in"
       ]
-    }
+    },
+    pauseAfter: true
   },
   {
     id: "document-reality",
-    question: "Are your most important documents stored somewhere intentionally — not just scattered across email, drawers, or devices?",
+    question: "Are your important documents stored somewhere on purpose — not scattered across email, drawers, or devices?",
     whyWeAsk: "A little intentional organization now saves a lot of stress for the people you care about.",
     riskLabel: "Important documents are scattered and hard to find under stress.",
     category: "documents",
@@ -106,15 +123,16 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Choose one secure central location",
         "Move or copy everything to that hub"
       ]
-    }
+    },
+    sectionEnd: true
   },
   {
     id: "healthcare-moment",
-    question: "If you were in an emergency room, could someone quickly show proof of who can speak for you medically?",
+    question: "If you were in an emergency room, could someone quickly show who can speak for you medically?",
     whyWeAsk: "In medical moments, having the right paperwork accessible can prevent delays and confusion.",
     riskLabel: "Medical decisions could be delayed when seconds matter most.",
     category: "healthcare",
-    categoryLabel: "Healthcare Access",
+    categoryLabel: "Healthcare Decisions",
     categoryIcon: "Heart",
     guidance: {
       yes: "This is huge. Having medical documents accessible can literally change outcomes in emergencies.",
@@ -128,15 +146,20 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Ensure your medical proxy has a copy",
         "Store a digital copy they can access instantly"
       ]
+    },
+    reflectionText: {
+      yes: "Having this ready can change outcomes when it matters most.",
+      somewhat: "The right document in the right hands — we'll help you get there.",
+      no: "This is one of the fastest things to set up."
     }
   },
   {
     id: "money-monday",
-    question: "Could someone pay critical bills or manage basic finances for the first few weeks without major confusion?",
+    question: "Could someone manage basic finances and pay critical bills for a few weeks without major confusion?",
     whyWeAsk: "Bills don't pause for difficult times. A little clarity here goes a long way.",
     riskLabel: "Critical bills could go unpaid, creating cascading problems.",
     category: "financial",
-    categoryLabel: "Financial Access",
+    categoryLabel: "Financial Basics",
     categoryIcon: "Wallet",
     guidance: {
       yes: "You've set things up so the lights stay on. That peace of mind is invaluable.",
@@ -150,7 +173,9 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Document account access information",
         "Set up authorized access for critical accounts"
       ]
-    }
+    },
+    pauseAfter: true,
+    sectionEnd: true
   },
   {
     id: "phone-problem",
@@ -158,7 +183,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
     whyWeAsk: "So much of our lives live on our devices now. It's worth thinking about a backup plan.",
     riskLabel: "Too much critical information is locked in inaccessible devices.",
     category: "digital",
-    categoryLabel: "Digital Backup",
+    categoryLabel: "Digital Access",
     categoryIcon: "Smartphone",
     guidance: {
       yes: "You've got a backup plan for your digital life. That's forward-thinking.",
@@ -176,7 +201,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
   },
   {
     id: "only-you-know",
-    question: "Are there important details only you know that others would struggle to figure out quickly?",
+    question: "Are there important details only you know that others would struggle to figure out?",
     whyWeAsk: "We all carry little details that would be hard for others to piece together. That's completely normal.",
     riskLabel: "Important details live only in your head and would be lost.",
     category: "documents",
@@ -194,7 +219,13 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Organize by category (accounts, contacts, preferences)",
         "Store securely where your person can access it"
       ]
-    }
+    },
+    reflectionText: {
+      yes: "Capturing what only you know — that's a gift.",
+      somewhat: "More lives in your head than you might realize.",
+      no: "We all carry things that aren't written down."
+    },
+    sectionEnd: true
   },
 ];
 
@@ -211,6 +242,21 @@ export const scoreTiers = {
   unclear: { min: 40, label: "Findability Unclear", color: "amber" },
   fragile: { min: 0, label: "Findability Fragile", color: "red" },
 } as const;
+
+// Section groupings for transitions
+export const sectionInfo: Record<string, { closingMessage: string; nextHint?: string }> = {
+  documents: {
+    closingMessage: "That brings clarity around your documents and access.",
+    nextHint: "Now let's look at healthcare and finances..."
+  },
+  financial: {
+    closingMessage: "You've thought through the financial basics.",
+    nextHint: "A few more questions about your digital life..."
+  },
+  digital: {
+    closingMessage: "That covers how people can reach what you've built digitally.",
+  }
+};
 
 export function calculateScore(answers: Record<string, AnswerValue>): number {
   const rawScore = Object.values(answers).reduce((sum, answer) => {

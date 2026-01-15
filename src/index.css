@@ -164,6 +164,53 @@
 }
 
 /* Smooth scroll */
+/* Assessment-specific utilities */
+.question-enter {
+  animation: question-enter 0.4s ease-out forwards;
+}
+
+@keyframes question-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reflection-enter {
+  animation: reflection-enter 0.5s ease-out forwards;
+}
+
+@keyframes reflection-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Breathing animation for pause screens */
+.breathing {
+  animation: breathing 3s ease-in-out infinite;
+}
+
+@keyframes breathing {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
