@@ -20,6 +20,7 @@ import {
   JourneyHeader,
   JourneyDrawer,
   AnimatedQuestionCard,
+  SectionComplete,
 } from "@/components/assessment/journey";
 
 type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "complete";
@@ -268,6 +269,8 @@ const Readiness = () => {
   const [lastSaved, setLastSaved] = useState(false);
   const [showJourneyDrawer, setShowJourneyDrawer] = useState(false);
   const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
+  const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
+  const [viewingCompletedSection, setViewingCompletedSection] = useState(false);
 
   // Persist flow phase
   useEffect(() => {
@@ -649,15 +652,38 @@ const Readiness = () => {
   const handleSectionClick = (sectionId: string) => {
     if (!schema) return;
     
+    setFocusedSectionId(sectionId);
+    setShowJourneyDrawer(false);
+    
     // Find the first unanswered question in that section
     const sectionQuestions = applicableQuestions.filter(q => q.section_id === sectionId);
     const firstUnanswered = sectionQuestions.find(q => !answers[q.id]);
     
     if (firstUnanswered) {
+      // Section has unanswered questions - go to first unanswered
+      setViewingCompletedSection(false);
       setCurrentStepId(`question:${firstUnanswered.id}`);
     } else if (sectionQuestions.length > 0) {
-      // If all answered, go to first question of section
+      // All questions answered - show section complete view
+      setViewingCompletedSection(true);
       setCurrentStepId(`question:${sectionQuestions[0].id}`);
+    }
+  };
+
+  // Continue from completed section to next incomplete section
+  const handleContinueFromCompletedSection = () => {
+    if (!schema) return;
+    
+    setViewingCompletedSection(false);
+    setFocusedSectionId(null);
+    
+    // Find next section with unanswered questions
+    const nextStep = getNextStepId(profileAnswers, answers, profile);
+    if (nextStep) {
+      setCurrentStepId(nextStep);
+    } else {
+      setFlowPhase("complete");
+      setCurrentStepId(null);
     }
   };
 
@@ -673,6 +699,39 @@ const Readiness = () => {
   };
 
   const handleBack = () => {
+    // If viewing completed section, just exit that view
+    if (viewingCompletedSection) {
+      setViewingCompletedSection(false);
+      setFocusedSectionId(null);
+      const nextStep = getNextStepId(profileAnswers, answers, profile);
+      if (nextStep) {
+        setCurrentStepId(nextStep);
+      }
+      return;
+    }
+
+    // If focused on a section, navigate within that section
+    if (focusedSectionId && currentQuestion) {
+      const sectionQuestions = applicableQuestions.filter(q => q.section_id === focusedSectionId);
+      const currentIndex = sectionQuestions.findIndex(q => q.id === currentQuestion.id);
+      
+      if (currentIndex > 0) {
+        // Go to previous question in this section
+        setCurrentStepId(`question:${sectionQuestions[currentIndex - 1].id}`);
+        return;
+      } else {
+        // At first question of focused section - exit section focus
+        setFocusedSectionId(null);
+        if (stepHistory.length > 0) {
+          const previousStep = stepHistory[stepHistory.length - 1];
+          setStepHistory(stepHistory.slice(0, -1));
+          setCurrentStepId(previousStep);
+        }
+        return;
+      }
+    }
+
+    // Default back behavior using step history
     if (stepHistory.length === 0) {
       if (flowPhase === "profile") {
         setFlowPhase("intro");
@@ -1037,16 +1096,22 @@ const Readiness = () => {
                 variant="ghost"
                 size="icon"
                 onClick={handleBack}
-                disabled={stepHistory.length === 0}
+                disabled={stepHistory.length === 0 && !focusedSectionId && !viewingCompletedSection}
                 className="touch-target press-effect"
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="text-center">
-                <p className="text-sm font-body text-muted-foreground">
-                  Question {currentQuestionIndex} of {applicableQuestions.length}
-                </p>
+                {viewingCompletedSection ? (
+                  <p className="text-sm font-body text-muted-foreground">
+                    {currentSection?.label} Complete
+                  </p>
+                ) : (
+                  <p className="text-sm font-body text-muted-foreground">
+                    Question {currentQuestionIndex} of {applicableQuestions.length}
+                  </p>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -1065,7 +1130,7 @@ const Readiness = () => {
                 variant="ghost"
                 size="icon"
                 onClick={handleBack}
-                disabled={stepHistory.length === 0}
+                disabled={stepHistory.length === 0 && !focusedSectionId && !viewingCompletedSection}
                 className="touch-target press-effect"
                 aria-label="Go back"
               >
@@ -1082,55 +1147,64 @@ const Readiness = () => {
               </Button>
             </header>
 
-            {/* Question Content */}
+            {/* Content Area */}
             <div className="flex-1 overflow-y-auto px-6 py-8 bg-gradient-hero">
-              <div className="max-w-lg mx-auto space-y-8">
-                {/* Section Label */}
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-primary font-medium uppercase tracking-wide">
-                    {currentSection?.label}
-                  </p>
-                  <p className="text-xs text-muted-foreground md:hidden">
-                    {currentQuestionIndex} of {applicableQuestions.length}
-                  </p>
-                </div>
-
-                <AnimatedQuestionCard 
-                  question={currentQuestion.prompt}
-                  questionKey={currentQuestion.id}
+              {viewingCompletedSection && currentSection ? (
+                <SectionComplete
+                  sectionId={currentSection.id}
+                  sectionLabel={currentSection.label}
+                  questionsCompleted={sectionProgress[currentSection.id]?.total || 0}
+                  onContinue={handleContinueFromCompletedSection}
                 />
-
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option, index) => (
-                    <AnswerButton
-                      key={`${option.value}-${index}`}
-                      label={option.label}
-                      selected={answers[currentQuestion.id]?.answer_value === option.value}
-                      showConfirmation={recentlySelected === `question:${currentQuestion.id}:${option.value}`}
-                      onClick={() => {
-                        setRecentlySelected(`question:${currentQuestion.id}:${option.value}`);
-                        setTimeout(() => setRecentlySelected(null), 500);
-                        handleAnswer(option.value);
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <SkipButton onClick={handleSkip} />
-                  <AutosaveIndicator show={lastSaved} />
-                </div>
-
-                {saveError && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                    <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-                    <p className="text-sm text-destructive font-body">{saveError}</p>
+              ) : (
+                <div className="max-w-lg mx-auto space-y-8">
+                  {/* Section Label */}
+                  <div className="text-center space-y-2">
+                    <p className="text-sm text-primary font-medium uppercase tracking-wide">
+                      {currentSection?.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground md:hidden">
+                      {currentQuestionIndex} of {applicableQuestions.length}
+                    </p>
                   </div>
-                )}
-              </div>
+
+                  <AnimatedQuestionCard 
+                    question={currentQuestion.prompt}
+                    questionKey={currentQuestion.id}
+                  />
+
+                  <div className="space-y-3">
+                    {currentQuestion.options.map((option, index) => (
+                      <AnswerButton
+                        key={`${option.value}-${index}`}
+                        label={option.label}
+                        selected={answers[currentQuestion.id]?.answer_value === option.value}
+                        showConfirmation={recentlySelected === `question:${currentQuestion.id}:${option.value}`}
+                        onClick={() => {
+                          setRecentlySelected(`question:${currentQuestion.id}:${option.value}`);
+                          setTimeout(() => setRecentlySelected(null), 500);
+                          handleAnswer(option.value);
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <SkipButton onClick={handleSkip} />
+                    <AutosaveIndicator show={lastSaved} />
+                  </div>
+
+                  {saveError && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                      <p className="text-sm text-destructive font-body">{saveError}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {saving && (
+            {saving && !viewingCompletedSection && (
               <div className="px-6 py-3 border-t border-border/30 flex items-center justify-center bg-card/50">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
               </div>
