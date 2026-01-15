@@ -36,20 +36,24 @@ export function ProfilePromptModal({
             <UserCircle className="w-10 h-10 text-primary" />
           </div>
           <DialogTitle className="font-display text-2xl text-center">
-            {hasStarted ? "Almost there!" : "Before we begin..."}
+            {hasStarted ? "Almost there!" : "Let's get to know you"}
           </DialogTitle>
           <DialogDescription className="font-body text-base text-foreground/80 text-center pt-3 leading-relaxed">
             {hasStarted ? (
               <>
-                You've answered {completedCount} of {totalCount} questions.
+                <span className="inline-flex items-center gap-1.5 text-primary font-medium">
+                  {completedCount} of {totalCount} answered
+                </span>
                 <br />
-                Just {remaining} more to complete your profile.
+                Just {remaining} more {remaining === 1 ? "question" : "questions"} to complete your snapshot.
               </>
             ) : (
               <>
-                We'd love to learn a little about you first.
+                A quick snapshot of your life helps us personalize your journey.
                 <br />
-                Just {totalCount} simple questions — takes about a minute.
+                <span className="text-muted-foreground text-sm">
+                  {totalCount} simple questions · About 1 minute
+                </span>
               </>
             )}
           </DialogDescription>

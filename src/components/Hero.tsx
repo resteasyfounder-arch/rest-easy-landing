@@ -51,8 +51,8 @@ const Hero = () => {
                   className="font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-shadow"
                   asChild
                 >
-                  <a href="/assessment">
-                    Get Your Findability Score
+                  <a href="/readiness">
+                    Get Started
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </a>
                 </Button>
