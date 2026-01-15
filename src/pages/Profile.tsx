@@ -279,16 +279,19 @@ const Profile = () => {
           {completedCount === 0 && (
             <Card className="p-8 text-center bg-card/60 backdrop-blur-sm border-border/40 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
               <div className="space-y-5">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                  <UserCircle className="w-8 h-8 text-primary" />
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mx-auto">
+                  <UserCircle className="w-10 h-10 text-primary" />
                 </div>
-                <div>
-                  <p className="text-foreground font-body text-base leading-relaxed max-w-sm mx-auto">
-                    We'd love to learn a little about you. Just a few simple questions — 
+                <div className="space-y-2">
+                  <h2 className="text-lg font-display font-semibold text-foreground">
+                    Welcome! Let's create your snapshot
+                  </h2>
+                  <p className="text-foreground/80 font-body text-base leading-relaxed max-w-sm mx-auto">
+                    A few quick questions help us understand what matters most in your life — 
                     no right or wrong answers.
                   </p>
-                  <p className="text-sm text-muted-foreground font-body mt-2">
-                    Takes about a minute. You can always change this later.
+                  <p className="text-sm text-muted-foreground font-body">
+                    About 1 minute · You can always update later
                   </p>
                 </div>
                 <Button
