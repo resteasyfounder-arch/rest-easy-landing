@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import ProfileIntro from "@/components/assessment/ProfileIntro";
 import ProfileReview from "@/components/assessment/ProfileReview";
@@ -226,6 +226,7 @@ const ErrorState = ({
 
 const Readiness = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [schema, setSchema] = useState<Schema | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -304,6 +305,41 @@ const Readiness = () => {
     bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Check if profile is already complete on initial load - skip to assessment
+  useEffect(() => {
+    if (!schema || loading) return;
+    
+    // Only check on intro phase - don't interfere with other phases
+    if (flowPhase !== "intro") return;
+
+    const totalProfileQuestions = schema.profile_questions.length;
+    const answeredProfileQuestions = Object.keys(profileAnswers).length;
+    
+    // If profile is complete, skip directly to assessment phase
+    if (answeredProfileQuestions >= totalProfileQuestions) {
+      console.log("Profile already complete, skipping to assessment");
+      setFlowPhase("assessment");
+    }
+  }, [schema, loading, flowPhase, profileAnswers]);
+
+  // Handle ?edit=profile query parameter from Profile page
+  useEffect(() => {
+    if (!schema || loading) return;
+    
+    const editMode = searchParams.get("edit");
+    if (editMode === "profile") {
+      // Clear the query param to avoid re-triggering
+      setSearchParams({}, { replace: true });
+      
+      // Go directly to profile phase for editing
+      if (schema.profile_questions.length > 0) {
+        setCurrentStepId(`profile:${schema.profile_questions[0].id}`);
+        setStepHistory([]);
+        setFlowPhase("profile");
+      }
+    }
+  }, [schema, loading, searchParams, setSearchParams]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));
