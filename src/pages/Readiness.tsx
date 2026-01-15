@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import ProfileIntro from "@/components/assessment/ProfileIntro";
 import ProfileReview from "@/components/assessment/ProfileReview";
@@ -227,7 +227,6 @@ const ErrorState = ({
 
 const Readiness = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [schema, setSchema] = useState<Schema | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -331,23 +330,6 @@ const Readiness = () => {
     }
   }, [schema, loading, flowPhase, profileAnswers, profilePromptDismissed]);
 
-  // Handle ?edit=profile query parameter from Profile page
-  useEffect(() => {
-    if (!schema || loading) return;
-    
-    const editMode = searchParams.get("edit");
-    if (editMode === "profile") {
-      // Clear the query param to avoid re-triggering
-      setSearchParams({}, { replace: true });
-      
-      // Go directly to profile phase for editing
-      if (schema.profile_questions.length > 0) {
-        setCurrentStepId(`profile:${schema.profile_questions[0].id}`);
-        setStepHistory([]);
-        setFlowPhase("profile");
-      }
-    }
-  }, [schema, loading, searchParams, setSearchParams]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));

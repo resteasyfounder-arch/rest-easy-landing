@@ -14,22 +14,9 @@ import {
   HandHeart,
   Flower2,
   PiggyBank,
-  Edit3,
-  RotateCcw,
   ArrowRight,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
+
 import { cn } from "@/lib/utils";
 import { ProfileEditModal, QUESTION_PROMPTS } from "@/components/profile/ProfileEditModal";
 
@@ -250,16 +237,7 @@ const Profile = () => {
 
   const summary = useMemo(() => generateSummary(profileAnswers), [profileAnswers]);
 
-  const handleClearProfile = () => {
-    clearProfile();
-    toast.success("Your answers have been cleared");
-  };
-
-  const handleEditProfile = () => {
-    navigate("/readiness?edit=profile");
-  };
-
-  const handleStartProfile = () => {
+  const handleStartReadiness = () => {
     navigate("/readiness");
   };
 
@@ -314,7 +292,7 @@ const Profile = () => {
                   </p>
                 </div>
                 <Button
-                  onClick={handleStartProfile}
+                  onClick={handleStartReadiness}
                   size="lg"
                   className="mt-2 gap-2 font-body"
                 >
@@ -347,77 +325,21 @@ const Profile = () => {
               </Card>
 
               {/* Continue CTA */}
-              {isComplete ? (
-                <div className="text-center space-y-4 pt-4">
-                  <p className="text-foreground font-body text-base leading-relaxed">
-                    Whenever you're ready, we can continue.
-                  </p>
-                  <Button
-                    onClick={() => navigate("/readiness")}
-                    size="lg"
-                    className="gap-2 font-body"
-                  >
-                    Continue
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center space-y-4 pt-4">
-                  <p className="text-foreground font-body text-base leading-relaxed">
-                    A few more questions to complete your snapshot.
-                  </p>
-                  <Button
-                    onClick={handleEditProfile}
-                    size="lg"
-                    className="gap-2 font-body"
-                  >
-                    Continue
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-center gap-6 pt-2">
+              <div className="text-center space-y-4 pt-4">
+                <p className="text-foreground font-body text-base leading-relaxed">
+                  {isComplete 
+                    ? "Whenever you're ready, we can continue."
+                    : "Tap any icon to answer, or continue when you're ready."
+                  }
+                </p>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleEditProfile}
-                  className="gap-2 text-muted-foreground hover:text-foreground font-body"
+                  onClick={handleStartReadiness}
+                  size="lg"
+                  className="gap-2 font-body"
                 >
-                  <Edit3 className="w-4 h-4" />
-                  Update
+                  Continue
+                  <ArrowRight className="w-4 h-4" />
                 </Button>
-                
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-2 text-muted-foreground hover:text-foreground font-body"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Start over
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="font-display">Start over?</AlertDialogTitle>
-                      <AlertDialogDescription className="font-body">
-                        This will clear what you've shared. You can always fill it out again.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="font-body">Keep my answers</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleClearProfile}
-                        className="font-body"
-                      >
-                        Start over
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
               </div>
             </div>
           )}
