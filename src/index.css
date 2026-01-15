@@ -355,3 +355,77 @@ html {
 .animate-slide-in-left {
   animation: slide-in-left 0.3s ease-out forwards;
 }
+
+/* Journey-based assessment animations */
+@keyframes slide-out-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}
+
+.animate-slide-out-left {
+  animation: slide-out-left 0.15s ease-in forwards;
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-check-pop {
+  animation: check-pop 0.3s ease-out forwards;
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+
+.animate-node-pulse {
+  animation: node-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ping-slow {
+  75%, 100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-ping-slow {
+  animation: ping-slow 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes selection-confirm {
+  0% {
+    background-color: hsl(var(--primary) / 0.08);
+  }
+  50% {
+    background-color: hsl(var(--primary) / 0.15);
+  }
+  100% {
+    background-color: hsl(var(--primary) / 0.08);
+  }
+}
+
+.animate-selection-confirm {
+  animation: selection-confirm 0.4s ease-out;
+}
