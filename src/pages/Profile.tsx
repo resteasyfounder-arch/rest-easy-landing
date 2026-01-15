@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProfileEditModal, QUESTION_PROMPTS } from "@/components/profile/ProfileEditModal";
 
 // Profile items for the visual snapshot
 const SNAPSHOT_ITEMS = [
@@ -38,49 +39,41 @@ const SNAPSHOT_ITEMS = [
     id: "profile.household.has_dependents",
     label: "Family",
     icon: Users,
-    position: "top-left",
   },
   {
     id: "profile.pets.has_pets",
     label: "Pets",
     icon: Heart,
-    position: "top-right",
   },
   {
     id: "profile.family.supports_aging_parent",
     label: "Caregiving",
     icon: HandHeart,
-    position: "left",
   },
   {
     id: "profile.home.owns_real_property",
     label: "Home",
     icon: Home,
-    position: "right",
   },
   {
     id: "profile.home.has_significant_personal_property",
     label: "Belongings",
     icon: Briefcase,
-    position: "bottom-left",
   },
   {
     id: "profile.financial.has_beneficiary_accounts",
     label: "Finances",
     icon: PiggyBank,
-    position: "bottom",
   },
   {
     id: "profile.digital.owns_crypto",
     label: "Digital",
     icon: Laptop,
-    position: "bottom-right",
   },
   {
     id: "profile.emotional.has_spiritual_practices",
     label: "Faith",
     icon: Flower2,
-    position: "center-bottom",
   },
 ];
 
@@ -124,7 +117,13 @@ function generateSummary(profileAnswers: Record<string, string>): string {
 }
 
 // Visual snapshot component
-const LifeSnapshot = ({ profileAnswers }: { profileAnswers: Record<string, string> }) => {
+const LifeSnapshot = ({ 
+  profileAnswers, 
+  onItemClick 
+}: { 
+  profileAnswers: Record<string, string>;
+  onItemClick: (item: typeof SNAPSHOT_ITEMS[0]) => void;
+}) => {
   const getItemState = (id: string) => {
     const answer = profileAnswers[id];
     if (answer === "yes") return "active";
@@ -182,26 +181,38 @@ const LifeSnapshot = ({ profileAnswers }: { profileAnswers: Record<string, strin
               top: `${y}%`,
             }}
           >
-            <div
+            <button
+              onClick={() => onItemClick(item)}
               className={cn(
-                "flex flex-col items-center gap-1.5 group",
+                "flex flex-col items-center gap-1.5 group cursor-pointer",
                 state === "active" && "animate-fade-in",
               )}
             >
               <div
                 className={cn(
                   "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
-                  state === "active" && "bg-primary/15 border-2 border-primary/30 shadow-md shadow-primary/10",
-                  state === "inactive" && "bg-muted/30 border border-border/30",
-                  state === "unknown" && "bg-muted/20 border border-dashed border-border/20",
+                  "hover:scale-110 hover:shadow-lg",
+                  state === "active" && [
+                    "bg-primary/15 border-2 border-primary/30 shadow-md shadow-primary/10",
+                    "hover:shadow-primary/20",
+                    `animate-float-gentle animate-delay-${index}`,
+                  ],
+                  state === "inactive" && [
+                    "bg-muted/30 border border-border/30",
+                    "hover:bg-muted/50 hover:border-border/50",
+                  ],
+                  state === "unknown" && [
+                    "bg-muted/20 border border-dashed border-border/20",
+                    "hover:bg-muted/30 hover:border-border/30",
+                  ],
                 )}
               >
                 <Icon
                   className={cn(
                     "w-5 h-5 transition-all duration-300",
                     state === "active" && "text-primary",
-                    state === "inactive" && "text-muted-foreground/40",
-                    state === "unknown" && "text-muted-foreground/20",
+                    state === "inactive" && "text-muted-foreground/40 group-hover:text-muted-foreground/60",
+                    state === "unknown" && "text-muted-foreground/20 group-hover:text-muted-foreground/40",
                   )}
                 />
               </div>
@@ -209,13 +220,13 @@ const LifeSnapshot = ({ profileAnswers }: { profileAnswers: Record<string, strin
                 className={cn(
                   "text-xs font-body transition-all duration-300 text-center",
                   state === "active" && "text-foreground font-medium",
-                  state === "inactive" && "text-muted-foreground/50",
-                  state === "unknown" && "text-muted-foreground/30",
+                  state === "inactive" && "text-muted-foreground/50 group-hover:text-muted-foreground/70",
+                  state === "unknown" && "text-muted-foreground/30 group-hover:text-muted-foreground/50",
                 )}
               >
                 {item.label}
               </span>
-            </div>
+            </button>
           </div>
         );
       })}
@@ -230,14 +241,14 @@ const Profile = () => {
     isComplete,
     completedCount,
     clearProfile,
+    updateAnswer,
+    saveProfile,
     isLoading,
   } = useGuestProfile();
 
-  const summary = useMemo(() => generateSummary(profileAnswers), [profileAnswers]);
+  const [editingItem, setEditingItem] = useState<typeof SNAPSHOT_ITEMS[0] | null>(null);
 
-  const activeCount = useMemo(() => {
-    return Object.values(profileAnswers).filter((v) => v === "yes").length;
-  }, [profileAnswers]);
+  const summary = useMemo(() => generateSummary(profileAnswers), [profileAnswers]);
 
   const handleClearProfile = () => {
     clearProfile();
@@ -250,6 +261,16 @@ const Profile = () => {
 
   const handleStartProfile = () => {
     navigate("/readiness");
+  };
+
+  const handleItemClick = (item: typeof SNAPSHOT_ITEMS[0]) => {
+    setEditingItem(item);
+  };
+
+  const handleEditAnswer = async (value: "yes" | "no") => {
+    if (!editingItem) return;
+    updateAnswer(editingItem.id, value);
+    await saveProfile();
   };
 
   if (isLoading) {
@@ -310,7 +331,10 @@ const Profile = () => {
               
               {/* Life Snapshot Visual Card */}
               <Card className="p-6 pt-8 bg-card/60 backdrop-blur-sm border-border/40 overflow-hidden">
-                <LifeSnapshot profileAnswers={profileAnswers} />
+                <LifeSnapshot 
+                  profileAnswers={profileAnswers} 
+                  onItemClick={handleItemClick}
+                />
                 
                 {/* Summary below the visual */}
                 {isComplete && (
@@ -321,20 +345,6 @@ const Profile = () => {
                   </div>
                 )}
               </Card>
-
-              {/* Legend / Context */}
-              {isComplete && (
-                <div className="flex items-center justify-center gap-6 text-xs font-body text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-primary/20 border border-primary/30" />
-                    <span>Part of your life</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-muted/30 border border-border/30" />
-                    <span>Not applicable</span>
-                  </div>
-                </div>
-              )}
 
               {/* Continue CTA */}
               {isComplete ? (
@@ -413,6 +423,19 @@ const Profile = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editingItem && (
+        <ProfileEditModal
+          open={!!editingItem}
+          onOpenChange={(open) => !open && setEditingItem(null)}
+          icon={editingItem.icon}
+          label={editingItem.label}
+          questionPrompt={QUESTION_PROMPTS[editingItem.id] || editingItem.label}
+          currentValue={profileAnswers[editingItem.id] as "yes" | "no" | null}
+          onAnswer={handleEditAnswer}
+        />
+      )}
     </AppLayout>
   );
 };
