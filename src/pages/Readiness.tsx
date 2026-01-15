@@ -630,8 +630,47 @@ const Readiness = () => {
             answers: [answerRecord],
           });
         }
+
+        // Determine next step based on whether we're focused on a section
+        const currentSectionId = focusedSectionId || currentQuestion.section_id;
+        
+        // Recalculate applicable questions with updated answers
+        const nextAnswerValues = Object.fromEntries(
+          Object.entries(nextAnswers).map(([key, val]) => [key, val.answer_value])
+        ) as Record<string, AnswerValue>;
+        
+        const nextApplicable = schema.questions.filter((q) =>
+          evaluateCondition(q.applies_if, nextProfile, nextAnswerValues)
+        );
+        
+        // Find next unanswered question in the current/focused section
+        const sectionQuestions = nextApplicable.filter(q => q.section_id === currentSectionId);
+        const nextInSection = sectionQuestions.find(q => !nextAnswers[q.id]);
+        
+        if (nextInSection) {
+          // Stay in the same section
+          setStepHistory((prev) => [...prev, currentStepId]);
+          setCurrentStepId(`question:${nextInSection.id}`);
+        } else if (focusedSectionId) {
+          // Focused section is now complete - show section complete view
+          setStepHistory((prev) => [...prev, currentStepId]);
+          setViewingCompletedSection(true);
+        } else {
+          // Not focused on a section - find next global step
+          setStepHistory((prev) => [...prev, currentStepId]);
+          const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
+          
+          if (nextStep) {
+            setCurrentStepId(nextStep);
+          } else {
+            setFlowPhase("complete");
+            setCurrentStepId(null);
+          }
+        }
+        return;
       }
 
+      // For profile questions, use global navigation
       setStepHistory((prev) => [...prev, currentStepId]);
       const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
       
@@ -688,8 +727,26 @@ const Readiness = () => {
   };
 
   const handleSkip = () => {
-    if (!currentStepId) return;
+    if (!currentStepId || !currentQuestion) return;
+    
     setStepHistory((prev) => [...prev, currentStepId]);
+    
+    // If focused on a section, skip within that section
+    if (focusedSectionId) {
+      const sectionQuestions = applicableQuestions.filter(q => q.section_id === focusedSectionId);
+      const currentIndex = sectionQuestions.findIndex(q => q.id === currentQuestion.id);
+      const nextInSection = sectionQuestions.slice(currentIndex + 1).find(q => !answers[q.id]);
+      
+      if (nextInSection) {
+        setCurrentStepId(`question:${nextInSection.id}`);
+      } else {
+        // No more unanswered in section - show complete view
+        setViewingCompletedSection(true);
+      }
+      return;
+    }
+    
+    // Global skip
     const nextStep = getNextStepId(profileAnswers, answers, profile);
     if (nextStep) {
       setCurrentStepId(nextStep);
