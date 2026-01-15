@@ -11,15 +11,18 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, X, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
 import {
   GentleIntro,
-  QuestionCard,
-  SoftProgress,
-  AnswerButton,
   SkipButton,
   AutosaveIndicator,
   PauseScreen,
-  CompletionScreen,
   pauseMessages,
 } from "@/components/assessment/shared";
+import AnswerButton from "@/components/assessment/shared/AnswerButton";
+import {
+  JourneySidebar,
+  JourneyHeader,
+  JourneyDrawer,
+  AnimatedQuestionCard,
+} from "@/components/assessment/journey";
 
 type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "pause" | "complete";
 
@@ -267,6 +270,8 @@ const Readiness = () => {
   const [lastSaved, setLastSaved] = useState(false);
   const [pauseMessageIndex, setPauseMessageIndex] = useState(0);
   const [questionsSinceLastPause, setQuestionsSinceLastPause] = useState(0);
+  const [showJourneyDrawer, setShowJourneyDrawer] = useState(false);
+  const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
 
   // Persist flow phase
   useEffect(() => {
@@ -484,6 +489,33 @@ const Readiness = () => {
     if (!schema || !currentProfileQuestion) return 0;
     return schema.profile_questions.findIndex(q => q.id === currentProfileQuestion.id) + 1;
   }, [schema, currentProfileQuestion]);
+
+  // Section progress for journey sidebar
+  const sectionProgress = useMemo(() => {
+    if (!schema) return {};
+    const progress: Record<string, { completed: number; total: number }> = {};
+    
+    for (const section of schema.sections) {
+      const sectionQuestions = applicableQuestions.filter(q => q.section_id === section.id);
+      const completedInSection = sectionQuestions.filter(q => answers[q.id]).length;
+      progress[section.id] = {
+        completed: completedInSection,
+        total: sectionQuestions.length,
+      };
+    }
+    return progress;
+  }, [schema, applicableQuestions, answers]);
+
+  // Completed sections for journey sidebar
+  const completedSections = useMemo(() => {
+    if (!schema) return [];
+    return schema.sections
+      .filter(section => {
+        const progress = sectionProgress[section.id];
+        return progress && progress.total > 0 && progress.completed === progress.total;
+      })
+      .map(s => s.id);
+  }, [schema, sectionProgress]);
 
   // Profile review data
   const profileReviewData = useMemo(() => {
@@ -929,7 +961,11 @@ const Readiness = () => {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="flex-1" />
+            <div className="flex-1 text-center">
+              <p className="text-sm font-body text-muted-foreground">
+                {currentProfileIndex} of {schema.profile_questions.length}
+              </p>
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -941,15 +977,25 @@ const Readiness = () => {
             </Button>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="max-w-md mx-auto space-y-8 question-enter">
-              <SoftProgress
-                current={currentProfileIndex}
-                total={schema.profile_questions.length}
-                sectionName="Getting to Know You"
-              />
+          {/* Progress bar for profile */}
+          <div className="px-4">
+            <Progress 
+              value={(currentProfileIndex / schema.profile_questions.length) * 100} 
+              className="h-1"
+            />
+          </div>
 
-              <QuestionCard question={currentProfileQuestion.prompt} />
+          <div className="flex-1 overflow-y-auto px-6 py-8">
+            <div className="max-w-md mx-auto space-y-8">
+              {/* Section Label */}
+              <p className="text-sm text-primary font-medium text-center uppercase tracking-wide">
+                Getting to Know You
+              </p>
+
+              <AnimatedQuestionCard 
+                question={currentProfileQuestion.prompt}
+                questionKey={currentProfileQuestion.id}
+              />
 
               <div className="space-y-3">
                 {currentProfileQuestion.options.map((option) => (
@@ -957,7 +1003,12 @@ const Readiness = () => {
                     key={option.value}
                     label={option.label}
                     selected={profileAnswers[currentProfileQuestion.id] === option.value}
-                    onClick={() => handleAnswer(option.value)}
+                    showConfirmation={recentlySelected === `profile:${currentProfileQuestion.id}:${option.value}`}
+                    onClick={() => {
+                      setRecentlySelected(`profile:${currentProfileQuestion.id}:${option.value}`);
+                      setTimeout(() => setRecentlySelected(null), 500);
+                      handleAnswer(option.value);
+                    }}
                   />
                 ))}
               </div>
@@ -986,74 +1037,144 @@ const Readiness = () => {
     );
   }
 
-  // Assessment Questions Phase
+  // Assessment Questions Phase - Journey-based layout
   if (flowPhase === "assessment" && currentQuestion) {
     return (
       <AppLayout hideNav>
-        <div className="min-h-screen flex flex-col bg-gradient-hero">
-          <header className="flex items-center justify-between px-4 h-14">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBack}
-              disabled={stepHistory.length === 0}
-              className="touch-target press-effect"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleExit}
-              className="touch-target press-effect"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </header>
+        <div className="min-h-screen flex bg-background">
+          {/* Journey Sidebar - Desktop only */}
+          <JourneySidebar
+            sections={schema.sections}
+            currentSectionId={currentSection?.id || null}
+            sectionProgress={sectionProgress}
+            completedSections={completedSections}
+          />
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="max-w-md mx-auto space-y-8 question-enter">
-              <SoftProgress
-                current={currentQuestionIndex}
-                total={applicableQuestions.length}
-                sectionName={currentSection?.label}
-              />
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col min-h-screen">
+            {/* Mobile Journey Header */}
+            <JourneyHeader
+              sections={schema.sections}
+              currentSectionId={currentSection?.id || null}
+              completedSections={completedSections}
+              onOpenDrawer={() => setShowJourneyDrawer(true)}
+            />
 
-              <QuestionCard question={currentQuestion.prompt} />
-
-              <div className="space-y-3">
-                {currentQuestion.options.map((option) => (
-                  <AnswerButton
-                    key={option.value}
-                    label={option.label}
-                    selected={answers[currentQuestion.id]?.answer_value === option.value}
-                    onClick={() => handleAnswer(option.value)}
-                  />
-                ))}
+            {/* Desktop Header */}
+            <header className="hidden md:flex items-center justify-between px-6 h-14 border-b border-border/30">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBack}
+                disabled={stepHistory.length === 0}
+                className="touch-target press-effect"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="text-center">
+                <p className="text-sm font-body text-muted-foreground">
+                  Question {currentQuestionIndex} of {applicableQuestions.length}
+                </p>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleExit}
+                className="touch-target press-effect"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </header>
 
-              <div className="flex items-center justify-between pt-2">
-                <SkipButton onClick={handleSkip} />
-                <AutosaveIndicator show={lastSaved} />
-              </div>
+            {/* Mobile Header Controls */}
+            <header className="md:hidden flex items-center justify-between px-4 h-12">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBack}
+                disabled={stepHistory.length === 0}
+                className="touch-target press-effect"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleExit}
+                className="touch-target press-effect"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </header>
 
-              {saveError && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-                  <p className="text-sm text-destructive font-body">{saveError}</p>
+            {/* Question Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-8 bg-gradient-hero">
+              <div className="max-w-lg mx-auto space-y-8">
+                {/* Section Label */}
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-primary font-medium uppercase tracking-wide">
+                    {currentSection?.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground md:hidden">
+                    {currentQuestionIndex} of {applicableQuestions.length}
+                  </p>
                 </div>
-              )}
+
+                <AnimatedQuestionCard 
+                  question={currentQuestion.prompt}
+                  questionKey={currentQuestion.id}
+                />
+
+                <div className="space-y-3">
+                  {currentQuestion.options.map((option) => (
+                    <AnswerButton
+                      key={option.value}
+                      label={option.label}
+                      selected={answers[currentQuestion.id]?.answer_value === option.value}
+                      showConfirmation={recentlySelected === `question:${currentQuestion.id}:${option.value}`}
+                      onClick={() => {
+                        setRecentlySelected(`question:${currentQuestion.id}:${option.value}`);
+                        setTimeout(() => setRecentlySelected(null), 500);
+                        handleAnswer(option.value);
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <SkipButton onClick={handleSkip} />
+                  <AutosaveIndicator show={lastSaved} />
+                </div>
+
+                {saveError && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                    <p className="text-sm text-destructive font-body">{saveError}</p>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {saving && (
+              <div className="px-6 py-3 border-t border-border/30 flex items-center justify-center bg-card/50">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            )}
           </div>
 
-          {saving && (
-            <div className="px-6 py-4 border-t border-border/30 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            </div>
-          )}
+          {/* Journey Drawer - Mobile */}
+          <JourneyDrawer
+            open={showJourneyDrawer}
+            onOpenChange={setShowJourneyDrawer}
+            sections={schema.sections}
+            currentSectionId={currentSection?.id || null}
+            sectionProgress={sectionProgress}
+            completedSections={completedSections}
+          />
         </div>
       </AppLayout>
     );
