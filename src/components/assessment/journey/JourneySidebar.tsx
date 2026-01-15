@@ -104,11 +104,7 @@ const JourneySidebar = ({
                   progress={getSectionProgressPercent(section.id)}
                   questionsCompleted={progress?.completed || 0}
                   questionsTotal={progress?.total || 0}
-                  onClick={
-                    status !== "upcoming" && onSectionClick
-                      ? () => onSectionClick(section.id)
-                      : undefined
-                  }
+                  onClick={onSectionClick ? () => onSectionClick(section.id) : undefined}
                 />
               </div>
             );

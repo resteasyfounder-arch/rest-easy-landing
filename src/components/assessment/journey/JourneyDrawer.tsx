@@ -115,11 +115,7 @@ const JourneyDrawer = ({
                     progress={getSectionProgressPercent(section.id)}
                     questionsCompleted={progress?.completed || 0}
                     questionsTotal={progress?.total || 0}
-                    onClick={
-                      status !== "upcoming"
-                        ? () => handleSectionClick(section.id)
-                        : undefined
-                    }
+                    onClick={() => handleSectionClick(section.id)}
                   />
                 </div>
               );
