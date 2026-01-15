@@ -37,13 +37,15 @@ const SectionNode = ({
   return (
     <button
       onClick={onClick}
-      disabled={status === "upcoming"}
+      disabled={!onClick}
       className={cn(
         "group flex items-center gap-3 w-full p-3 rounded-xl transition-all duration-300",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         status === "completed" && "bg-primary/8 hover:bg-primary/12 cursor-pointer",
         status === "current" && "bg-primary/15 shadow-soft cursor-default",
-        status === "upcoming" && "opacity-50 cursor-not-allowed"
+        status === "upcoming" && onClick 
+          ? "hover:bg-muted/50 cursor-pointer opacity-70 hover:opacity-100" 
+          : "opacity-50 cursor-not-allowed"
       )}
     >
       {/* Node Circle */}

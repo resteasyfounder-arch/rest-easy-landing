@@ -13,8 +13,6 @@ import {
   GentleIntro,
   SkipButton,
   AutosaveIndicator,
-  PauseScreen,
-  pauseMessages,
 } from "@/components/assessment/shared";
 import AnswerButton from "@/components/assessment/shared/AnswerButton";
 import {
@@ -24,7 +22,7 @@ import {
   AnimatedQuestionCard,
 } from "@/components/assessment/journey";
 
-type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "pause" | "complete";
+type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "complete";
 
 type AnswerValue = "yes" | "partial" | "no" | "not_sure" | "na";
 
@@ -268,8 +266,6 @@ const Readiness = () => {
     return sessionStorage.getItem("rest-easy.profile-prompt-dismissed") === "true";
   });
   const [lastSaved, setLastSaved] = useState(false);
-  const [pauseMessageIndex, setPauseMessageIndex] = useState(0);
-  const [questionsSinceLastPause, setQuestionsSinceLastPause] = useState(0);
   const [showJourneyDrawer, setShowJourneyDrawer] = useState(false);
   const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
 
@@ -552,7 +548,6 @@ const Readiness = () => {
     setFlowPhase("assessment");
     setCurrentStepId(null);
     setStepHistory([]);
-    setQuestionsSinceLastPause(0);
   };
 
   const handleEditProfileQuestion = (questionId: string) => {
@@ -632,19 +627,6 @@ const Readiness = () => {
             answers: [answerRecord],
           });
         }
-
-        // Track questions for pause
-        const newCount = questionsSinceLastPause + 1;
-        setQuestionsSinceLastPause(newCount);
-
-        // Check if we need a pause (every 5 questions)
-        if (newCount >= 5) {
-          setStepHistory((prev) => [...prev, currentStepId]);
-          setPauseMessageIndex((prev) => (prev + 1) % pauseMessages.length);
-          setFlowPhase("pause");
-          setSaving(false);
-          return;
-        }
       }
 
       setStepHistory((prev) => [...prev, currentStepId]);
@@ -663,14 +645,19 @@ const Readiness = () => {
     }
   };
 
-  const handlePauseContinue = () => {
-    setQuestionsSinceLastPause(0);
-    const nextStep = getNextStepId(profileAnswers, answers, profile);
-    if (nextStep) {
-      setFlowPhase("assessment");
-      setCurrentStepId(nextStep);
-    } else {
-      setFlowPhase("complete");
+  // Navigate to a specific section
+  const handleSectionClick = (sectionId: string) => {
+    if (!schema) return;
+    
+    // Find the first unanswered question in that section
+    const sectionQuestions = applicableQuestions.filter(q => q.section_id === sectionId);
+    const firstUnanswered = sectionQuestions.find(q => !answers[q.id]);
+    
+    if (firstUnanswered) {
+      setCurrentStepId(`question:${firstUnanswered.id}`);
+    } else if (sectionQuestions.length > 0) {
+      // If all answered, go to first question of section
+      setCurrentStepId(`question:${sectionQuestions[0].id}`);
     }
   };
 
@@ -686,10 +673,6 @@ const Readiness = () => {
   };
 
   const handleBack = () => {
-    if (flowPhase === "pause") {
-      setFlowPhase("assessment");
-      return;
-    }
     if (stepHistory.length === 0) {
       if (flowPhase === "profile") {
         setFlowPhase("intro");
@@ -714,7 +697,6 @@ const Readiness = () => {
     setCurrentStepId(null);
     setStepHistory([]);
     setScoreSaved(false);
-    setQuestionsSinceLastPause(0);
     setFlowPhase("intro");
   };
 
@@ -791,7 +773,7 @@ const Readiness = () => {
     return null;
   }
 
-  const showNavigation = flowPhase !== "intro" && flowPhase !== "complete" && flowPhase !== "pause";
+  const showNavigation = flowPhase !== "intro" && flowPhase !== "complete";
   const canGoBack = stepHistory.length > 0 || flowPhase === "profile";
 
   // Intro Phase
@@ -832,18 +814,6 @@ const Readiness = () => {
     );
   }
 
-  // Pause Phase
-  if (flowPhase === "pause") {
-    return (
-      <AppLayout hideNav>
-        <PauseScreen
-          message={pauseMessages[pauseMessageIndex]}
-          onContinue={handlePauseContinue}
-          autoAdvanceMs={3500}
-        />
-      </AppLayout>
-    );
-  }
 
   // Complete Phase
   if (flowPhase === "complete" && results) {
@@ -1048,6 +1018,7 @@ const Readiness = () => {
             currentSectionId={currentSection?.id || null}
             sectionProgress={sectionProgress}
             completedSections={completedSections}
+            onSectionClick={handleSectionClick}
           />
 
           {/* Main Content Area */}
@@ -1130,9 +1101,9 @@ const Readiness = () => {
                 />
 
                 <div className="space-y-3">
-                  {currentQuestion.options.map((option) => (
+                  {currentQuestion.options.map((option, index) => (
                     <AnswerButton
-                      key={option.value}
+                      key={`${option.value}-${index}`}
                       label={option.label}
                       selected={answers[currentQuestion.id]?.answer_value === option.value}
                       showConfirmation={recentlySelected === `question:${currentQuestion.id}:${option.value}`}
@@ -1174,6 +1145,7 @@ const Readiness = () => {
             currentSectionId={currentSection?.id || null}
             sectionProgress={sectionProgress}
             completedSections={completedSections}
+            onSectionClick={handleSectionClick}
           />
         </div>
       </AppLayout>
