@@ -354,6 +354,15 @@ const Readiness = () => {
     );
   }, [schema, profile, answerValues]);
 
+  // Filter sections to only show those with applicable questions
+  const applicableSections = useMemo(() => {
+    if (!schema) return [];
+    return schema.sections.filter(section => {
+      const sectionQuestions = applicableQuestions.filter(q => q.section_id === section.id);
+      return sectionQuestions.length > 0;
+    });
+  }, [schema, applicableQuestions]);
+
   const completedQuestionCount = useMemo(() => {
     const applicableIds = new Set(applicableQuestions.map((question) => question.id));
     return Object.keys(answers).filter((key) => applicableIds.has(key)).length;
@@ -450,6 +459,14 @@ const Readiness = () => {
     if (currentStepId && currentStepId.startsWith("question:") && !isStepApplicable(currentStepId)) {
       setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
     }
+
+    // If viewing a section that's no longer applicable, redirect
+    if (focusedSectionId && !applicableSections.some(s => s.id === focusedSectionId)) {
+      setFocusedSectionId(null);
+      setViewingCompletedSection(false);
+      const nextStep = getNextStepId(profileAnswers, answers, profile);
+      setCurrentStepId(nextStep);
+    }
   }, [
     schema,
     loading,
@@ -460,6 +477,8 @@ const Readiness = () => {
     profile,
     getNextStepId,
     isStepApplicable,
+    focusedSectionId,
+    applicableSections,
   ]);
 
   const currentProfileQuestion = useMemo(() => {
@@ -505,16 +524,15 @@ const Readiness = () => {
     return progress;
   }, [schema, applicableQuestions, answers]);
 
-  // Completed sections for journey sidebar
+  // Completed sections for journey sidebar - only from applicable sections
   const completedSections = useMemo(() => {
-    if (!schema) return [];
-    return schema.sections
+    return applicableSections
       .filter(section => {
         const progress = sectionProgress[section.id];
         return progress && progress.total > 0 && progress.completed === progress.total;
       })
       .map(s => s.id);
-  }, [schema, sectionProgress]);
+  }, [applicableSections, sectionProgress]);
 
   // Profile review data
   const profileReviewData = useMemo(() => {
@@ -690,6 +708,12 @@ const Readiness = () => {
   // Navigate to a specific section
   const handleSectionClick = (sectionId: string) => {
     if (!schema) return;
+    
+    // Verify section is still applicable
+    if (!applicableSections.some(s => s.id === sectionId)) {
+      console.warn('Attempted to navigate to non-applicable section');
+      return;
+    }
     
     setFocusedSectionId(sectionId);
     setShowJourneyDrawer(false);
@@ -1130,7 +1154,7 @@ const Readiness = () => {
         <div className="min-h-screen flex bg-background">
           {/* Journey Sidebar - Desktop only */}
           <JourneySidebar
-            sections={schema.sections}
+            sections={applicableSections}
             currentSectionId={currentSection?.id || null}
             sectionProgress={sectionProgress}
             completedSections={completedSections}
@@ -1141,7 +1165,7 @@ const Readiness = () => {
           <div className="flex-1 flex flex-col min-h-screen">
             {/* Mobile Journey Header */}
             <JourneyHeader
-              sections={schema.sections}
+              sections={applicableSections}
               currentSectionId={currentSection?.id || null}
               completedSections={completedSections}
               onOpenDrawer={() => setShowJourneyDrawer(true)}
@@ -1272,7 +1296,7 @@ const Readiness = () => {
           <JourneyDrawer
             open={showJourneyDrawer}
             onOpenChange={setShowJourneyDrawer}
-            sections={schema.sections}
+            sections={applicableSections}
             currentSectionId={currentSection?.id || null}
             sectionProgress={sectionProgress}
             completedSections={completedSections}
