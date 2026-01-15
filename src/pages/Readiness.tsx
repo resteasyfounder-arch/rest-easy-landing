@@ -421,18 +421,31 @@ const Readiness = () => {
       return;
     }
 
+    // Only auto-initialize if currentStepId is null
     if (flowPhase === "profile" && !currentStepId) {
-      const firstProfileStep = schema.profile_questions[0];
-      if (firstProfileStep) {
-        setCurrentStepId(`profile:${firstProfileStep.id}`);
+      const firstUnansweredProfile = schema.profile_questions.find(
+        (q) => !profileAnswers[q.id]
+      );
+      if (firstUnansweredProfile) {
+        setCurrentStepId(`profile:${firstUnansweredProfile.id}`);
+      } else {
+        // All profile questions answered, go to review
+        setFlowPhase("profile-review");
       }
     }
 
     if (flowPhase === "assessment" && !currentStepId) {
-      setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
+      const nextStep = getNextStepId(profileAnswers, answers, profile);
+      if (nextStep) {
+        setCurrentStepId(nextStep);
+      } else {
+        // No more questions, assessment complete
+        setFlowPhase("complete");
+      }
     }
 
-    if (currentStepId && !isStepApplicable(currentStepId)) {
+    // Handle case where current step is no longer applicable (due to profile changes)
+    if (currentStepId && currentStepId.startsWith("question:") && !isStepApplicable(currentStepId)) {
       setCurrentStepId(getNextStepId(profileAnswers, answers, profile));
     }
   }, [
@@ -504,6 +517,11 @@ const Readiness = () => {
   }, [schema, profileAnswers]);
 
   const handleStartProfile = () => {
+    // Reset to first profile question when starting fresh
+    if (schema && schema.profile_questions.length > 0) {
+      setCurrentStepId(`profile:${schema.profile_questions[0].id}`);
+    }
+    setStepHistory([]);
     setFlowPhase("profile");
   };
 
@@ -793,12 +811,11 @@ const Readiness = () => {
             />
           )}
 
-          {/* Profile Questions Phase */}
           {flowPhase === "profile" && currentProfileQuestion && (
             <div className="px-6 py-8 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
                 <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
-                  Profile Setup • Question {Object.keys(profileAnswers).length + 1} of {schema.profile_questions.length}
+                  Profile Setup • Question {schema.profile_questions.findIndex(q => q.id === currentProfileQuestion.id) + 1} of {schema.profile_questions.length}
                 </p>
                 <h2 className="text-2xl font-display font-semibold text-foreground mt-2">
                   {currentProfileQuestion.prompt}
@@ -834,13 +851,12 @@ const Readiness = () => {
             </div>
           )}
 
-          {/* Assessment Questions Phase */}
           {flowPhase === "assessment" && currentQuestion && (
             <div className="px-6 py-8 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
               <div>
                 {currentSection && (
                   <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
-                    {currentSection.label} • Question {completedQuestionCount + 1} of {applicableQuestions.length}
+                    {currentSection.label} • Question {applicableQuestions.findIndex(q => q.id === currentQuestion.id) + 1} of {applicableQuestions.length}
                   </p>
                 )}
                 <h2 className="text-2xl font-display font-semibold text-foreground mt-2">
