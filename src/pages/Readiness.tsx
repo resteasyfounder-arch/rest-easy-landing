@@ -157,7 +157,7 @@ const callAgent = async (payload: Record<string, unknown>) => {
 
 // Loading skeleton component
 const LoadingSkeleton = () => (
-  <AppLayout hideBottomNav>
+  <AppLayout hideNav>
     <div className="min-h-screen flex flex-col bg-background">
       <header className="px-4 py-4 border-b border-border/50 flex items-center justify-between">
         <Skeleton className="h-10 w-16" />
@@ -197,7 +197,7 @@ const ErrorState = ({
   onRetry: () => void; 
   onExit: () => void;
 }) => (
-  <AppLayout hideBottomNav>
+  <AppLayout hideNav>
     <div className="min-h-screen flex items-center justify-center px-6 bg-background">
       <div className="text-center space-y-6 max-w-sm">
         <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -781,7 +781,7 @@ const Readiness = () => {
   const canGoBack = stepHistory.length > 0 || flowPhase === "profile";
 
   return (
-    <AppLayout hideBottomNav>
+    <AppLayout hideNav>
       <div className="min-h-screen flex flex-col bg-background">
         {/* Header */}
         <header className="px-4 py-4 border-b border-border/50 flex items-center justify-between">
