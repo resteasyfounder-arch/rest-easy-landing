@@ -1,7 +1,6 @@
 import { User, Settings, HelpCircle, FileText, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/layout/AppLayout";
-import Header from "@/components/Header";
 
 const menuItems = [
   { icon: User, label: "Account", description: "Manage your profile" },
@@ -13,8 +12,7 @@ const menuItems = [
 const MenuPage = () => {
   return (
     <AppLayout>
-      <Header />
-      <div className="pt-20 px-4 pb-8">
+      <div className="px-4 py-8">
         <div className="max-w-lg mx-auto">
           <h1 className="text-2xl font-display font-semibold text-foreground mb-6">
             Menu

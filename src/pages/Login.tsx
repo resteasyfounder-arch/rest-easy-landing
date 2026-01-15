@@ -15,7 +15,7 @@ const Login = () => {
   };
 
   return (
-    <AppLayout hideBottomNav>
+    <AppLayout hideNav>
       <div className="min-h-screen flex flex-col">
         {/* Mobile Back Button */}
         <div className="md:hidden p-4">
