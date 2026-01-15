@@ -17,6 +17,7 @@ const routeTitles: Record<string, string> = {
   "/results": "Your Results",
   "/menu": "Settings",
   "/login": "Sign In",
+  "/profile": "My Profile",
 };
 
 const DesktopLayout = ({ children }: DesktopLayoutProps) => {
