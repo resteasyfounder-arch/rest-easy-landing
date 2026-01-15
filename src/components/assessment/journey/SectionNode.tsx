@@ -82,22 +82,24 @@ const SectionNode = ({
           {label}
         </p>
         
-        {status === "current" && questionsTotal > 0 && (
+        {questionsTotal > 0 && (
           <div className="mt-1.5 space-y-1">
             <div className="h-1.5 bg-primary/20 rounded-full overflow-hidden">
               <div
-                className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                className={cn(
+                  "h-full rounded-full transition-all duration-500 ease-out",
+                  status === "completed" ? "bg-primary" : status === "current" ? "bg-primary" : "bg-primary/50"
+                )}
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {questionsCompleted} of {questionsTotal}
+            <p className={cn(
+              "text-xs",
+              status === "completed" ? "text-primary font-medium" : "text-muted-foreground"
+            )}>
+              {status === "completed" ? "Complete" : `${questionsCompleted} of ${questionsTotal}`}
             </p>
           </div>
-        )}
-        
-        {status === "completed" && (
-          <p className="text-xs text-primary font-medium mt-0.5">Complete</p>
         )}
       </div>
     </button>
