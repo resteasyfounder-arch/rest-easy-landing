@@ -208,6 +208,30 @@ html {
   }
 }
 
+/* Subtle floating animation for profile icons */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+/* Staggered animation delays for radial items */
+.animate-delay-0 { animation-delay: 0s; }
+.animate-delay-1 { animation-delay: 0.5s; }
+.animate-delay-2 { animation-delay: 1s; }
+.animate-delay-3 { animation-delay: 1.5s; }
+.animate-delay-4 { animation-delay: 2s; }
+.animate-delay-5 { animation-delay: 2.5s; }
+.animate-delay-6 { animation-delay: 3s; }
+.animate-delay-7 { animation-delay: 3.5s; }
+
 @keyframes fade-up {
   from {
     opacity: 0;

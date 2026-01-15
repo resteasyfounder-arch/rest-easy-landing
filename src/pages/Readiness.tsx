@@ -4,6 +4,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import ProfileIntro from "@/components/assessment/ProfileIntro";
 import ProfileReview from "@/components/assessment/ProfileReview";
 import ReadinessProgress from "@/components/assessment/ReadinessProgress";
+import { ProfilePromptModal } from "@/components/profile/ProfilePromptModal";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -263,6 +264,10 @@ const Readiness = () => {
   const [pendingValue, setPendingValue] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [scoreSaved, setScoreSaved] = useState(false);
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const [profilePromptDismissed, setProfilePromptDismissed] = useState(() => {
+    return sessionStorage.getItem("rest-easy.profile-prompt-dismissed") === "true";
+  });
 
   // Persist flow phase
   useEffect(() => {
@@ -306,7 +311,7 @@ const Readiness = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Check if profile is already complete on initial load - skip to assessment
+  // Check if profile is already complete on initial load - skip to assessment or show prompt
   useEffect(() => {
     if (!schema || loading) return;
     
@@ -320,8 +325,11 @@ const Readiness = () => {
     if (answeredProfileQuestions >= totalProfileQuestions) {
       console.log("Profile already complete, skipping to assessment");
       setFlowPhase("assessment");
+    } else if (!profilePromptDismissed && answeredProfileQuestions < totalProfileQuestions) {
+      // Show profile prompt if profile is incomplete and user hasn't dismissed it
+      setShowProfilePrompt(true);
     }
-  }, [schema, loading, flowPhase, profileAnswers]);
+  }, [schema, loading, flowPhase, profileAnswers, profilePromptDismissed]);
 
   // Handle ?edit=profile query parameter from Profile page
   useEffect(() => {
@@ -558,7 +566,14 @@ const Readiness = () => {
       setCurrentStepId(`profile:${schema.profile_questions[0].id}`);
     }
     setStepHistory([]);
+    setShowProfilePrompt(false);
     setFlowPhase("profile");
+  };
+
+  const handleSkipProfilePrompt = () => {
+    setShowProfilePrompt(false);
+    setProfilePromptDismissed(true);
+    sessionStorage.setItem("rest-easy.profile-prompt-dismissed", "true");
   };
 
   const handleContinueToAssessment = () => {
@@ -998,6 +1013,16 @@ const Readiness = () => {
           </footer>
         )}
       </div>
+
+      {/* Profile Prompt Modal */}
+      <ProfilePromptModal
+        open={showProfilePrompt}
+        onOpenChange={setShowProfilePrompt}
+        onStartProfile={handleStartProfile}
+        onSkip={handleSkipProfilePrompt}
+        completedCount={Object.keys(profileAnswers).length}
+        totalCount={schema.profile_questions.length}
+      />
     </AppLayout>
   );
 };
