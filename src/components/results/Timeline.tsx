@@ -1,5 +1,4 @@
-import { Calendar } from "lucide-react";
-import type { ReportTimeline } from "@/types/report";
+import type { ReportTimeline, TimelineItem } from "@/types/report";
 
 interface TimelineProps {
   timeline: ReportTimeline;
@@ -7,64 +6,49 @@ interface TimelineProps {
 
 const Timeline = ({ timeline }: TimelineProps) => {
   const phases = [
-    { label: "Weeks 1-2", subtitle: "Quick Starts", items: timeline.week_1_2, color: "bg-green-500" },
-    { label: "Months 1-2", subtitle: "Core Actions", items: timeline.month_1_2, color: "bg-amber-500" },
-    { label: "Months 3-6", subtitle: "Long-term Goals", items: timeline.month_3_6, color: "bg-primary" },
+    { label: "Within the Next 1-2 Weeks", subtitle: "Initial Triage & Conversations", items: timeline.week_1_2 },
+    { label: "Within the Next 1-2 Months", subtitle: "Legal & Home Foundation", items: timeline.month_1_2 },
+    { label: "Within the Next 3-6 Months", subtitle: "Deeper Dive & Ongoing Maintenance", items: timeline.month_3_6 },
   ];
 
   return (
-    <div className="print:break-inside-avoid">
-      <h2 className="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-        <Calendar className="h-5 w-5 text-primary" />
-        Suggested Timeline
+    <section className="mb-12 print:break-inside-avoid">
+      <h2 className="font-display text-2xl font-bold text-gray-900 mb-2 pb-2 border-b border-gray-200">
+        Practical Timeline
       </h2>
-      <p className="text-sm text-gray-600 font-body mb-6">
-        A roadmap for the next 6 months
+      <p className="font-body text-gray-600 mb-8">
+        To tackle these remaining areas:
       </p>
       
-      <div className="relative">
+      <div className="space-y-10">
         {phases.map((phase, phaseIndex) => (
-          <div key={phase.label} className="relative pb-6 last:pb-0">
-            {/* Connector Line */}
-            {phaseIndex < phases.length - 1 && (
-              <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gray-200" />
-            )}
+          <div key={phase.label} className="print:break-inside-avoid">
+            <h3 className="font-display text-xl font-bold text-gray-900 mb-1">
+              {phase.label}
+            </h3>
+            <p className="font-body text-gray-500 text-sm mb-4 italic">
+              {phase.subtitle}
+            </p>
             
-            <div className="flex gap-4">
-              {/* Phase Marker */}
-              <div className={`w-8 h-8 rounded-full ${phase.color} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                <span className="text-white text-sm font-bold">{phaseIndex + 1}</span>
-              </div>
-              
-              {/* Phase Content */}
-              <div className="flex-1 pb-4">
-                <div className="mb-3">
-                  <h3 className="font-body font-bold text-gray-900">{phase.label}</h3>
-                  <p className="text-sm text-gray-500 font-body">{phase.subtitle}</p>
-                </div>
-                <ul className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  {phase.items.map((item, itemIndex) => (
-                    <li key={itemIndex} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 flex-shrink-0" />
-                      <div className="flex-1">
-                        <span className="font-body font-semibold text-sm text-gray-900">
-                          {typeof item === 'string' ? item : item.title}
-                        </span>
-                        {typeof item !== 'string' && item.description && (
-                          <p className="font-body text-sm text-gray-600 mt-1 leading-relaxed">
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            <ul className="space-y-3">
+              {phase.items.map((item: string | TimelineItem, itemIndex: number) => {
+                const title = typeof item === 'string' ? item : item.title;
+                const description = typeof item === 'string' ? null : item.description;
+                
+                return (
+                  <li key={itemIndex} className="font-body text-gray-700 leading-relaxed">
+                    <span className="font-semibold text-gray-900">• {title}</span>
+                    {description && (
+                      <span className="text-gray-600">: {description}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 

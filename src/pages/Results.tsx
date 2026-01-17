@@ -21,6 +21,7 @@ import {
   ReportLoading,
 } from "@/components/results";
 import { ShareReportDialog } from "@/components/results/ShareReportDialog";
+import restEasyLogo from "@/assets/rest-easy-logo.png";
 
 const REPORT_STORAGE_KEY = "rest-easy.readiness.report";
 
@@ -51,7 +52,7 @@ const Results = () => {
       const html2pdf = (await import("html2pdf.js")).default;
       
       const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
+        margin: [0.75, 0.75, 0.75, 0.75],
         filename: `Rest-Easy-Readiness-Report-${new Date().toISOString().split('T')[0]}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, letterRendering: true },
@@ -89,7 +90,6 @@ const Results = () => {
     );
   }
 
-  // Default metrics if not present (backward compatibility)
   const metrics = report.metrics || {
     categoriesAssessed: report.category_analyses?.length || 9,
     strengthsIdentified: report.strengths?.length || 6,
@@ -101,103 +101,105 @@ const Results = () => {
     <AppLayout hideNav>
       {/* Sticky Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 print:hidden">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="gap-2 text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="h-4 w-4" />Dashboard
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Dashboard</span>
           </Button>
-          <h1 className="font-display font-semibold text-gray-900 hidden sm:block">Life Readiness Report</h1>
+          <h1 className="font-display font-semibold text-gray-900 text-sm">Life Readiness Report</h1>
           <div className="flex items-center gap-2">
             <ShareReportDialog report={report} />
-            <Button onClick={handleDownloadPDF} disabled={downloading} className="gap-2 bg-primary hover:bg-primary/90">
+            <Button onClick={handleDownloadPDF} disabled={downloading} size="sm" className="gap-2">
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              <span className="hidden sm:inline">{downloading ? "Generating..." : "Download PDF"}</span>
+              <span className="hidden sm:inline">{downloading ? "Generating..." : "Download"}</span>
             </Button>
           </div>
         </div>
       </header>
 
-      {/* PDF-Ready Report Content */}
-      <div ref={reportRef} className="pt-20 pb-24 bg-white min-h-screen print:pt-0">
-        <div className="max-w-4xl mx-auto px-6 print:px-8">
+      {/* Document-Style Report */}
+      <div ref={reportRef} className="pt-16 pb-24 bg-white min-h-screen print:pt-0 print:pb-0">
+        <div className="max-w-3xl mx-auto px-8 print:px-12 print:max-w-none">
+          
           {/* Cover Page */}
-          <CoverPage score={report.overallScore} tier={report.tier} userName={report.userName} generatedAt={report.generatedAt} metrics={metrics} />
+          <CoverPage 
+            score={report.overallScore} 
+            tier={report.tier} 
+            userName={report.userName} 
+            generatedAt={report.generatedAt} 
+            metrics={metrics} 
+          />
 
           {/* Table of Contents */}
           <TableOfContents />
 
           {/* Executive Summary */}
-          <section className="mb-8 print:break-inside-avoid">
-            <ExecutiveSummary summary={report.executive_summary} />
-          </section>
+          <ExecutiveSummary summary={report.executive_summary} />
 
           {/* Immediate Actions */}
-          <section className="mb-8 print:break-inside-avoid">
-            <ImmediateActions actions={report.immediate_actions} />
-          </section>
+          <ImmediateActions actions={report.immediate_actions} />
 
-          {/* Category Scores */}
-          <section className="mb-8 print:break-inside-avoid">
-            <CategoryScores categories={report.category_analyses} />
-          </section>
+          {/* Category Scores with Detailed Analysis */}
+          <CategoryScores categories={report.category_analyses} />
 
-          {/* Two Column: Strengths & Attention */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <section className="print:break-inside-avoid"><StrengthsSection strengths={report.strengths} /></section>
-            <section className="print:break-inside-avoid"><AttentionSection areas={report.areas_requiring_attention} /></section>
-          </div>
+          {/* Strengths */}
+          <StrengthsSection strengths={report.strengths} />
+
+          {/* Attention Areas */}
+          <AttentionSection areas={report.areas_requiring_attention} />
 
           {/* Action Plan */}
-          <section className="mb-8 print:break-inside-avoid">
-            <ActionPlan actions={report.action_plan} />
-          </section>
+          <ActionPlan actions={report.action_plan} />
 
           {/* Journey Reflection */}
           {report.journey_reflection && (
-            <section className="mb-8 print:break-inside-avoid">
-              <JourneyReflection reflection={report.journey_reflection} userName={report.userName} />
-            </section>
+            <JourneyReflection reflection={report.journey_reflection} userName={report.userName} />
           )}
 
           {/* Timeline */}
-          <section className="mb-8 print:break-inside-avoid">
-            <Timeline timeline={report.timeline} />
-          </section>
+          <Timeline timeline={report.timeline} />
 
           {/* Moving Forward */}
           {report.moving_forward && (
-            <section className="mb-8 print:break-inside-avoid">
-              <MovingForward content={report.moving_forward} userName={report.userName} />
-            </section>
+            <MovingForward content={report.moving_forward} userName={report.userName} />
           )}
 
           {/* Resources */}
-          <section className="mb-8 print:break-inside-avoid">
-            <ResourcesSection />
-          </section>
+          <ResourcesSection />
 
           {/* Closing Message */}
-          <section className="mb-8 print:break-inside-avoid">
-            <ClosingMessage message={report.closing_message} />
-          </section>
+          <ClosingMessage message={report.closing_message} />
 
           {/* Footer */}
-          <footer className="mt-12 pt-6 border-t border-gray-200 text-center print:break-inside-avoid">
-            <p className="text-sm text-gray-500 font-body">
-              This report was generated by Rest Easy on {new Date(report.generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          <footer className="border-t-2 border-gray-200 pt-8 mt-12 text-center print:break-inside-avoid">
+            <img src={restEasyLogo} alt="Rest Easy" className="h-10 mx-auto mb-4 opacity-60" />
+            <p className="text-xs text-gray-400 font-body mb-2">
+              End-of-Life Planning Services
             </p>
-            <p className="text-xs text-gray-400 mt-2">© {new Date().getFullYear()} Rest Easy. All rights reserved.</p>
+            <p className="text-xs text-gray-400 font-body mb-4 max-w-lg mx-auto">
+              This report was generated based on your assessment responses and is intended to provide guidance for your planning journey. 
+              The information contained herein is educational in nature and should not be considered legal, financial, or medical advice.
+            </p>
+            <p className="text-xs text-gray-500 font-body">
+              Generated: {new Date(report.generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              © {new Date().getFullYear()} Rest Easy. All rights reserved.
+            </p>
           </footer>
         </div>
       </div>
 
       {/* Bottom Actions */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 print:hidden">
-        <div className="max-w-4xl mx-auto flex gap-3">
-          <Button variant="outline" onClick={() => navigate("/readiness")} className="flex-1">Retake Assessment</Button>
+        <div className="max-w-3xl mx-auto flex gap-3">
+          <Button variant="outline" onClick={() => navigate("/readiness")} className="flex-1">
+            Retake Assessment
+          </Button>
           <ShareReportDialog report={report} />
           <Button onClick={handleDownloadPDF} disabled={downloading} className="flex-1 gap-2">
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Download Report
+            Download PDF
           </Button>
         </div>
       </div>
