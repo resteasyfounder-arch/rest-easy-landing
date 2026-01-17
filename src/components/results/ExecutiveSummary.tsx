@@ -1,6 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText } from "lucide-react";
-
 interface ExecutiveSummaryProps {
   summary: string;
 }
@@ -10,21 +7,19 @@ const ExecutiveSummary = ({ summary }: ExecutiveSummaryProps) => {
   const paragraphs = summary.split('\n\n').filter(p => p.trim());
 
   return (
-    <Card className="border-primary/20 bg-card shadow-soft">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <FileText className="h-5 w-5 text-primary" />
-          Executive Summary
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="print:break-inside-avoid">
+      <h2 className="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <span className="w-1 h-6 bg-primary rounded-full" />
+        Executive Summary
+      </h2>
+      <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
         {paragraphs.map((paragraph, index) => (
-          <p key={index} className="font-body text-sm leading-relaxed text-foreground/90">
+          <p key={index} className="font-body text-gray-700 leading-relaxed mb-4 last:mb-0">
             {paragraph}
           </p>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

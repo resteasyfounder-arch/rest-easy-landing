@@ -23,7 +23,7 @@ const navItems = [
   { title: "My Profile", url: "/profile", icon: UserCircle },
   { title: "Findability Score", url: "/assessment", icon: ClipboardList },
   { title: "Life Readiness", url: "/readiness", icon: Sparkles },
-  { title: "Results", url: "/results", icon: BarChart3 },
+  { title: "Readiness Report", url: "/results", icon: BarChart3 },
 ];
 
 const AppSidebar = () => {

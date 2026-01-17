@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,10 +8,10 @@ interface CategoryScoresProps {
 }
 
 const getScoreColor = (score: number) => {
-  if (score >= 80) return "text-green-600";
-  if (score >= 60) return "text-emerald-600";
-  if (score >= 40) return "text-amber-600";
-  return "text-red-500";
+  if (score >= 80) return "text-green-700";
+  if (score >= 60) return "text-emerald-700";
+  if (score >= 40) return "text-amber-700";
+  return "text-red-600";
 };
 
 const getProgressColor = (score: number) => {
@@ -26,36 +25,42 @@ const CategoryScores = ({ categories }: CategoryScoresProps) => {
   // Sort by score ascending to show areas needing work first
   const sortedCategories = [...categories].sort((a, b) => a.score - b.score);
 
+  // Handle score - could be decimal (0-1) or percentage (0-100)
+  const normalizeScore = (score: number) => {
+    return score <= 1 ? Math.round(score * 100) : Math.round(score);
+  };
+
   return (
-    <Card className="border-primary/20 bg-card shadow-soft">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <BarChart3 className="h-5 w-5 text-primary" />
-          Category Breakdown
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {sortedCategories.map((category) => (
-          <div key={category.section_id} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-body text-sm font-medium text-foreground">
-                {category.section_label}
-              </span>
-              <span className={cn("text-sm font-body font-semibold", getScoreColor(category.score))}>
-                {category.score}%
-              </span>
+    <div className="print:break-inside-avoid">
+      <h2 className="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <BarChart3 className="h-5 w-5 text-primary" />
+        Category Breakdown
+      </h2>
+      <div className="space-y-5">
+        {sortedCategories.map((category) => {
+          const normalizedScore = normalizeScore(category.score);
+          return (
+            <div key={category.section_id} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-sm font-semibold text-gray-900">
+                  {category.section_label}
+                </span>
+                <span className={cn("text-sm font-body font-bold", getScoreColor(normalizedScore))}>
+                  {normalizedScore}%
+                </span>
+              </div>
+              <Progress 
+                value={normalizedScore} 
+                className={cn("h-2 bg-gray-200", getProgressColor(normalizedScore))} 
+              />
+              <p className="font-body text-xs text-gray-600 leading-relaxed">
+                {category.analysis}
+              </p>
             </div>
-            <Progress 
-              value={category.score} 
-              className={cn("h-2", getProgressColor(category.score))} 
-            />
-            <p className="font-body text-xs text-muted-foreground leading-relaxed">
-              {category.analysis}
-            </p>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+          );
+        })}
+      </div>
+    </div>
   );
 };
 
