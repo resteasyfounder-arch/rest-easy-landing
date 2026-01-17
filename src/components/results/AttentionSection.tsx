@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AttentionArea } from "@/types/report";
@@ -16,53 +15,49 @@ const AttentionSection = ({ areas }: AttentionSectionProps) => {
   });
 
   return (
-    <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-red-500/5 shadow-soft">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <AlertTriangle className="h-5 w-5 text-amber-600" />
-          Areas Requiring Attention
-        </CardTitle>
-        <p className="text-sm text-muted-foreground font-body">
-          Focus areas to improve your readiness
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-3">
-          {sortedAreas.map((area, index) => (
-            <div
-              key={index}
-              className={cn(
-                "p-3 rounded-lg border",
-                area.priority === "PRIORITY"
-                  ? "bg-red-500/5 border-red-500/30"
-                  : "bg-background/60 border-amber-500/20"
-              )}
-            >
-              <div className="flex items-start gap-2">
-                <span
-                  className={cn(
-                    "text-[10px] font-body font-bold px-1.5 py-0.5 rounded",
-                    area.priority === "PRIORITY"
-                      ? "bg-red-500/20 text-red-700"
-                      : "bg-amber-500/20 text-amber-700"
-                  )}
-                >
-                  {area.priority}
-                </span>
-                <div className="flex-1">
-                  <h4 className="font-body font-semibold text-sm text-foreground">
-                    {area.title}
-                  </h4>
-                  <p className="font-body text-xs text-muted-foreground mt-1 leading-relaxed">
-                    {area.description}
-                  </p>
-                </div>
+    <div className="print:break-inside-avoid">
+      <h2 className="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <AlertTriangle className="h-5 w-5 text-amber-600" />
+        Areas Requiring Attention
+      </h2>
+      <p className="text-sm text-gray-600 font-body mb-4">
+        Focus areas to improve your readiness
+      </p>
+      <div className="space-y-3">
+        {sortedAreas.map((area, index) => (
+          <div
+            key={index}
+            className={cn(
+              "p-4 rounded-lg border",
+              area.priority === "PRIORITY"
+                ? "bg-red-50 border-red-200"
+                : "bg-amber-50 border-amber-200"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className={cn(
+                  "text-xs font-body font-bold px-2 py-1 rounded",
+                  area.priority === "PRIORITY"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-amber-100 text-amber-700"
+                )}
+              >
+                {area.priority}
+              </span>
+              <div className="flex-1">
+                <h3 className="font-body font-semibold text-gray-900 mb-1">
+                  {area.title}
+                </h3>
+                <p className="font-body text-sm text-gray-600 leading-relaxed">
+                  {area.description}
+                </p>
               </div>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 

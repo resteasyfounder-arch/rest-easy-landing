@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ReportTier } from "@/types/report";
+import restEasyLogo from "@/assets/rest-easy-logo.png";
 
 interface ReportHeaderProps {
   score: number;
@@ -10,10 +11,10 @@ interface ReportHeaderProps {
 }
 
 const tierColors: Record<ReportTier, { border: string; bg: string; text: string }> = {
-  "Rest Easy Ready": { border: "border-green-500", bg: "bg-green-500/10", text: "text-green-700" },
-  "Well Prepared": { border: "border-emerald-500", bg: "bg-emerald-500/10", text: "text-emerald-700" },
-  "On Your Way": { border: "border-amber-500", bg: "bg-amber-500/10", text: "text-amber-700" },
-  "Getting Started": { border: "border-red-400", bg: "bg-red-400/10", text: "text-red-700" },
+  "Rest Easy Ready": { border: "border-green-600", bg: "bg-green-50", text: "text-green-700" },
+  "Well Prepared": { border: "border-emerald-600", bg: "bg-emerald-50", text: "text-emerald-700" },
+  "On Your Way": { border: "border-amber-600", bg: "bg-amber-50", text: "text-amber-700" },
+  "Getting Started": { border: "border-orange-500", bg: "bg-orange-50", text: "text-orange-700" },
 };
 
 const ReportHeader = ({ score, tier, userName, generatedAt }: ReportHeaderProps) => {
@@ -46,38 +47,52 @@ const ReportHeader = ({ score, tier, userName, generatedAt }: ReportHeaderProps)
   });
 
   return (
-    <div className="text-center space-y-4 py-6">
-      <p className="text-sm text-muted-foreground font-body">
-        Generated {formattedDate}
-      </p>
+    <div className="border-b border-gray-200 pb-8">
+      {/* Logo and Title */}
+      <div className="flex items-center justify-between mb-6">
+        <img src={restEasyLogo} alt="Rest Easy" className="h-10 print:h-8" />
+        <p className="text-sm text-gray-500 font-body">
+          {formattedDate}
+        </p>
+      </div>
+
+      {/* Report Title */}
+      <div className="text-center mb-8">
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+          Life Readiness Report
+        </h1>
+        <p className="text-lg text-gray-600 font-body">
+          Prepared for {userName}
+        </p>
+      </div>
       
-      {/* Score circle + badge */}
-      <div className="flex flex-col items-center gap-3">
+      {/* Score Display */}
+      <div className="flex flex-col items-center gap-4">
         <div
           className={cn(
-            "w-28 h-28 rounded-full flex items-center justify-center border-4 transition-all duration-500",
+            "w-32 h-32 rounded-full flex items-center justify-center border-4 print:border-2",
             colors.border,
             colors.bg
           )}
         >
-          <span className="font-display text-4xl font-bold text-foreground">
-            {displayScore}%
-          </span>
+          <div className="text-center">
+            <span className="font-display text-4xl font-bold text-gray-900 block">
+              {displayScore}
+            </span>
+            <span className="text-sm text-gray-500 font-body">out of 100</span>
+          </div>
         </div>
-        <span
+        
+        <div
           className={cn(
-            "inline-block px-4 py-1.5 rounded-full text-sm font-body font-medium",
+            "inline-flex items-center px-4 py-2 rounded-full text-sm font-body font-semibold",
             colors.bg,
             colors.text
           )}
         >
           {tier}
-        </span>
+        </div>
       </div>
-
-      <h1 className="font-display text-2xl md:text-3xl font-semibold text-foreground">
-        {userName}'s Life Readiness Report
-      </h1>
     </div>
   );
 };

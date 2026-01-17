@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap } from "lucide-react";
 import type { ImmediateAction } from "@/types/report";
 
@@ -11,39 +10,37 @@ const ImmediateActions = ({ actions }: ImmediateActionsProps) => {
   const sortedActions = [...actions].sort((a, b) => a.priority - b.priority);
 
   return (
-    <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5 shadow-soft">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <Zap className="h-5 w-5 text-amber-600" />
-          Immediate Actions
-        </CardTitle>
-        <p className="text-sm text-muted-foreground font-body">
-          Your top priorities to address this week
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="print:break-inside-avoid">
+      <h2 className="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <Zap className="h-5 w-5 text-amber-600" />
+        Quick Wins
+      </h2>
+      <p className="text-sm text-gray-600 font-body mb-4">
+        Your top priorities to address this week
+      </p>
+      <div className="space-y-3">
         {sortedActions.map((action, index) => (
           <div
             key={index}
-            className="flex gap-3 p-3 rounded-lg bg-background/60 border border-border/50"
+            className="flex gap-4 p-4 rounded-lg bg-amber-50 border border-amber-200"
           >
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center">
-              <span className="font-display text-sm font-bold text-amber-700">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+              <span className="font-display text-sm font-bold text-white">
                 {index + 1}
               </span>
             </div>
-            <div className="flex-1 space-y-1">
-              <h4 className="font-body font-semibold text-sm text-foreground">
+            <div className="flex-1">
+              <h3 className="font-body font-semibold text-gray-900 mb-1">
                 {action.title}
-              </h4>
-              <p className="font-body text-xs text-muted-foreground leading-relaxed">
+              </h3>
+              <p className="font-body text-sm text-gray-600 leading-relaxed">
                 {action.description}
               </p>
             </div>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
