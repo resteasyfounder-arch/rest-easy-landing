@@ -895,66 +895,6 @@ const Readiness = () => {
     persistScore();
   }, [flowPhase, results, subjectId, scoreSaved]);
 
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
-
-  if (fatalError) {
-    return (
-      <ErrorState 
-        error={fatalError} 
-        onRetry={bootstrap} 
-        onExit={handleExit} 
-      />
-    );
-  }
-
-  if (!schema) {
-    return null;
-  }
-
-  const showNavigation = flowPhase !== "intro" && flowPhase !== "complete";
-  const canGoBack = stepHistory.length > 0 || flowPhase === "profile";
-
-  // Intro Phase
-  if (flowPhase === "intro") {
-    return (
-      <AppLayout hideNav>
-        <div className="min-h-screen flex flex-col bg-background">
-          <header className="flex items-center justify-end px-4 h-14">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleExit}
-              className="touch-target press-effect"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </header>
-          <div className="flex-1 overflow-y-auto">
-            <GentleIntro
-              headline="Let's understand what matters most to you."
-              description="A few quick questions help us personalize your experience. You can always change these later."
-              subtext="About 5 minutes · Your progress is saved automatically"
-              ctaLabel="Get Started"
-              onStart={handleStartProfile}
-            />
-          </div>
-          <ProfilePromptModal
-            open={showProfilePrompt}
-            onOpenChange={setShowProfilePrompt}
-            onStartProfile={handleStartProfile}
-            onSkip={handleSkipProfilePrompt}
-            completedCount={Object.keys(profileAnswers).length}
-            totalCount={schema.profile_questions.length}
-          />
-        </div>
-      </AppLayout>
-    );
-  }
-
-
   // Complete Phase - Generate report and redirect
   useEffect(() => {
     if (flowPhase !== "complete" || !results || !schema) return;
@@ -1038,6 +978,66 @@ const Readiness = () => {
 
     generateReport();
   }, [flowPhase, results, schema, answers, profile, navigate]);
+
+  if (loading) {
+    return <LoadingSkeleton />;
+  }
+
+  if (fatalError) {
+    return (
+      <ErrorState 
+        error={fatalError} 
+        onRetry={bootstrap} 
+        onExit={handleExit} 
+      />
+    );
+  }
+
+  if (!schema) {
+    return null;
+  }
+
+  const showNavigation = flowPhase !== "intro" && flowPhase !== "complete";
+  const canGoBack = stepHistory.length > 0 || flowPhase === "profile";
+
+  // Intro Phase
+  if (flowPhase === "intro") {
+    return (
+      <AppLayout hideNav>
+        <div className="min-h-screen flex flex-col bg-background">
+          <header className="flex items-center justify-end px-4 h-14">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleExit}
+              className="touch-target press-effect"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </header>
+          <div className="flex-1 overflow-y-auto">
+            <GentleIntro
+              headline="Let's understand what matters most to you."
+              description="A few quick questions help us personalize your experience. You can always change these later."
+              subtext="About 5 minutes · Your progress is saved automatically"
+              ctaLabel="Get Started"
+              onStart={handleStartProfile}
+            />
+          </div>
+          <ProfilePromptModal
+            open={showProfilePrompt}
+            onOpenChange={setShowProfilePrompt}
+            onStartProfile={handleStartProfile}
+            onSkip={handleSkipProfilePrompt}
+            completedCount={Object.keys(profileAnswers).length}
+            totalCount={schema.profile_questions.length}
+          />
+        </div>
+      </AppLayout>
+    );
+  }
+
 
   // Complete Phase - Show loading while generating
   if (flowPhase === "complete") {
