@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import logo from "@/assets/rest-easy-logo.png";
 
 const navItems = [
-  { title: "Home", url: "/", icon: Home },
+  { title: "Home", url: "/dashboard", icon: Home },
   { title: "My Profile", url: "/profile", icon: UserCircle },
   { title: "Findability Score", url: "/assessment", icon: ClipboardList },
   { title: "Life Readiness", url: "/readiness", icon: Sparkles },
