@@ -33,33 +33,48 @@ interface ReportRequest {
   };
 }
 
-const systemPrompt = `You are a compassionate end-of-life planning advisor for Rest Easy. Your role is to analyze assessment results and generate personalized, actionable reports that help people prepare for the future.
+const systemPrompt = `You are a compassionate, experienced end-of-life planning advisor for Rest Easy. Your role is to analyze assessment results and generate comprehensive, deeply personalized reports that guide people through their planning journey.
+
+REPORT STYLE - FOLLOW THIS EXAMPLE CLOSELY:
+This is an excerpt from a real report you should emulate. Notice the depth, personal touches, and specific references to answers:
+
+"Dear Alex Murray, Welcome to your personalized Rest Easy End-of-Life Preparedness Report! It's clear from your responses that you are a thoughtful and proactive individual, and we commend your dedication to planning for the future. You're 'On Your Way' with an impressive overall preparedness score of 70%, which is a fantastic foundation to build upon.
+
+We've observed several key strengths in your approach, Alex. Your proactive engagement in estate planning, highlighted by having a properly executed Will and a Financial Power of Attorney, sets a strong precedent. It's particularly impressive that you have very clear and detailed preferences for your funeral or memorial, including music and readings, and have even documented and shared these wishes..."
+
+KEY WRITING GUIDELINES:
+1. ADDRESS THE USER BY THEIR FIRST NAME FREQUENTLY throughout the report (at least 2-3 times per major section)
+2. Reference SPECIFIC answers they gave - quote their responses when relevant
+3. Connect their profile details (age, family status, dependents) to your recommendations
+4. Write in flowing paragraphs, not bullet points, for narrative sections
+5. Be WARM and ENCOURAGING while being honest about gaps
+6. Use phrases like "It's wonderful to see...", "This is commendable...", "You've clearly put thought into..."
+7. Make connections between different areas (e.g., "Since you have dependents and haven't yet...")
+8. Provide SPECIFIC, ACTIONABLE advice - not vague suggestions
+9. Write substantial content - each analysis paragraph should be 3-5 sentences minimum
 
 TONE & VOICE:
-- Warm, supportive, and non-judgmental
-- Encouraging about progress made, realistic about gaps
+- Warm, supportive, like a trusted advisor
+- Celebratory about achievements before addressing gaps
 - Never alarmist, always constructive
-- Address the user by their first name throughout
-- Use "you" and "your" to keep it personal
-- Celebrate strengths genuinely before addressing gaps
-- Write in a professional yet approachable manner
+- Professional yet approachable
+- Empathetic and understanding
 
 SCORING CONTEXT:
-- Answer values and their scores:
-  - "yes" = fully prepared (1.0)
-  - "partial" = in progress (0.5)
-  - "no" = not addressed (0.0)
-  - "not_sure" = needs clarification (0.25)
-  - "na" = not applicable (excluded from scoring)
+- "yes" = fully prepared (1.0)
+- "partial" = in progress (0.5)
+- "no" = not addressed (0.0)
+- "not_sure" = needs clarification (0.25)
+- "na" = not applicable (excluded)
 
-TIER DEFINITIONS (from score bands):
+TIER DEFINITIONS:
 - 80-100%: "Rest Easy Ready" - Highly Prepared
-- 60-79%: "Well Prepared" - Moderately Prepared
+- 60-79%: "Well Prepared" - Moderately Prepared  
 - 40-59%: "On Your Way" - Limited Preparedness
-- 0-39%: "Getting Started" - Low Readiness / High Risk
+- 0-39%: "Getting Started" - Low Readiness
 
-SECTION WEIGHTS (for prioritization - higher weight = more important):
-- Legal Planning: 25% (highest priority)
+SECTION WEIGHTS (higher = more important):
+- Legal Planning: 25%
 - Financial & Insurance: 20%
 - Health Care: 15%
 - Family Relationships: 10%
@@ -69,17 +84,9 @@ SECTION WEIGHTS (for prioritization - higher weight = more important):
 - Home & Personal Property: 3%
 - Emotional & Spiritual: 3%
 - Document Storage: 2%
-- Supporting Aging Parents: 2% (if applicable)
+- Supporting Aging Parents: 2%
 
-ANALYSIS GUIDELINES:
-1. Identify patterns in answers - multiple "no" answers in one section = major gap
-2. Connect profile to answers - if they have dependents but haven't documented guardian info, flag this
-3. Prioritize action items by impact (weight) and ease of completion
-4. Provide specific, actionable recommendations, not vague advice
-5. Reference specific answers to make feedback feel personalized
-6. Consider life stage context from profile data
-7. High-weight sections with low scores should be emphasized as priorities
-8. Look for quick wins - items marked "partial" that can easily become "yes"`;
+IMPORTANT: Generate COMPREHENSIVE content. Each section should have substantial detail matching the example PDF format. The executive summary alone should be 2-3 full paragraphs.`;
 
 function buildUserPrompt(data: ReportRequest): string {
   const profileDetails = Object.entries(data.profile)
@@ -87,6 +94,7 @@ function buildUserPrompt(data: ReportRequest): string {
     .join('\n');
 
   const sectionScoresText = Object.entries(data.sectionScores)
+    .sort((a, b) => b[1].score - a[1].score)
     .map(([id, info]) => `- ${info.label}: ${info.score}% (weight: ${info.weight}%)`)
     .join('\n');
 
@@ -106,14 +114,21 @@ function buildUserPrompt(data: ReportRequest): string {
       const sectionScore = sectionInfo?.score || 0;
       
       const answersText = sectionAnswers
-        .map(a => `Q: ${a.question_text}\nA: ${a.answer_label} (Score: ${a.score_fraction !== null ? a.score_fraction : 'N/A'})`)
+        .map(a => `Q: ${a.question_text}\nA: ${a.answer_label} (value: "${a.answer_value}", score: ${a.score_fraction !== null ? a.score_fraction : 'N/A'})`)
         .join('\n\n');
       
       return `## ${sectionLabel} (Score: ${sectionScore}%)\n${answersText}`;
     })
     .join('\n\n');
 
-  return `Generate a comprehensive End-of-Life Readiness Report for the following user.
+  // Count metrics
+  const numSections = Object.keys(data.sectionScores).length;
+  const yesAnswers = data.answers.filter(a => a.answer_value === 'yes').length;
+  const noAnswers = data.answers.filter(a => a.answer_value === 'no').length;
+
+  return `Generate a COMPREHENSIVE End-of-Life Readiness Report for ${data.userName}.
+
+IMPORTANT: This report should be detailed and thorough, like a 10-15 page professional document. Each section needs substantial content.
 
 USER PROFILE:
 - Name: ${data.userName}
@@ -122,45 +137,66 @@ ${profileDetails}
 ASSESSMENT RESULTS:
 - Overall Score: ${data.overallScore}%
 - Tier: ${data.tier}
+- Categories Assessed: ${numSections}
+- Strong Areas (yes answers): ${yesAnswers}
+- Areas to Address (no answers): ${noAnswers}
 
-SECTION SCORES:
+SECTION SCORES (sorted by performance):
 ${sectionScoresText}
 
-DETAILED ANSWERS:
+DETAILED ANSWERS BY SECTION:
 ${detailedAnswersText}
 
-Based on this data, generate the report using the generate_report function. Make it personal, actionable, and encouraging.`;
+Generate the report using the generate_report function. Remember to:
+1. Address ${data.userName} by name frequently throughout
+2. Reference specific answers they gave
+3. Write flowing, substantial paragraphs (not terse bullet points)
+4. Be warm, encouraging, and specific
+5. Make connections between their profile and their answers
+6. The executive_summary should be 2-3 full paragraphs
+7. Each category_analysis should be 3-5 sentences minimum
+8. The journey_reflection summary should be 2-3 paragraphs
+9. The closing_message should be 2-3 warm paragraphs`;
 }
 
 const reportToolDefinition = {
   type: "function",
   function: {
     name: "generate_report",
-    description: "Generate structured report sections based on assessment data",
+    description: "Generate a comprehensive, professional readiness report",
     parameters: {
       type: "object",
       properties: {
         tier: {
           type: "string",
-          enum: ["Getting Started", "On Your Way", "Well Prepared", "Rest Easy Ready"],
-          description: "The readiness tier based on overall score"
+          enum: ["Getting Started", "On Your Way", "Well Prepared", "Rest Easy Ready"]
+        },
+        metrics: {
+          type: "object",
+          properties: {
+            categoriesAssessed: { type: "number" },
+            strengthsIdentified: { type: "number" },
+            areasToAddress: { type: "number" },
+            actionItems: { type: "number" }
+          },
+          required: ["categoriesAssessed", "strengthsIdentified", "areasToAddress", "actionItems"]
         },
         executive_summary: {
           type: "string",
-          description: "2-3 paragraphs addressing user by name, summarizing score, key strengths, and main opportunities. Warm and encouraging tone."
+          description: "2-3 substantial paragraphs (200-300 words total). Start with warm greeting using their name. Summarize overall score, key strengths, main opportunities. Reference specific answers. End with encouragement."
         },
         immediate_actions: {
           type: "array",
           items: {
             type: "object",
             properties: {
-              title: { type: "string" },
-              description: { type: "string", description: "2-3 sentences explaining what to do and why" },
-              priority: { type: "number", description: "1 = highest priority, 3 = lowest" }
+              title: { type: "string", description: "Action title like 'Prioritize Legal & Financial Foundations'" },
+              description: { type: "string", description: "3-4 sentences explaining what to do, why it matters, and specific steps" },
+              priority: { type: "number" }
             },
             required: ["title", "description", "priority"]
           },
-          description: "Top 3 highest-impact actions to take immediately"
+          description: "Top 3 highest-impact immediate actions with detailed descriptions"
         },
         category_analyses: {
           type: "array",
@@ -170,36 +206,35 @@ const reportToolDefinition = {
               section_id: { type: "string" },
               section_label: { type: "string" },
               score: { type: "number" },
-              analysis: { type: "string", description: "2-4 sentences analyzing this category's results, referencing specific answers" }
+              analysis: { type: "string", description: "3-5 sentences analyzing this category. Reference specific answers. Mention what's strong and what needs work. Be personal and use their name." }
             },
             required: ["section_id", "section_label", "score", "analysis"]
-          },
-          description: "Analysis for each section that has answers"
+          }
         },
         strengths: {
           type: "array",
           items: {
             type: "object",
             properties: {
-              title: { type: "string", description: "Short title like 'Proactive Estate Planning'" },
-              description: { type: "string", description: "2-3 sentences explaining why this is a strength" }
+              title: { type: "string", description: "Descriptive title like 'Proactive in Estate Planning' or 'Clear Funeral Preferences'" },
+              description: { type: "string", description: "2-3 sentences explaining why this is a strength and its impact. Reference their specific answers." }
             },
             required: ["title", "description"]
           },
-          description: "4-6 key strengths based on 'yes' answers and high section scores"
+          description: "4-6 key strengths with titles and full paragraph descriptions"
         },
         areas_requiring_attention: {
           type: "array",
           items: {
             type: "object",
             properties: {
-              title: { type: "string" },
-              description: { type: "string" },
+              title: { type: "string", description: "Descriptive title like 'Unresolved Legal Worries' or 'Digital Life Unaddressed'" },
+              description: { type: "string", description: "2-3 sentences explaining the gap and its potential impact. Reference their specific answers." },
               priority: { type: "string", enum: ["PRIORITY", "IMPORTANT"] }
             },
             required: ["title", "description", "priority"]
           },
-          description: "4-6 key gaps based on 'no' answers and low section scores. PRIORITY for critical items, IMPORTANT for secondary."
+          description: "4-6 areas needing attention with PRIORITY for critical items, IMPORTANT for secondary"
         },
         action_plan: {
           type: "array",
@@ -207,31 +242,112 @@ const reportToolDefinition = {
             type: "object",
             properties: {
               title: { type: "string" },
-              description: { type: "string" },
-              why_it_matters: { type: "string" },
+              description: { type: "string", description: "2-3 sentences with specific, actionable steps" },
+              why_it_matters: { type: "string", description: "1-2 sentences explaining the importance" },
               effort: { type: "string", enum: ["Less than 1 hour", "A few hours", "May require professional assistance"] },
               timeline: { type: "string", enum: ["Complete this week", "Complete this month", "Complete within 3 months"] },
               priority: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] }
             },
             required: ["title", "description", "why_it_matters", "effort", "timeline", "priority"]
           },
-          description: "6-8 specific action items prioritized by impact"
+          description: "6-8 detailed action items"
+        },
+        journey_reflection: {
+          type: "object",
+          properties: {
+            summary: { type: "string", description: "2-3 paragraphs reflecting on their overall journey. Address them by name. Discuss their strongest areas, growth opportunities, and how their life stage impacts recommendations." },
+            strongest_area: {
+              type: "object",
+              properties: {
+                category: { type: "string" },
+                score: { type: "number" },
+                insight: { type: "string", description: "2-3 sentences about what makes this area strong" }
+              },
+              required: ["category", "score", "insight"]
+            },
+            growth_areas: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  category: { type: "string" },
+                  score: { type: "number" },
+                  insight: { type: "string" }
+                },
+                required: ["category", "score", "insight"]
+              }
+            },
+            response_highlights: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question_context: { type: "string", description: "Reference to a specific answer they gave" },
+                  implication: { type: "string", description: "What this answer means for their planning" }
+                },
+                required: ["question_context", "implication"]
+              },
+              description: "2-3 specific response highlights that shaped recommendations"
+            }
+          },
+          required: ["summary", "strongest_area", "growth_areas", "response_highlights"]
         },
         timeline: {
           type: "object",
           properties: {
-            week_1_2: { type: "array", items: { type: "string" }, description: "3-4 quick wins for the first two weeks" },
-            month_1_2: { type: "array", items: { type: "string" }, description: "3-4 medium-term goals for months 1-2" },
-            month_3_6: { type: "array", items: { type: "string" }, description: "3-4 longer-term goals for months 3-6" }
+            week_1_2: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string", description: "2-3 sentences with specific steps" }
+                },
+                required: ["title", "description"]
+              },
+              description: "3-4 quick wins for first two weeks"
+            },
+            month_1_2: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" }
+                },
+                required: ["title", "description"]
+              },
+              description: "3-4 medium-term goals"
+            },
+            month_3_6: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" }
+                },
+                required: ["title", "description"]
+              },
+              description: "3-4 longer-term goals"
+            }
           },
           required: ["week_1_2", "month_1_2", "month_3_6"]
         },
+        response_reflection: {
+          type: "string",
+          description: "1-2 paragraphs reflecting on specific answers they gave and how those shaped recommendations. Reference their actual responses."
+        },
+        moving_forward: {
+          type: "string",
+          description: "2-3 paragraphs providing personalized guidance for their next steps. Address them by name. Connect their profile to specific advice."
+        },
         closing_message: {
           type: "string",
-          description: "Warm, personalized 2-3 paragraph closing letter addressing user by name, celebrating their progress and encouraging next steps"
+          description: "2-3 warm, personalized paragraphs. Address them by name. Celebrate their progress. Encourage next steps. Sign off warmly as 'Your Rest Easy Advisor'."
         }
       },
-      required: ["tier", "executive_summary", "immediate_actions", "category_analyses", "strengths", "areas_requiring_attention", "action_plan", "timeline", "closing_message"]
+      required: ["tier", "metrics", "executive_summary", "immediate_actions", "category_analyses", "strengths", "areas_requiring_attention", "action_plan", "journey_reflection", "timeline", "response_reflection", "moving_forward", "closing_message"]
     }
   }
 };
@@ -258,14 +374,14 @@ serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON payload" }, 400);
   }
 
-  // Validate required fields
   if (!payload.userName || !payload.answers || payload.answers.length === 0) {
     return jsonResponse({ error: "Missing required fields: userName and answers" }, 400);
   }
 
-  console.log("Generating report for user:", payload.userName);
+  console.log("Generating comprehensive report for:", payload.userName);
   console.log("Overall score:", payload.overallScore);
   console.log("Number of answers:", payload.answers.length);
+  console.log("Number of sections:", Object.keys(payload.sectionScores).length);
 
   try {
     const userPrompt = buildUserPrompt(payload);
@@ -284,7 +400,8 @@ serve(async (req) => {
         ],
         tools: [reportToolDefinition],
         tool_choice: { type: "function", function: { name: "generate_report" } },
-        temperature: 0.7,
+        temperature: 0.75,
+        max_tokens: 8000,
       }),
     });
 
@@ -303,9 +420,8 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("OpenAI response received");
+    console.log("OpenAI response received, tokens used:", data.usage?.total_tokens);
 
-    // Extract the tool call response
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.function.name !== "generate_report") {
       console.error("Unexpected response format:", JSON.stringify(data));
@@ -316,7 +432,7 @@ serve(async (req) => {
     try {
       reportContent = JSON.parse(toolCall.function.arguments);
     } catch (_err) {
-      console.error("Failed to parse tool call arguments:", toolCall.function.arguments);
+      console.error("Failed to parse tool call arguments");
       return jsonResponse({ error: "Failed to parse report content" }, 500);
     }
 
@@ -328,7 +444,7 @@ serve(async (req) => {
       userName: payload.userName,
     };
 
-    console.log("Report generated successfully for:", payload.userName);
+    console.log("Comprehensive report generated successfully for:", payload.userName);
 
     return jsonResponse({ report });
   } catch (err) {
