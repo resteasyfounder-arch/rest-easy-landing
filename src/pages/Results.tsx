@@ -3,47 +3,65 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/layout/AppLayout";
 import Header from "@/components/Header";
-import { calculateScore, type AnswerValue } from "@/data/findabilityQuestions";
-import ResultsScoreHero from "@/components/assessment/results/ResultsScoreHero";
-import ResultsBreakdown from "@/components/assessment/results/ResultsBreakdown";
-import RescueMissionPreview from "@/components/assessment/results/RescueMissionPreview";
-import LifeReadinessTeaser from "@/components/assessment/results/LifeReadinessTeaser";
-import ResultsTrustSection from "@/components/assessment/results/ResultsTrustSection";
-import ResultsCTA from "@/components/assessment/results/ResultsCTA";
+import type { ReadinessReport } from "@/types/report";
+import {
+  ReportHeader,
+  ExecutiveSummary,
+  ImmediateActions,
+  CategoryScores,
+  StrengthsSection,
+  AttentionSection,
+  ActionPlan,
+  Timeline,
+  ClosingMessage,
+  ReportLoading,
+} from "@/components/results";
 
-interface StoredResults {
-  score: number;
-  biggestRisk: string;
-  answers: Record<string, AnswerValue>;
-  completedAt: string;
-}
+const REPORT_STORAGE_KEY = "rest-easy.readiness.report";
 
 const Results = () => {
   const navigate = useNavigate();
-  const [results, setResults] = useState<StoredResults | null>(null);
+  const [report, setReport] = useState<ReadinessReport | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem("findabilityResults");
+    const stored = localStorage.getItem(REPORT_STORAGE_KEY);
     if (stored) {
-      setResults(JSON.parse(stored));
+      try {
+        setReport(JSON.parse(stored));
+      } catch (err) {
+        console.error("Failed to parse stored report:", err);
+      }
     }
+    setLoading(false);
   }, []);
 
-  // No results - prompt to take assessment
-  if (!results) {
+  if (loading) {
+    return (
+      <AppLayout>
+        <Header />
+        <div className="pt-20">
+          <ReportLoading />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // No report - prompt to take assessment
+  if (!report) {
     return (
       <AppLayout>
         <Header />
         <div className="pt-20 px-4 pb-8">
           <div className="max-w-lg mx-auto text-center py-12">
             <h1 className="text-3xl font-display font-semibold text-foreground mb-4">
-              Your Results
+              Your Readiness Report
             </h1>
             <p className="text-muted-foreground font-body mb-8">
-              Complete the Findability Score assessment to see your personalized results and recommendations.
+              Complete the Life Readiness assessment to receive your personalized report with actionable recommendations.
             </p>
-            <Button onClick={() => navigate("/assessment")} className="press-effect">
-              Get Your Findability Score
+            <Button onClick={() => navigate("/readiness")} className="press-effect">
+              Start Life Readiness Assessment
             </Button>
           </div>
         </div>
@@ -55,24 +73,48 @@ const Results = () => {
     <AppLayout>
       <Header />
       <div className="pt-20 pb-8">
-        <div className="max-w-lg mx-auto px-4 space-y-8">
-          {/* Score Hero */}
-          <ResultsScoreHero score={results.score} />
+        <div className="max-w-2xl mx-auto px-4 space-y-6">
+          {/* Report Header */}
+          <ReportHeader
+            score={report.overallScore}
+            tier={report.tier}
+            userName={report.userName}
+            generatedAt={report.generatedAt}
+          />
 
-          {/* Rescue Mission Preview */}
-          <RescueMissionPreview answers={results.answers} />
+          {/* Executive Summary */}
+          <ExecutiveSummary summary={report.executive_summary} />
 
-          {/* Answer Breakdown */}
-          <ResultsBreakdown answers={results.answers} />
+          {/* Immediate Actions */}
+          <ImmediateActions actions={report.immediate_actions} />
 
-          {/* Life Readiness Teaser */}
-          <LifeReadinessTeaser />
+          {/* Category Breakdown */}
+          <CategoryScores categories={report.category_analyses} />
 
-          {/* Trust Section */}
-          <ResultsTrustSection />
+          {/* Strengths */}
+          <StrengthsSection strengths={report.strengths} />
 
-          {/* CTAs */}
-          <ResultsCTA />
+          {/* Areas Requiring Attention */}
+          <AttentionSection areas={report.areas_requiring_attention} />
+
+          {/* Action Plan */}
+          <ActionPlan actions={report.action_plan} />
+
+          {/* Timeline */}
+          <Timeline timeline={report.timeline} />
+
+          {/* Closing Message */}
+          <ClosingMessage message={report.closing_message} />
+
+          {/* Actions */}
+          <div className="flex flex-col gap-3 pt-4 pb-8">
+            <Button onClick={() => navigate("/dashboard")} className="w-full min-h-[56px]">
+              Go to Dashboard
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/readiness")} className="w-full">
+              Retake Assessment
+            </Button>
+          </div>
         </div>
       </div>
     </AppLayout>

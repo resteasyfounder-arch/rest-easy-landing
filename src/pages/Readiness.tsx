@@ -955,59 +955,108 @@ const Readiness = () => {
   }
 
 
-  // Complete Phase
-  if (flowPhase === "complete" && results) {
+  // Complete Phase - Generate report and redirect
+  useEffect(() => {
+    if (flowPhase !== "complete" || !results || !schema) return;
+    
+    const generateReport = async () => {
+      try {
+        // Build section scores with labels and weights
+        const sectionScoresWithMeta: Record<string, { score: number; label: string; weight: number }> = {};
+        for (const section of schema.sections) {
+          if (results.sectionScores[section.id] !== undefined) {
+            sectionScoresWithMeta[section.id] = {
+              score: results.sectionScores[section.id],
+              label: section.label,
+              weight: section.weight,
+            };
+          }
+        }
+
+        // Build answers array for the report
+        const answersForReport = Object.values(answers).map((answer) => ({
+          question_id: answer.question_id,
+          section_id: answer.section_id,
+          question_text: answer.question_text || "",
+          answer_value: answer.answer_value,
+          answer_label: answer.answer_label || answer.answer_value,
+          score_fraction: answer.score_fraction ?? null,
+        }));
+
+        // Determine tier from score bands
+        const scoreBands = (schema as any).score_bands || [];
+        let tier = "Getting Started";
+        for (const band of scoreBands) {
+          if (results.overallScore >= band.min && results.overallScore <= band.max) {
+            if (band.label === "Highly Prepared") tier = "Rest Easy Ready";
+            else if (band.label === "Moderately Prepared") tier = "Well Prepared";
+            else if (band.label === "Limited Preparedness") tier = "On Your Way";
+            else tier = "Getting Started";
+            break;
+          }
+        }
+
+        const payload = {
+          userName: "Friend", // Default name for guest mode
+          profile,
+          overallScore: results.overallScore,
+          tier,
+          sectionScores: sectionScoresWithMeta,
+          answers: answersForReport,
+          schema: {
+            answer_scoring: schema.answer_scoring,
+            score_bands: scoreBands,
+            sections: schema.sections,
+          },
+        };
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.report) {
+          localStorage.setItem("rest-easy.readiness.report", JSON.stringify(data.report));
+          navigate("/results");
+        } else {
+          console.error("Report generation failed:", data.error);
+          // Fallback: still navigate but report won't be there
+          navigate("/results");
+        }
+      } catch (err) {
+        console.error("Error generating report:", err);
+        navigate("/results");
+      }
+    };
+
+    generateReport();
+  }, [flowPhase, results, schema, answers, profile, navigate]);
+
+  // Complete Phase - Show loading while generating
+  if (flowPhase === "complete") {
     return (
       <AppLayout hideNav>
-        <div className="min-h-screen flex flex-col bg-gradient-hero">
-          <div className="flex-1 overflow-y-auto px-6 py-8">
-            <div className="max-w-md mx-auto space-y-8 animate-fade-up">
-              {/* Score Card */}
-              <Card className="border-primary/20 bg-card shadow-soft">
-                <CardHeader className="text-center pb-2">
-                  <CardTitle className="font-display text-lg text-muted-foreground">
-                    Your Life Readiness Score
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <span className="font-display text-6xl font-bold text-primary">
-                    {results.overallScore}%
-                  </span>
-                  <Progress value={results.overallScore} className="mt-6 h-2" />
-                </CardContent>
-              </Card>
-
-              {/* Section Breakdown */}
-              <div className="space-y-4">
-                <p className="text-sm font-body text-muted-foreground text-center">
-                  Here's how you're doing in each area
-                </p>
-                {schema.sections.map((section) => {
-                  const score = results.sectionScores[section.id];
-                  if (score === undefined) return null;
-                  return (
-                    <div key={section.id} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-body text-sm text-foreground">
-                          {section.label}
-                        </span>
-                        <span className="text-sm text-muted-foreground font-body">{score}%</span>
-                      </div>
-                      <Progress value={score} className="h-1.5" />
-                    </div>
-                  );
-                })}
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
+          <div className="text-center space-y-6 max-w-sm">
+            <div className="relative mx-auto w-20 h-20">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
               </div>
-
-              {/* Actions */}
-              <div className="flex flex-col gap-3 pt-4">
-                <Button onClick={() => navigate("/")} className="w-full min-h-[56px]">
-                  View Your Dashboard
-                </Button>
-                <Button variant="ghost" onClick={resetFlow} className="w-full">
-                  Start Over
-                </Button>
-              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="font-display text-xl font-semibold text-foreground">
+                Generating Your Report
+              </h2>
+              <p className="font-body text-sm text-muted-foreground">
+                Our AI is analyzing your responses to create personalized recommendations...
+              </p>
             </div>
           </div>
         </div>
