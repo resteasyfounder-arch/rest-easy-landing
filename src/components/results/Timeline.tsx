@@ -42,13 +42,20 @@ const Timeline = ({ timeline }: TimelineProps) => {
                   <h3 className="font-body font-bold text-gray-900">{phase.label}</h3>
                   <p className="text-sm text-gray-500 font-body">{phase.subtitle}</p>
                 </div>
-                <ul className="space-y-2 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <ul className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
                   {phase.items.map((item, itemIndex) => (
                     <li key={itemIndex} className="flex items-start gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 flex-shrink-0" />
-                      <span className="font-body text-sm text-gray-700 leading-relaxed">
-                        {item}
-                      </span>
+                      <div className="flex-1">
+                        <span className="font-body font-semibold text-sm text-gray-900">
+                          {typeof item === 'string' ? item : item.title}
+                        </span>
+                        {typeof item !== 'string' && item.description && (
+                          <p className="font-body text-sm text-gray-600 mt-1 leading-relaxed">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>
