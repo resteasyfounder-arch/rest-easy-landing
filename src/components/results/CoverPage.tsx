@@ -9,18 +9,18 @@ interface CoverPageProps {
   metrics: ReportMetrics;
 }
 
-const getTierGradient = (tier: ReportTier): string => {
+const getTierColor = (tier: ReportTier): string => {
   switch (tier) {
     case "Rest Easy Ready":
-      return "from-green-600 to-green-500";
+      return "text-green-600";
     case "Well Prepared":
-      return "from-emerald-600 to-emerald-500";
+      return "text-emerald-600";
     case "On Your Way":
-      return "from-amber-600 to-amber-500";
+      return "text-amber-600";
     case "Getting Started":
-      return "from-orange-600 to-orange-500";
+      return "text-orange-600";
     default:
-      return "from-primary to-primary/80";
+      return "text-primary";
   }
 };
 
@@ -32,62 +32,57 @@ const CoverPage = ({ score, tier, userName, generatedAt, metrics }: CoverPagePro
   });
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-xl overflow-hidden print:rounded-none print:min-h-[90vh] mb-8">
-      {/* Header */}
-      <div className="px-8 pt-8 pb-4 flex justify-center">
-        <img src={restEasyLogo} alt="Rest Easy" className="h-12 object-contain" />
+    <div className="text-center py-16 border-b-2 border-gray-200 mb-12 print:py-24 print:mb-16">
+      {/* Logo */}
+      <img src={restEasyLogo} alt="Rest Easy" className="h-16 mx-auto mb-8 print:h-20" />
+
+      {/* Title */}
+      <h1 className="font-display text-4xl md:text-5xl font-bold text-gray-900 mb-3 print:text-5xl">
+        End-of-Life Readiness Report
+      </h1>
+      <p className="font-body text-xl text-gray-500 mb-12 print:text-2xl">
+        A Comprehensive Assessment of Your Preparedness
+      </p>
+
+      {/* Prepared For */}
+      <div className="mb-12">
+        <p className="text-sm text-gray-400 uppercase tracking-widest font-body mb-2">
+          Prepared for
+        </p>
+        <p className="font-display text-3xl font-semibold text-gray-900">{userName}</p>
+        <p className="text-gray-500 font-body mt-2">{formattedDate}</p>
       </div>
 
-      {/* Main Content */}
-      <div className="px-8 py-12 text-center">
-        <h1 className="font-display text-3xl md:text-4xl font-bold mb-3">
-          End-of-Life Readiness Report
-        </h1>
-        <p className="text-slate-300 text-lg font-body">
-          A Comprehensive Assessment of Your Preparedness
-        </p>
-
-        <div className="mt-8 mb-10">
-          <p className="text-slate-400 text-sm font-body uppercase tracking-wider">
-            Prepared for
-          </p>
-          <p className="text-2xl font-display font-semibold mt-1">{userName}</p>
-          <p className="text-slate-400 text-sm font-body mt-2">{formattedDate}</p>
-        </div>
-
-        {/* Score Circle */}
-        <div className="flex justify-center mb-10">
-          <div className="relative">
-            <div className={`w-40 h-40 rounded-full bg-gradient-to-br ${getTierGradient(tier)} flex flex-col items-center justify-center shadow-2xl`}>
-              <span className="text-5xl font-display font-bold">{score}</span>
-              <span className="text-sm font-body uppercase tracking-wider opacity-90">
-                Overall Score
-              </span>
-            </div>
+      {/* Score */}
+      <div className="inline-flex flex-col items-center mb-8">
+        <div className="relative">
+          <div className="w-36 h-36 rounded-full border-8 border-gray-100 flex flex-col items-center justify-center print:w-40 print:h-40">
+            <span className="text-6xl font-display font-bold text-gray-900 print:text-7xl">{score}</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wider font-body">
+              Overall Score
+            </span>
           </div>
         </div>
+        <p className={`font-display text-2xl font-semibold mt-4 ${getTierColor(tier)}`}>
+          {tier}
+        </p>
+      </div>
 
-        {/* Tier Badge */}
-        <div className="inline-block bg-white/10 backdrop-blur rounded-full px-6 py-2 mb-10">
-          <span className="font-display font-semibold text-lg">{tier}</span>
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-          <MetricCard label="Categories Assessed" value={metrics.categoriesAssessed} />
-          <MetricCard label="Strengths Identified" value={metrics.strengthsIdentified} />
-          <MetricCard label="Areas to Address" value={metrics.areasToAddress} />
-          <MetricCard label="Action Items" value={metrics.actionItems} />
-        </div>
+      {/* Metrics */}
+      <div className="flex justify-center gap-8 md:gap-12 mt-8 flex-wrap">
+        <MetricItem label="Categories Assessed" value={metrics.categoriesAssessed} />
+        <MetricItem label="Strengths Identified" value={metrics.strengthsIdentified} />
+        <MetricItem label="Areas to Address" value={metrics.areasToAddress} />
+        <MetricItem label="Action Items" value={metrics.actionItems} />
       </div>
     </div>
   );
 };
 
-const MetricCard = ({ label, value }: { label: string; value: number }) => (
-  <div className="bg-white/5 rounded-lg p-4 text-center">
-    <span className="text-2xl font-display font-bold text-white">{value}</span>
-    <p className="text-xs font-body text-slate-400 mt-1">{label}</p>
+const MetricItem = ({ label, value }: { label: string; value: number }) => (
+  <div className="text-center">
+    <span className="text-3xl font-display font-bold text-gray-900">{value}</span>
+    <p className="text-xs text-gray-500 font-body mt-1">{label}</p>
   </div>
 );
 

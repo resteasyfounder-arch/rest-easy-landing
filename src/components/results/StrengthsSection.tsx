@@ -1,4 +1,3 @@
-import { CheckCircle2 } from "lucide-react";
 import type { Strength } from "@/types/report";
 
 interface StrengthsSectionProps {
@@ -7,31 +6,28 @@ interface StrengthsSectionProps {
 
 const StrengthsSection = ({ strengths }: StrengthsSectionProps) => {
   return (
-    <div className="print:break-inside-avoid">
-      <h2 className="font-display text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-        <CheckCircle2 className="h-5 w-5 text-green-600" />
-        Your Strengths
+    <section className="mb-12 print:break-inside-avoid">
+      <h2 className="font-display text-2xl font-bold text-gray-900 mb-2 pb-2 border-b border-gray-200">
+        Areas of Strength
       </h2>
-      <p className="text-sm text-gray-600 font-body mb-4">
-        Areas where you're well-prepared
+      <p className="font-body text-gray-600 mb-6">
+        The following areas demonstrate your thoughtful preparation and provide a strong foundation:
       </p>
-      <div className="space-y-3">
+      
+      <div className="space-y-6">
         {strengths.map((strength, index) => (
-          <div
-            key={index}
-            className="p-4 rounded-lg bg-green-50 border border-green-200"
-          >
-            <h3 className="font-body font-semibold text-gray-900 flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
+          <div key={index} className="print:break-inside-avoid">
+            <h3 className="font-display text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <span className="text-green-600">✓</span>
               {strength.title}
             </h3>
-            <p className="font-body text-sm text-gray-600 leading-relaxed pl-4">
+            <p className="font-body text-gray-700 leading-relaxed pl-6">
               {strength.description}
             </p>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 
