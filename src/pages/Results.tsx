@@ -16,6 +16,7 @@ import {
   ClosingMessage,
   ReportLoading,
 } from "@/components/results";
+import { ShareReportDialog } from "@/components/results/ShareReportDialog";
 
 const REPORT_STORAGE_KEY = "rest-easy.readiness.report";
 
@@ -120,18 +121,21 @@ const Results = () => {
             Life Readiness Report
           </h1>
 
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-            className="gap-2 bg-primary hover:bg-primary/90"
-          >
-            {downloading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            {downloading ? "Generating..." : "Download PDF"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <ShareReportDialog report={report} />
+            <Button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="gap-2 bg-primary hover:bg-primary/90"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{downloading ? "Generating..." : "Download PDF"}</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -222,6 +226,7 @@ const Results = () => {
           >
             Retake Assessment
           </Button>
+          <ShareReportDialog report={report} />
           <Button 
             onClick={handleDownloadPDF}
             disabled={downloading}
