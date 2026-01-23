@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, ChevronRight, Edit3, Sparkles, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { CheckCircle2, ChevronRight, Edit3, Sparkles } from "lucide-react";
 
 type AnswerRecord = {
   question_id: string;
@@ -59,23 +58,12 @@ export function SectionSummary({
     .map((q) => answers[q.id])
     .filter(Boolean);
 
-  const yesCount = sectionAnswers.filter((a) => a.answer_value === "yes").length;
-  const partialCount = sectionAnswers.filter((a) => a.answer_value === "partial").length;
-  const noCount = sectionAnswers.filter((a) => a.answer_value === "no").length;
-  const naCount = sectionAnswers.filter((a) => a.answer_value === "na" || a.answer_value === "not_sure").length;
-
   // Calculate score
   const scoredAnswers = sectionAnswers.filter(
     (a) => a.score_fraction !== null && a.score_fraction !== undefined
   );
   const totalScore = scoredAnswers.reduce((sum, a) => sum + (a.score_fraction || 0), 0);
   const avgScore = scoredAnswers.length > 0 ? Math.round((totalScore / scoredAnswers.length) * 100) : 0;
-
-  // Determine strengths and areas for attention
-  const strengths = sectionAnswers.filter((a) => a.answer_value === "yes");
-  const attentionAreas = sectionAnswers.filter(
-    (a) => a.answer_value === "no" || a.answer_value === "partial"
-  );
 
   // Create a cache key based on answers
   const answerHash = sectionAnswers
@@ -159,69 +147,6 @@ export function SectionSummary({
           <Progress value={avgScore} className="h-2" />
         </CardContent>
       </Card>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <div className="text-center p-3 rounded-lg bg-emerald-500/10">
-          <div className="text-lg font-semibold text-emerald-600">{yesCount}</div>
-          <div className="text-xs text-muted-foreground">Ready</div>
-        </div>
-        <div className="text-center p-3 rounded-lg bg-amber-500/10">
-          <div className="text-lg font-semibold text-amber-600">{partialCount}</div>
-          <div className="text-xs text-muted-foreground">Partial</div>
-        </div>
-        <div className="text-center p-3 rounded-lg bg-destructive/10">
-          <div className="text-lg font-semibold text-destructive">{noCount}</div>
-          <div className="text-xs text-muted-foreground">Needs Work</div>
-        </div>
-        <div className="text-center p-3 rounded-lg bg-muted">
-          <div className="text-lg font-semibold text-muted-foreground">{naCount}</div>
-          <div className="text-xs text-muted-foreground">N/A</div>
-        </div>
-      </div>
-
-      {/* Template-based Highlights */}
-      {strengths.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="font-medium text-foreground mb-2 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Strengths ({strengths.length})
-            </h3>
-            <ul className="space-y-1.5">
-              {strengths.slice(0, 3).map((s) => (
-                <li key={s.question_id} className="text-sm text-muted-foreground truncate">
-                  • {s.question_text}
-                </li>
-              ))}
-              {strengths.length > 3 && (
-                <li className="text-sm text-primary">+{strengths.length - 3} more</li>
-              )}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {attentionAreas.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="font-medium text-foreground mb-2 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500" />
-              Areas for Attention ({attentionAreas.length})
-            </h3>
-            <ul className="space-y-1.5">
-              {attentionAreas.slice(0, 3).map((a) => (
-                <li key={a.question_id} className="text-sm text-muted-foreground truncate">
-                  • {a.question_text}
-                </li>
-              ))}
-              {attentionAreas.length > 3 && (
-                <li className="text-sm text-primary">+{attentionAreas.length - 3} more</li>
-              )}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       {/* AI Insight */}
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
