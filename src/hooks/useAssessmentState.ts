@@ -83,7 +83,9 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
       return emptyState;
     }
 
-    if (!silent) {
+    // Only show syncing indicator for non-silent fetches AND not initial load
+    // This prevents constant spinner flicker during background auto-refreshes
+    if (!silent && !isLoading) {
       setState((prev) => ({ ...prev, syncStatus: "syncing" }));
     }
 

@@ -314,6 +314,30 @@ const Readiness = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Detect and reset stale flow phase
+  // If flowPhase is "complete" but we have no answers, reset to intro
+  useEffect(() => {
+    if (loading) return;
+    
+    const hasAnswers = Object.keys(answers).length > 0;
+    const hasProfileAnswers = Object.keys(profileAnswers).length > 0;
+    
+    if (flowPhase === "complete" && !hasAnswers) {
+      console.log("[Readiness] Resetting stale complete phase - no answers found");
+      setFlowPhase("intro");
+      // Clear the assessment ID to force a fresh start
+      localStorage.removeItem(STORAGE_KEYS.assessmentId);
+      setAssessmentId(null);
+    }
+    
+    // If we're in assessment phase but have no applicable questions answered,
+    // and profile isn't complete, go back to profile
+    if (flowPhase === "assessment" && !hasAnswers && !hasProfileAnswers && schema) {
+      console.log("[Readiness] No progress detected, resetting to intro");
+      setFlowPhase("intro");
+    }
+  }, [loading, flowPhase, answers, profileAnswers, schema]);
+
   // Check if profile is already complete on initial load
   useEffect(() => {
     if (!schema || loading) return;
