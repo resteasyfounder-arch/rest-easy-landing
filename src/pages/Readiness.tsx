@@ -449,9 +449,13 @@ const Readiness = () => {
       // Find questions for this section
       const sectionQuestions = applicableQuestions.filter(q => q.section_id === sectionParam);
       const answeredInSection = sectionQuestions.filter(q => answers[q.id]).length;
+      const sectionIsComplete = answeredInSection === sectionQuestions.length && sectionQuestions.length > 0;
       
-      // If section is complete, show section summary
-      if (answeredInSection === sectionQuestions.length && sectionQuestions.length > 0) {
+      // Check if entire assessment is complete
+      const allQuestionsAnswered = applicableQuestions.every(q => answers[q.id]);
+      
+      if (sectionIsComplete) {
+        // Section is complete - show section summary for review
         console.log("[Readiness] Section complete, showing summary");
         setFocusedSectionId(sectionParam);
         setFlowPhase("section-summary");
@@ -463,8 +467,15 @@ const Readiness = () => {
       if (firstUnanswered) {
         console.log("[Readiness] Navigating to first unanswered in section");
         setFocusedSectionId(sectionParam);
-        setFlowPhase("assessment");
+        // Use "review" phase for completed assessments, "assessment" for incomplete
+        setFlowPhase(allQuestionsAnswered ? "review" : "assessment");
         setCurrentStepId(`question:${firstUnanswered.id}`);
+      } else if (sectionQuestions.length > 0) {
+        // All questions in section answered - show first question in review mode
+        console.log("[Readiness] Section fully answered, showing in review mode");
+        setFocusedSectionId(sectionParam);
+        setFlowPhase(allQuestionsAnswered ? "review" : "assessment");
+        setCurrentStepId(`question:${sectionQuestions[0].id}`);
       }
     }
   }, [loading, schema, searchParams, applicableSections, applicableQuestions, answers, setSearchParams]);
@@ -1531,7 +1542,12 @@ const Readiness = () => {
   }
 
   // Assessment Questions Phase - Journey-based layout (also used for review phase)
-  if ((flowPhase === "assessment" || flowPhase === "review") && currentQuestion) {
+  if (flowPhase === "assessment" || flowPhase === "review") {
+    // If currentQuestion is not yet set, show loading state while it initializes
+    if (!currentQuestion) {
+      return <LoadingSkeleton />;
+    }
+    
     const isReviewMode = flowPhase === "review";
     return (
       <AppLayout hideNav>
@@ -1702,7 +1718,8 @@ const Readiness = () => {
     );
   }
 
-  return null;
+  // Fallback - show loading instead of blank screen
+  return <LoadingSkeleton />;
 };
 
 export default Readiness;
