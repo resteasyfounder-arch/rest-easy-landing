@@ -177,7 +177,7 @@ const Dashboard = () => {
                 <SectionProgressCard
                   key={section.id}
                   section={section}
-                  onClick={() => navigate("/readiness")}
+                  onClick={() => navigate(`/readiness?section=${section.id}`)}
                 />
               ))}
             </div>

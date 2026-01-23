@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import ProfileReview from "@/components/assessment/ProfileReview";
 import { ProfilePromptModal } from "@/components/profile/ProfilePromptModal";
@@ -22,8 +22,10 @@ import {
   AnimatedQuestionCard,
   SectionComplete,
 } from "@/components/assessment/journey";
+import SectionSummary from "@/components/assessment/SectionSummary";
+import SectionAnswerList from "@/components/assessment/SectionAnswerList";
 
-type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "complete";
+type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "section-summary" | "section-edit" | "complete";
 
 type AnswerValue = "yes" | "partial" | "no" | "not_sure" | "na";
 
@@ -227,6 +229,7 @@ const ErrorState = ({
 
 const Readiness = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [schema, setSchema] = useState<Schema | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -314,10 +317,17 @@ const Readiness = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // URL parameter handling moved below applicableSections definition
+
   // Detect and reset stale flow phase
   // If flowPhase is "complete" but we have no answers, reset to intro
+  // IMPORTANT: Only reset if not coming from a URL parameter navigation
   useEffect(() => {
     if (loading) return;
+    
+    // Don't reset if we have a section URL param - that takes priority
+    const sectionParam = searchParams.get("section");
+    if (sectionParam) return;
     
     const hasAnswers = Object.keys(answers).length > 0;
     const hasProfileAnswers = Object.keys(profileAnswers).length > 0;
@@ -336,7 +346,7 @@ const Readiness = () => {
       console.log("[Readiness] No progress detected, resetting to intro");
       setFlowPhase("intro");
     }
-  }, [loading, flowPhase, answers, profileAnswers, schema]);
+  }, [loading, flowPhase, answers, profileAnswers, schema, searchParams]);
 
   // Check if profile is already complete on initial load
   useEffect(() => {
@@ -386,6 +396,48 @@ const Readiness = () => {
       return sectionQuestions.length > 0;
     });
   }, [schema, applicableQuestions]);
+
+  // Handle URL parameters for section navigation
+  // Must be after applicableSections and applicableQuestions are defined
+  useEffect(() => {
+    if (loading || !schema) return;
+    
+    const sectionParam = searchParams.get("section");
+    if (sectionParam) {
+      console.log("[Readiness] URL has section param:", sectionParam);
+      
+      // Clear the URL param so we don't re-trigger on subsequent renders
+      setSearchParams({}, { replace: true });
+      
+      // Check if section exists and is applicable
+      const section = applicableSections.find(s => s.id === sectionParam);
+      if (!section) {
+        console.log("[Readiness] Section not found or not applicable:", sectionParam);
+        return;
+      }
+      
+      // Find questions for this section
+      const sectionQuestions = applicableQuestions.filter(q => q.section_id === sectionParam);
+      const answeredInSection = sectionQuestions.filter(q => answers[q.id]).length;
+      
+      // If section is complete, show section summary
+      if (answeredInSection === sectionQuestions.length && sectionQuestions.length > 0) {
+        console.log("[Readiness] Section complete, showing summary");
+        setFocusedSectionId(sectionParam);
+        setFlowPhase("section-summary");
+        return;
+      }
+      
+      // Section has unanswered questions - go to first unanswered
+      const firstUnanswered = sectionQuestions.find(q => !answers[q.id]);
+      if (firstUnanswered) {
+        console.log("[Readiness] Navigating to first unanswered in section");
+        setFocusedSectionId(sectionParam);
+        setFlowPhase("assessment");
+        setCurrentStepId(`question:${firstUnanswered.id}`);
+      }
+    }
+  }, [loading, schema, searchParams, applicableSections, applicableQuestions, answers, setSearchParams]);
 
   const completedQuestionCount = useMemo(() => {
     const applicableIds = new Set(applicableQuestions.map((question) => question.id));
@@ -767,11 +819,78 @@ const Readiness = () => {
     // Find next section with unanswered questions
     const nextStep = getNextStepId(profileAnswers, answers, profile);
     if (nextStep) {
+      setFlowPhase("assessment");
       setCurrentStepId(nextStep);
     } else {
       setFlowPhase("complete");
       setCurrentStepId(null);
     }
+  };
+
+  // Handle editing answers from section summary
+  const handleEditSectionAnswers = () => {
+    setFlowPhase("section-edit");
+  };
+
+  // Handle back from section edit to section summary
+  const handleBackToSectionSummary = () => {
+    setFlowPhase("section-summary");
+  };
+
+  // Handle saving edited answers (batch mode)
+  const handleSaveEditedAnswers = async (updatedAnswers: AnswerRecord[]) => {
+    if (!subjectId || updatedAnswers.length === 0) return;
+
+    setSaving(true);
+    setSaveError(null);
+
+    try {
+      // Update local state
+      const newAnswers = { ...answers };
+      for (const answer of updatedAnswers) {
+        newAnswers[answer.question_id] = answer;
+      }
+      setAnswers(newAnswers);
+
+      // Persist to backend
+      await callAgent({
+        subject_id: subjectId,
+        assessment_id: ASSESSMENT_ID,
+        answers: updatedAnswers,
+      });
+
+      // Mark report as stale if it exists
+      const existingReport = localStorage.getItem("rest-easy.readiness.report");
+      if (existingReport) {
+        localStorage.setItem("rest-easy.readiness.report_stale", "true");
+        localStorage.setItem("rest-easy.readiness.last_edit_at", new Date().toISOString());
+      }
+
+      // Clear any cached section insights for this section
+      if (focusedSectionId) {
+        // Clear cached insights for this section (they're stale now)
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key?.startsWith(`section-insight:${focusedSectionId}:`)) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      }
+
+      // Go back to section summary
+      setFlowPhase("section-summary");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Unable to save changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Navigate back to dashboard
+  const handleBackToDashboard = () => {
+    navigate("/dashboard");
   };
 
   const handleSkip = () => {
@@ -1086,6 +1205,93 @@ const Readiness = () => {
         </div>
       </AppLayout>
     );
+  }
+
+  // Section Summary Phase - Show completed section with AI insights
+  if (flowPhase === "section-summary" && focusedSectionId) {
+    const focusedSection = applicableSections.find(s => s.id === focusedSectionId);
+    
+    if (focusedSection) {
+      return (
+        <AppLayout hideNav>
+          <div className="min-h-screen flex flex-col bg-gradient-hero">
+            <header className="flex items-center justify-between px-4 h-14">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBackToDashboard}
+                className="touch-target press-effect"
+                aria-label="Back to dashboard"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleExit}
+                className="touch-target press-effect"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </header>
+            <div className="flex-1 overflow-y-auto px-6 py-8">
+              <SectionSummary
+                sectionId={focusedSectionId}
+                sectionLabel={focusedSection.label}
+                answers={answers}
+                questions={applicableQuestions}
+                onEditAnswers={handleEditSectionAnswers}
+                onContinue={handleContinueFromCompletedSection}
+                onBackToDashboard={handleBackToDashboard}
+              />
+            </div>
+          </div>
+        </AppLayout>
+      );
+    }
+  }
+
+  // Section Edit Phase - Edit answers in batch mode
+  if (flowPhase === "section-edit" && focusedSectionId && schema) {
+    const focusedSection = applicableSections.find(s => s.id === focusedSectionId);
+    
+    if (focusedSection) {
+      return (
+        <AppLayout hideNav>
+          <div className="min-h-screen flex flex-col bg-gradient-hero">
+            <header className="flex items-center justify-end px-4 h-14">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleExit}
+                className="touch-target press-effect"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </header>
+            <div className="flex-1 overflow-y-auto px-6 py-8">
+              <SectionAnswerList
+                sectionId={focusedSectionId}
+                sectionLabel={focusedSection.label}
+                questions={applicableQuestions}
+                answers={answers}
+                answerScoring={schema.answer_scoring}
+                onSaveChanges={handleSaveEditedAnswers}
+                onBack={handleBackToSectionSummary}
+              />
+            </div>
+            {saving && (
+              <div className="px-6 py-3 border-t border-border/30 flex items-center justify-center bg-card/50">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            )}
+          </div>
+        </AppLayout>
+      );
+    }
   }
 
   // Profile Review Phase
