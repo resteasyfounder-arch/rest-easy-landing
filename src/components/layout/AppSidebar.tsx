@@ -15,7 +15,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
+import { useAssessmentState } from "@/hooks/useAssessmentState";
+import { TierBadge } from "@/components/dashboard";
 import logo from "@/assets/rest-easy-logo.png";
 
 const navItems = [
@@ -31,6 +32,7 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const { assessmentState, hasStarted } = useAssessmentState();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -89,19 +91,29 @@ const AppSidebar = () => {
             <div className={`px-3 py-4 ${isCollapsed ? "hidden" : ""}`}>
               <div className="rounded-lg bg-gradient-to-br from-primary/5 to-accent/10 p-4 border border-primary/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground">Findability Score</span>
-                  <span className="text-lg font-display font-bold text-primary">--</span>
+                  <span className="text-sm font-medium text-foreground">Readiness Score</span>
+                  <span className="text-lg font-display font-bold text-primary">
+                    {hasStarted ? assessmentState.overall_score : "--"}
+                  </span>
                 </div>
-                <Progress value={0} className="h-2 bg-muted" />
-                <p className="text-xs text-muted-foreground mt-3">
-                  Complete an assessment to see your score
-                </p>
+                <Progress value={assessmentState.overall_progress} className="h-2 bg-muted" />
+                {hasStarted ? (
+                  <div className="mt-3">
+                    <TierBadge tier={assessmentState.tier} size="sm" />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Complete an assessment to see your score
+                  </p>
+                )}
               </div>
             </div>
             {isCollapsed && (
               <div className="flex justify-center py-2">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-primary">
+                    {hasStarted ? assessmentState.overall_score : "--"}
+                  </span>
                 </div>
               </div>
             )}
