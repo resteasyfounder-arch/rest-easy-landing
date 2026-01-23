@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, FileText, RotateCcw } from "lucide-react";
+import { ArrowRight, Play, FileText, RotateCcw, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { AssessmentState } from "@/types/assessment";
 
@@ -35,8 +35,8 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
     );
   }
 
-  // In progress - continue
-  if (status === "draft" || status === "in_progress") {
+  // In progress - continue (but NOT if they're at 100% - that means complete)
+  if ((status === "draft" || status === "in_progress") && overall_progress < 100) {
     return (
       <Button asChild size="lg" className={className}>
         <Link to="/readiness" className="gap-2">
@@ -50,9 +50,15 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
     );
   }
 
-  // Completed - view report or retake
-  if (status === "completed") {
-    if (report_status === "ready") {
+  // Assessment complete (100% progress) but not yet marked as completed status
+  // OR status is completed - show report options
+  if (overall_progress >= 100 || status === "completed") {
+    // Check if we have an existing report
+    const hasExistingReport = localStorage.getItem("rest-easy.readiness.report") !== null;
+    const isReportStale = localStorage.getItem("rest-easy.readiness.report_stale") === "true";
+
+    if (hasExistingReport && !isReportStale) {
+      // Have a valid report - show view report option
       return (
         <div className="flex flex-col sm:flex-row gap-3">
           <Button asChild size="lg" className={className}>
@@ -63,30 +69,32 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
           </Button>
           <Button asChild variant="outline" size="lg">
             <Link to="/readiness" className="gap-2">
-              <RotateCcw className="h-4 w-4" />
-              Retake Assessment
+              <Eye className="h-4 w-4" />
+              Review Answers
             </Link>
           </Button>
         </div>
       );
     }
 
-    if (report_status === "generating") {
-      return (
-        <Button size="lg" disabled className={className}>
-          <span className="animate-pulse">Generating Report...</span>
-        </Button>
-      );
-    }
-
-    // Report failed or not started after completion
+    // Assessment complete but no report yet (or stale) - prompt to generate
     return (
-      <Button asChild size="lg" className={className}>
-        <Link to="/results" className="gap-2">
-          <FileText className="h-4 w-4" />
-          View Results
-        </Link>
-      </Button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button asChild size="lg" className={className}>
+          <Link to="/readiness" className="gap-2">
+            <FileText className="h-4 w-4" />
+            {isReportStale ? "Regenerate Report" : "Generate Report"}
+          </Link>
+        </Button>
+        {hasExistingReport && (
+          <Button asChild variant="outline" size="lg">
+            <Link to="/results" className="gap-2">
+              <Eye className="h-4 w-4" />
+              View Previous Report
+            </Link>
+          </Button>
+        )}
+      </div>
     );
   }
 

@@ -25,7 +25,7 @@ import {
 import SectionSummary from "@/components/assessment/SectionSummary";
 import SectionAnswerList from "@/components/assessment/SectionAnswerList";
 
-type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "section-summary" | "section-edit" | "complete";
+type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "section-summary" | "section-edit" | "review" | "complete";
 
 type AnswerValue = "yes" | "partial" | "no" | "not_sure" | "na";
 
@@ -275,10 +275,15 @@ const Readiness = () => {
   const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
   const [viewingCompletedSection, setViewingCompletedSection] = useState(false);
 
-  // Persist flow phase
+  // Persist flow phase - but NEVER persist "complete" (it's transient)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.flowPhase, flowPhase);
+    if (flowPhase !== "complete") {
+      localStorage.setItem(STORAGE_KEYS.flowPhase, flowPhase);
+    }
   }, [flowPhase]);
+
+  // State for explicit report generation
+  const [reportGenerating, setReportGenerating] = useState(false);
 
   const bootstrap = useCallback(async () => {
     setLoading(true);
@@ -352,6 +357,10 @@ const Readiness = () => {
   useEffect(() => {
     if (!schema || loading) return;
     if (flowPhase !== "intro") return;
+    
+    // Don't interfere if we have a section URL param
+    const sectionParam = searchParams.get("section");
+    if (sectionParam) return;
 
     const totalProfileQuestions = schema.profile_questions.length;
     const answeredProfileQuestions = Object.keys(profileAnswers).length;
@@ -361,7 +370,7 @@ const Readiness = () => {
     } else if (!profilePromptDismissed && answeredProfileQuestions < totalProfileQuestions) {
       setShowProfilePrompt(true);
     }
-  }, [schema, loading, flowPhase, profileAnswers, profilePromptDismissed]);
+  }, [schema, loading, flowPhase, profileAnswers, profilePromptDismissed, searchParams]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));
@@ -387,6 +396,27 @@ const Readiness = () => {
       evaluateCondition(question.applies_if, profile, answerValues)
     );
   }, [schema, profile, answerValues]);
+
+  // Check if assessment is actually complete (all applicable questions answered)
+  const isAssessmentComplete = useMemo(() => {
+    if (!schema || applicableQuestions.length === 0) return false;
+    const answeredCount = applicableQuestions.filter(q => answers[q.id]).length;
+    return answeredCount === applicableQuestions.length;
+  }, [schema, applicableQuestions, answers]);
+
+  // If we're in assessment phase and all questions are answered, show completion screen
+  useEffect(() => {
+    if (loading || !schema) return;
+    
+    // Don't interfere if we have a section URL param
+    const sectionParam = searchParams.get("section");
+    if (sectionParam) return;
+    
+    if (flowPhase === "assessment" && isAssessmentComplete && applicableQuestions.length > 0) {
+      console.log("[Readiness] Assessment complete, showing completion screen");
+      setFlowPhase("complete");
+    }
+  }, [loading, schema, flowPhase, isAssessmentComplete, applicableQuestions.length, searchParams]);
 
   // Filter sections to only show those with applicable questions
   const applicableSections = useMemo(() => {
@@ -527,9 +557,15 @@ const Readiness = () => {
       const nextStep = getNextStepId(profileAnswers, answers, profile);
       if (nextStep) {
         setCurrentStepId(nextStep);
-      } else {
+      } else if (isAssessmentComplete) {
+        // Only go to complete if actually complete
         setFlowPhase("complete");
       }
+    }
+
+    // Handle review phase - if we're in review mode and have no currentStepId, set one
+    if (flowPhase === "review" && !currentStepId && applicableQuestions.length > 0) {
+      setCurrentStepId(`question:${applicableQuestions[0].id}`);
     }
 
     if (currentStepId && currentStepId.startsWith("question:") && !isStepApplicable(currentStepId)) {
@@ -1038,89 +1074,100 @@ const Readiness = () => {
     persistScore();
   }, [flowPhase, results, subjectId, scoreSaved]);
 
-  // Complete Phase - Generate report and redirect
-  useEffect(() => {
-    if (flowPhase !== "complete" || !results || !schema) return;
+  // Explicit report generation - only called by user action
+  const handleGenerateReport = useCallback(async () => {
+    if (!results || !schema || reportGenerating) return;
     
-    const generateReport = async () => {
-      try {
-        // Build section scores with labels and weights
-        const sectionScoresWithMeta: Record<string, { score: number; label: string; weight: number }> = {};
-        for (const section of schema.sections) {
-          if (results.sectionScores[section.id] !== undefined) {
-            sectionScoresWithMeta[section.id] = {
-              score: results.sectionScores[section.id],
-              label: section.label,
-              weight: section.weight,
-            };
-          }
+    setReportGenerating(true);
+    
+    try {
+      // Build section scores with labels and weights
+      const sectionScoresWithMeta: Record<string, { score: number; label: string; weight: number }> = {};
+      for (const section of schema.sections) {
+        if (results.sectionScores[section.id] !== undefined) {
+          sectionScoresWithMeta[section.id] = {
+            score: results.sectionScores[section.id],
+            label: section.label,
+            weight: section.weight,
+          };
         }
+      }
 
-        // Build answers array for the report
-        const answersForReport = Object.values(answers).map((answer) => ({
-          question_id: answer.question_id,
-          section_id: answer.section_id,
-          question_text: answer.question_text || "",
-          answer_value: answer.answer_value,
-          answer_label: answer.answer_label || answer.answer_value,
-          score_fraction: answer.score_fraction ?? null,
-        }));
+      // Build answers array for the report
+      const answersForReport = Object.values(answers).map((answer) => ({
+        question_id: answer.question_id,
+        section_id: answer.section_id,
+        question_text: answer.question_text || "",
+        answer_value: answer.answer_value,
+        answer_label: answer.answer_label || answer.answer_value,
+        score_fraction: answer.score_fraction ?? null,
+      }));
 
-        // Determine tier from score bands
-        const scoreBands = (schema as any).score_bands || [];
-        let tier = "Getting Started";
-        for (const band of scoreBands) {
-          if (results.overallScore >= band.min && results.overallScore <= band.max) {
-            if (band.label === "Highly Prepared") tier = "Rest Easy Ready";
-            else if (band.label === "Moderately Prepared") tier = "Well Prepared";
-            else if (band.label === "Limited Preparedness") tier = "On Your Way";
-            else tier = "Getting Started";
-            break;
-          }
+      // Determine tier from score bands
+      const scoreBands = (schema as any).score_bands || [];
+      let tier = "Getting Started";
+      for (const band of scoreBands) {
+        if (results.overallScore >= band.min && results.overallScore <= band.max) {
+          if (band.label === "Highly Prepared") tier = "Rest Easy Ready";
+          else if (band.label === "Moderately Prepared") tier = "Well Prepared";
+          else if (band.label === "Limited Preparedness") tier = "On Your Way";
+          else tier = "Getting Started";
+          break;
         }
+      }
 
-        const payload = {
-          userName: "Friend", // Default name for guest mode
-          profile,
-          overallScore: results.overallScore,
-          tier,
-          sectionScores: sectionScoresWithMeta,
-          answers: answersForReport,
-          schema: {
-            answer_scoring: schema.answer_scoring,
-            score_bands: scoreBands,
-            sections: schema.sections,
-          },
-        };
+      const payload = {
+        userName: "Friend", // Default name for guest mode
+        profile,
+        overallScore: results.overallScore,
+        tier,
+        sectionScores: sectionScoresWithMeta,
+        answers: answersForReport,
+        schema: {
+          answer_scoring: schema.answer_scoring,
+          score_bands: scoreBands,
+          sections: schema.sections,
+        },
+      };
 
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify(payload),
-        });
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify(payload),
+      });
 
-        const data = await response.json();
-        
-        if (response.ok && data.report) {
-          localStorage.setItem("rest-easy.readiness.report", JSON.stringify(data.report));
-          navigate("/results");
-        } else {
-          console.error("Report generation failed:", data.error);
-          // Fallback: still navigate but report won't be there
-          navigate("/results");
-        }
-      } catch (err) {
-        console.error("Error generating report:", err);
+      const data = await response.json();
+      
+      if (response.ok && data.report) {
+        localStorage.setItem("rest-easy.readiness.report", JSON.stringify(data.report));
+        localStorage.removeItem("rest-easy.readiness.report_stale");
+        // Clear complete phase from localStorage on successful generation
+        localStorage.removeItem(STORAGE_KEYS.flowPhase);
+        navigate("/results");
+      } else {
+        console.error("Report generation failed:", data.error);
+        // Fallback: still navigate but report won't be there
         navigate("/results");
       }
-    };
+    } catch (err) {
+      console.error("Error generating report:", err);
+      navigate("/results");
+    } finally {
+      setReportGenerating(false);
+    }
+  }, [results, schema, answers, profile, navigate, reportGenerating]);
 
-    generateReport();
-  }, [flowPhase, results, schema, answers, profile, navigate]);
+  // Handle going back to review sections from complete phase
+  const handleReviewSections = () => {
+    setFlowPhase("review");
+    if (applicableQuestions.length > 0) {
+      setCurrentStepId(`question:${applicableQuestions[0].id}`);
+    }
+  };
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -1181,30 +1228,87 @@ const Readiness = () => {
     );
   }
 
-
-  // Complete Phase - Show loading while generating
+  // Complete Phase - Show completion screen with explicit CTA
   if (flowPhase === "complete") {
+    // If report is generating, show loading
+    if (reportGenerating) {
+      return (
+        <AppLayout hideNav>
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
+            <div className="text-center space-y-6 max-w-sm">
+              <div className="relative mx-auto w-20 h-20">
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h2 className="font-display text-xl font-semibold text-foreground">
+                  Generating Your Report
+                </h2>
+                <p className="font-body text-sm text-muted-foreground">
+                  Our AI is analyzing your responses to create personalized recommendations...
+                </p>
+              </div>
+            </div>
+          </div>
+        </AppLayout>
+      );
+    }
+
+    // Show completion screen with explicit actions
     return (
       <AppLayout hideNav>
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
-          <div className="text-center space-y-6 max-w-sm">
-            <div className="relative mx-auto w-20 h-20">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          <div className="text-center space-y-8 max-w-sm">
+            <div className="relative mx-auto w-24 h-24">
+              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-4xl">🎉</span>
               </div>
             </div>
-            <div className="space-y-2">
-              <h2 className="font-display text-xl font-semibold text-foreground">
-                Generating Your Report
+            <div className="space-y-3">
+              <h2 className="font-display text-2xl font-semibold text-foreground">
+                Assessment Complete!
               </h2>
-              <p className="font-body text-sm text-muted-foreground">
-                Our AI is analyzing your responses to create personalized recommendations...
+              <p className="font-body text-muted-foreground">
+                You've answered all {applicableQuestions.length} questions. 
+                Your overall score is <span className="font-semibold text-primary">{results?.overallScore || 0}%</span>.
               </p>
+            </div>
+            
+            <div className="space-y-3 pt-4">
+              <Button 
+                onClick={handleGenerateReport} 
+                size="lg" 
+                className="w-full gap-2"
+              >
+                Generate Your Report
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleReviewSections} 
+                size="lg" 
+                className="w-full"
+              >
+                Review Your Answers
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={handleBackToDashboard} 
+                className="w-full text-muted-foreground"
+              >
+                Back to Dashboard
+              </Button>
             </div>
           </div>
         </div>
       </AppLayout>
     );
+  }
+
+  // Review Phase - Same as assessment but for completed assessments
+  if (flowPhase === "review") {
+    // Reuse the assessment UI but with different navigation context
+    // Fall through to assessment rendering below
   }
 
   // Section Summary Phase - Show completed section with AI insights
@@ -1426,8 +1530,9 @@ const Readiness = () => {
     );
   }
 
-  // Assessment Questions Phase - Journey-based layout
-  if (flowPhase === "assessment" && currentQuestion) {
+  // Assessment Questions Phase - Journey-based layout (also used for review phase)
+  if ((flowPhase === "assessment" || flowPhase === "review") && currentQuestion) {
+    const isReviewMode = flowPhase === "review";
     return (
       <AppLayout hideNav>
         <div className="min-h-screen flex bg-background">
@@ -1550,7 +1655,18 @@ const Readiness = () => {
                   </div>
 
                   <div className="flex items-center justify-between pt-2">
-                    <SkipButton onClick={handleSkip} />
+                    {isReviewMode ? (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setFlowPhase("complete")}
+                        className="text-muted-foreground"
+                      >
+                        ← Back to Summary
+                      </Button>
+                    ) : (
+                      <SkipButton onClick={handleSkip} />
+                    )}
                     <AutosaveIndicator show={lastSaved} />
                   </div>
 
