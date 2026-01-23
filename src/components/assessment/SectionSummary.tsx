@@ -29,6 +29,9 @@ interface SectionSummaryProps {
   onEditAnswers: () => void;
   onContinue: () => void;
   onBackToDashboard: () => void;
+  onViewReport?: () => void;
+  showContinueButton?: boolean;
+  isAssessmentComplete?: boolean;
 }
 
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
@@ -42,6 +45,9 @@ export function SectionSummary({
   onEditAnswers,
   onContinue,
   onBackToDashboard,
+  onViewReport,
+  showContinueButton = true,
+  isAssessmentComplete = false,
 }: SectionSummaryProps) {
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -250,10 +256,23 @@ export function SectionSummary({
           <Edit3 className="w-4 h-4" />
           Review & Edit Answers
         </Button>
-        <Button onClick={onContinue} className="w-full gap-2">
-          Continue Assessment
-          <ChevronRight className="w-4 h-4" />
-        </Button>
+        
+        {/* Only show Continue if assessment is incomplete */}
+        {showContinueButton && !isAssessmentComplete && (
+          <Button onClick={onContinue} className="w-full gap-2">
+            Continue Assessment
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        )}
+        
+        {/* Show View Report for completed assessments */}
+        {isAssessmentComplete && onViewReport && (
+          <Button onClick={onViewReport} className="w-full gap-2">
+            View Full Report
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        )}
+        
         <Button onClick={onBackToDashboard} variant="ghost" className="w-full">
           Back to Dashboard
         </Button>

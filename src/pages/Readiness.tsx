@@ -1322,87 +1322,221 @@ const Readiness = () => {
     // Fall through to assessment rendering below
   }
 
-  // Section Summary Phase - Show completed section with AI insights
+  // Section Summary Phase - Show completed section with AI insights (now with sidebar)
   if (flowPhase === "section-summary" && focusedSectionId) {
     const focusedSection = applicableSections.find(s => s.id === focusedSectionId);
     
     if (focusedSection) {
       return (
         <AppLayout hideNav>
-          <div className="min-h-screen flex flex-col bg-gradient-hero">
-            <header className="flex items-center justify-between px-4 h-14">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBackToDashboard}
-                className="touch-target press-effect"
-                aria-label="Back to dashboard"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleExit}
-                className="touch-target press-effect"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </header>
-            <div className="flex-1 overflow-y-auto px-6 py-8">
-              <SectionSummary
-                sectionId={focusedSectionId}
-                sectionLabel={focusedSection.label}
-                answers={answers}
-                questions={applicableQuestions}
-                onEditAnswers={handleEditSectionAnswers}
-                onContinue={handleContinueFromCompletedSection}
-                onBackToDashboard={handleBackToDashboard}
+          <div className="min-h-screen flex bg-background">
+            {/* Journey Sidebar - Desktop only */}
+            <JourneySidebar
+              sections={applicableSections}
+              currentSectionId={focusedSectionId}
+              sectionProgress={sectionProgress}
+              completedSections={completedSections}
+              onSectionClick={handleSectionClick}
+            />
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-h-screen">
+              {/* Mobile Journey Header */}
+              <JourneyHeader
+                sections={applicableSections}
+                currentSectionId={focusedSectionId}
+                completedSections={completedSections}
+                onOpenDrawer={() => setShowJourneyDrawer(true)}
               />
+
+              {/* Desktop Header */}
+              <header className="hidden md:flex items-center justify-between px-6 h-14 border-b border-border/30">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackToDashboard}
+                  className="touch-target press-effect"
+                  aria-label="Back to dashboard"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="text-center">
+                  <p className="text-sm font-body text-muted-foreground">
+                    {focusedSection.label} Summary
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExit}
+                  className="touch-target press-effect"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </header>
+
+              {/* Mobile Header Controls */}
+              <header className="md:hidden flex items-center justify-between px-4 h-12">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackToDashboard}
+                  className="touch-target press-effect"
+                  aria-label="Back to dashboard"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExit}
+                  className="touch-target press-effect"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </header>
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto px-6 py-8 bg-gradient-hero">
+                <SectionSummary
+                  sectionId={focusedSectionId}
+                  sectionLabel={focusedSection.label}
+                  answers={answers}
+                  questions={applicableQuestions}
+                  onEditAnswers={handleEditSectionAnswers}
+                  onContinue={handleContinueFromCompletedSection}
+                  onBackToDashboard={handleBackToDashboard}
+                  onViewReport={() => navigate("/results")}
+                  showContinueButton={!isAssessmentComplete}
+                  isAssessmentComplete={isAssessmentComplete}
+                />
+              </div>
             </div>
+
+            {/* Journey Drawer - Mobile */}
+            <JourneyDrawer
+              open={showJourneyDrawer}
+              onOpenChange={setShowJourneyDrawer}
+              sections={applicableSections}
+              currentSectionId={focusedSectionId}
+              sectionProgress={sectionProgress}
+              completedSections={completedSections}
+              onSectionClick={handleSectionClick}
+            />
           </div>
         </AppLayout>
       );
     }
   }
 
-  // Section Edit Phase - Edit answers in batch mode
+  // Section Edit Phase - Edit answers in batch mode (with sidebar)
   if (flowPhase === "section-edit" && focusedSectionId && schema) {
     const focusedSection = applicableSections.find(s => s.id === focusedSectionId);
     
     if (focusedSection) {
       return (
         <AppLayout hideNav>
-          <div className="min-h-screen flex flex-col bg-gradient-hero">
-            <header className="flex items-center justify-end px-4 h-14">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleExit}
-                className="touch-target press-effect"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </header>
-            <div className="flex-1 overflow-y-auto px-6 py-8">
-              <SectionAnswerList
-                sectionId={focusedSectionId}
-                sectionLabel={focusedSection.label}
-                questions={applicableQuestions}
-                answers={answers}
-                answerScoring={schema.answer_scoring}
-                onSaveChanges={handleSaveEditedAnswers}
-                onBack={handleBackToSectionSummary}
+          <div className="min-h-screen flex bg-background">
+            {/* Journey Sidebar - Desktop only */}
+            <JourneySidebar
+              sections={applicableSections}
+              currentSectionId={focusedSectionId}
+              sectionProgress={sectionProgress}
+              completedSections={completedSections}
+              onSectionClick={handleSectionClick}
+            />
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-h-screen">
+              {/* Mobile Journey Header */}
+              <JourneyHeader
+                sections={applicableSections}
+                currentSectionId={focusedSectionId}
+                completedSections={completedSections}
+                onOpenDrawer={() => setShowJourneyDrawer(true)}
               />
-            </div>
-            {saving && (
-              <div className="px-6 py-3 border-t border-border/30 flex items-center justify-center bg-card/50">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+
+              {/* Desktop Header */}
+              <header className="hidden md:flex items-center justify-between px-6 h-14 border-b border-border/30">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackToSectionSummary}
+                  className="touch-target press-effect"
+                  aria-label="Back to summary"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="text-center">
+                  <p className="text-sm font-body text-muted-foreground">
+                    Editing {focusedSection.label}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExit}
+                  className="touch-target press-effect"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </header>
+
+              {/* Mobile Header Controls */}
+              <header className="md:hidden flex items-center justify-between px-4 h-12">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackToSectionSummary}
+                  className="touch-target press-effect"
+                  aria-label="Back to summary"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExit}
+                  className="touch-target press-effect"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </header>
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto px-6 py-8 bg-gradient-hero">
+                <SectionAnswerList
+                  sectionId={focusedSectionId}
+                  sectionLabel={focusedSection.label}
+                  questions={applicableQuestions}
+                  answers={answers}
+                  answerScoring={schema.answer_scoring}
+                  onSaveChanges={handleSaveEditedAnswers}
+                  onBack={handleBackToSectionSummary}
+                />
               </div>
-            )}
+
+              {saving && (
+                <div className="px-6 py-3 border-t border-border/30 flex items-center justify-center bg-card/50">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                </div>
+              )}
+            </div>
+
+            {/* Journey Drawer - Mobile */}
+            <JourneyDrawer
+              open={showJourneyDrawer}
+              onOpenChange={setShowJourneyDrawer}
+              sections={applicableSections}
+              currentSectionId={focusedSectionId}
+              sectionProgress={sectionProgress}
+              completedSections={completedSections}
+              onSectionClick={handleSectionClick}
+            />
           </div>
         </AppLayout>
       );
