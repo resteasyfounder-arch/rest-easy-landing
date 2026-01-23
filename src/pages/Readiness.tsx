@@ -848,10 +848,12 @@ const Readiness = () => {
     if (firstUnanswered) {
       // Section has unanswered questions - go to first unanswered
       setViewingCompletedSection(false);
+      setFlowPhase("assessment");
       setCurrentStepId(`question:${firstUnanswered.id}`);
     } else if (sectionQuestions.length > 0) {
-      // All questions answered - show section complete view
-      setViewingCompletedSection(true);
+      // All questions answered - show section summary
+      setViewingCompletedSection(false);
+      setFlowPhase("section-summary");
       setCurrentStepId(`question:${sectionQuestions[0].id}`);
     }
   };
