@@ -441,15 +441,39 @@ serve(async (req) => {
       return jsonResponse({ error: "subject_id required for get_state" }, 400);
     }
 
-    // Find the assessment
-    const { data: assessment } = await readiness
+    // Find the best assessment - prefer ones with actual answers
+    // First, get all assessments for this subject
+    const { data: assessments } = await readiness
       .from("assessments")
-      .select("id")
+      .select("id, status, overall_score, created_at")
       .eq("subject_id", payload.subject_id)
       .eq("assessment_id", assessmentKey)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
+
+    let assessment = null;
+
+    if (assessments && assessments.length > 0) {
+      // For each assessment, check if it has answers
+      for (const a of assessments) {
+        const { count } = await readiness
+          .from("assessment_answers")
+          .select("*", { count: "exact", head: true })
+          .eq("assessment_id", a.id);
+
+        if (count && count > 0) {
+          // Found an assessment with answers - use this one
+          assessment = a;
+          console.log(`[get_state] Using assessment ${a.id} with ${count} answers`);
+          break;
+        }
+      }
+
+      // If no assessment has answers, use the most recent one
+      if (!assessment) {
+        assessment = assessments[0];
+        console.log(`[get_state] No assessment has answers, using most recent: ${assessment.id}`);
+      }
+    }
 
     if (!assessment) {
       // No assessment exists - return empty state
