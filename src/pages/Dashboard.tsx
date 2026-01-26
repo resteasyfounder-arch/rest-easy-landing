@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
-import { LogOut, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { LogOut, RefreshCw, Wifi, WifiOff, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import {
@@ -16,10 +17,23 @@ import {
   WelcomeHeader,
   TierBadge,
 } from "@/components/dashboard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const Dashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [isStartingFresh, setIsStartingFresh] = useState(false);
   const {
     assessmentState,
     isLoading,
@@ -27,11 +41,24 @@ const Dashboard = () => {
     hasStarted,
     isComplete,
     refresh,
+    startFresh,
   } = useAssessmentState({ autoRefresh: true, refreshInterval: 30000 });
 
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleStartFresh = async () => {
+    setIsStartingFresh(true);
+    try {
+      await startFresh();
+      toast.success("Started fresh! Your previous assessment has been archived.");
+    } catch (error) {
+      toast.error("Failed to start fresh. Please try again.");
+    } finally {
+      setIsStartingFresh(false);
+    }
   };
 
   // Loading state
@@ -170,15 +197,45 @@ const Dashboard = () => {
               <h2 className="font-display text-lg font-semibold text-foreground">
                 Assessment Sections
               </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => refresh()}
-                className="gap-1.5 text-muted-foreground"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-muted-foreground hover:text-destructive"
+                      disabled={isStartingFresh}
+                    >
+                      <RotateCcw className={`h-3.5 w-3.5 ${isStartingFresh ? "animate-spin" : ""}`} />
+                      Start Fresh
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Start a Fresh Assessment?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will archive your current assessment and start a new one from scratch. 
+                        Your previous answers will be saved but no longer active.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleStartFresh}>
+                        Yes, Start Fresh
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refresh()}
+                  className="gap-1.5 text-muted-foreground"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

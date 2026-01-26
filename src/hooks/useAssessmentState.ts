@@ -202,6 +202,72 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     return fetchState(false);
   }, [fetchState]);
 
+  // Start fresh - archive old assessments and create new one
+  const startFresh = useCallback(async () => {
+    const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
+    
+    if (!subjectId) {
+      // No existing session - just clear local state
+      clearState();
+      return;
+    }
+
+    setState((prev) => ({ ...prev, syncStatus: "syncing" }));
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: "start_fresh",
+          subject_id: subjectId,
+          assessment_id: ASSESSMENT_ID,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start fresh assessment");
+      }
+
+      const data = await response.json();
+      
+      if (!mountedRef.current) return;
+
+      // Update localStorage with new assessment ID
+      if (data.assessment_id) {
+        localStorage.setItem(STORAGE_KEYS.assessmentId, data.assessment_id);
+      }
+      
+      // Clear cached state
+      localStorage.removeItem(STORAGE_KEYS.cachedState);
+
+      const serverState = data.assessment_state || createEmptyState();
+      
+      setState({
+        serverState,
+        syncStatus: "synced",
+        lastSyncAt: new Date(),
+        error: null,
+      });
+
+      return serverState;
+    } catch (error) {
+      if (!mountedRef.current) return;
+      
+      setState((prev) => ({
+        ...prev,
+        syncStatus: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      }));
+      
+      throw error;
+    }
+  }, []);
+
   // Clear local state (for logout/reset)
   const clearState = useCallback(() => {
     localStorage.removeItem(STORAGE_KEYS.subjectId);
@@ -231,6 +297,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     
     // Actions
     refresh,
+    startFresh,
     clearState,
     
     // Utilities
