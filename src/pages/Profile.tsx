@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useGuestProfile } from "@/hooks/useGuestProfile";
+import { useAssessmentState } from "@/hooks/useAssessmentState";
 import {
   UserCircle,
   Heart,
@@ -15,109 +15,25 @@ import {
   Flower2,
   PiggyBank,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { ProfileEditModal, QUESTION_PROMPTS } from "@/components/profile/ProfileEditModal";
 
-// Profile items for the visual snapshot
+// Profile items for the visual snapshot - simplified view only
 const SNAPSHOT_ITEMS = [
-  {
-    id: "profile.household.has_dependents",
-    label: "Family",
-    icon: Users,
-  },
-  {
-    id: "profile.pets.has_pets",
-    label: "Pets",
-    icon: Heart,
-  },
-  {
-    id: "profile.family.supports_aging_parent",
-    label: "Caregiving",
-    icon: HandHeart,
-  },
-  {
-    id: "profile.home.owns_real_property",
-    label: "Home",
-    icon: Home,
-  },
-  {
-    id: "profile.home.has_significant_personal_property",
-    label: "Belongings",
-    icon: Briefcase,
-  },
-  {
-    id: "profile.financial.has_beneficiary_accounts",
-    label: "Finances",
-    icon: PiggyBank,
-  },
-  {
-    id: "profile.digital.owns_crypto",
-    label: "Digital",
-    icon: Laptop,
-  },
-  {
-    id: "profile.emotional.has_spiritual_practices",
-    label: "Faith",
-    icon: Flower2,
-  },
+  { id: "family", label: "Family", icon: Users },
+  { id: "pets", label: "Pets", icon: Heart },
+  { id: "caregiving", label: "Caregiving", icon: HandHeart },
+  { id: "home", label: "Home", icon: Home },
+  { id: "belongings", label: "Belongings", icon: Briefcase },
+  { id: "finances", label: "Finances", icon: PiggyBank },
+  { id: "digital", label: "Digital", icon: Laptop },
+  { id: "faith", label: "Faith", icon: Flower2 },
 ];
 
-// Generate a reflective summary based on profile
-function generateSummary(profileAnswers: Record<string, string>): string {
-  const yesItems: string[] = [];
-  
-  if (profileAnswers["profile.household.has_dependents"] === "yes") {
-    yesItems.push("loved ones who count on you");
-  }
-  if (profileAnswers["profile.pets.has_pets"] === "yes") {
-    yesItems.push("pets who are part of the family");
-  }
-  if (profileAnswers["profile.family.supports_aging_parent"] === "yes") {
-    yesItems.push("a parent you're helping care for");
-  }
-  if (profileAnswers["profile.home.owns_real_property"] === "yes") {
-    yesItems.push("a home");
-  }
-  if (profileAnswers["profile.home.has_significant_personal_property"] === "yes") {
-    yesItems.push("belongings that matter");
-  }
-  if (profileAnswers["profile.emotional.has_spiritual_practices"] === "yes") {
-    yesItems.push("traditions close to your heart");
-  }
-
-  if (yesItems.length === 0) {
-    return "Everyone's situation is different. We'll focus on the essentials.";
-  }
-
-  if (yesItems.length === 1) {
-    return `Your life includes ${yesItems[0]}.`;
-  }
-
-  if (yesItems.length === 2) {
-    return `Your life includes ${yesItems[0]} and ${yesItems[1]}.`;
-  }
-
-  const lastItem = yesItems.pop();
-  return `Your life includes ${yesItems.join(", ")}, and ${lastItem}.`;
-}
-
-// Visual snapshot component
-const LifeSnapshot = ({ 
-  profileAnswers, 
-  onItemClick 
-}: { 
-  profileAnswers: Record<string, string>;
-  onItemClick: (item: typeof SNAPSHOT_ITEMS[0]) => void;
-}) => {
-  const getItemState = (id: string) => {
-    const answer = profileAnswers[id];
-    if (answer === "yes") return "active";
-    if (answer === "no") return "inactive";
-    return "unknown";
-  };
-
+// Visual snapshot component - read-only display
+const LifeSnapshot = ({ profileComplete }: { profileComplete: boolean }) => {
   return (
     <div className="relative w-full max-w-sm mx-auto aspect-square">
       {/* Central avatar */}
@@ -136,7 +52,6 @@ const LifeSnapshot = ({
             <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.1" />
           </linearGradient>
         </defs>
-        {/* Subtle circular connection */}
         <circle 
           cx="50" 
           cy="50" 
@@ -150,12 +65,12 @@ const LifeSnapshot = ({
 
       {/* Snapshot items arranged around center */}
       {SNAPSHOT_ITEMS.map((item, index) => {
-        const state = getItemState(item.id);
         const Icon = item.icon;
+        const isActive = profileComplete;
         
         // Calculate position around the circle
         const angle = (index / SNAPSHOT_ITEMS.length) * 2 * Math.PI - Math.PI / 2;
-        const radius = 38; // percentage from center
+        const radius = 38;
         const x = 50 + radius * Math.cos(angle);
         const y = 50 + radius * Math.sin(angle);
 
@@ -168,52 +83,36 @@ const LifeSnapshot = ({
               top: `${y}%`,
             }}
           >
-            <button
-              onClick={() => onItemClick(item)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 group cursor-pointer",
-                state === "active" && "animate-fade-in",
-              )}
-            >
+            <div className="flex flex-col items-center gap-1.5">
               <div
                 className={cn(
                   "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
-                  "hover:scale-110 hover:shadow-lg",
-                  state === "active" && [
+                  isActive && [
                     "bg-primary/15 border-2 border-primary/30 shadow-md shadow-primary/10",
-                    "hover:shadow-primary/20",
-                    `animate-float-gentle animate-delay-${index}`,
                   ],
-                  state === "inactive" && [
-                    "bg-muted/30 border border-border/30",
-                    "hover:bg-muted/50 hover:border-border/50",
-                  ],
-                  state === "unknown" && [
+                  !isActive && [
                     "bg-muted/20 border border-dashed border-border/20",
-                    "hover:bg-muted/30 hover:border-border/30",
                   ],
                 )}
               >
                 <Icon
                   className={cn(
                     "w-5 h-5 transition-all duration-300",
-                    state === "active" && "text-primary",
-                    state === "inactive" && "text-muted-foreground/40 group-hover:text-muted-foreground/60",
-                    state === "unknown" && "text-muted-foreground/20 group-hover:text-muted-foreground/40",
+                    isActive && "text-primary",
+                    !isActive && "text-muted-foreground/30",
                   )}
                 />
               </div>
               <span
                 className={cn(
                   "text-xs font-body transition-all duration-300 text-center",
-                  state === "active" && "text-foreground font-medium",
-                  state === "inactive" && "text-muted-foreground/50 group-hover:text-muted-foreground/70",
-                  state === "unknown" && "text-muted-foreground/30 group-hover:text-muted-foreground/50",
+                  isActive && "text-foreground font-medium",
+                  !isActive && "text-muted-foreground/40",
                 )}
               >
                 {item.label}
               </span>
-            </button>
+            </div>
           </div>
         );
       })}
@@ -223,39 +122,20 @@ const LifeSnapshot = ({
 
 const Profile = () => {
   const navigate = useNavigate();
-  const {
-    profileAnswers,
-    isComplete,
-    completedCount,
-    clearProfile,
-    updateAnswer,
-    saveProfile,
-    isLoading,
-  } = useGuestProfile();
+  const { assessmentState, isLoading } = useAssessmentState();
 
-  const [editingItem, setEditingItem] = useState<typeof SNAPSHOT_ITEMS[0] | null>(null);
-
-  const summary = useMemo(() => generateSummary(profileAnswers), [profileAnswers]);
+  const { profile_complete, profile_progress, status } = assessmentState;
+  const hasStarted = status !== "not_started";
 
   const handleStartReadiness = () => {
     navigate("/readiness");
-  };
-
-  const handleItemClick = (item: typeof SNAPSHOT_ITEMS[0]) => {
-    setEditingItem(item);
-  };
-
-  const handleEditAnswer = async (value: "yes" | "no") => {
-    if (!editingItem) return;
-    updateAnswer(editingItem.id, value);
-    await saveProfile();
   };
 
   if (isLoading) {
     return (
       <AppLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground font-body">Loading...</div>
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       </AppLayout>
     );
@@ -275,8 +155,8 @@ const Profile = () => {
             </p>
           </div>
 
-          {/* Empty State */}
-          {completedCount === 0 && (
+          {/* Empty State - Not started */}
+          {!hasStarted && (
             <Card className="p-8 text-center bg-card/60 backdrop-blur-sm border-border/40 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
               <div className="space-y-5">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mx-auto">
@@ -306,33 +186,34 @@ const Profile = () => {
             </Card>
           )}
 
-          {/* Profile Content */}
-          {completedCount > 0 && (
+          {/* Profile Content - Has started */}
+          {hasStarted && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
               
               {/* Life Snapshot Visual Card */}
               <Card className="p-6 pt-8 bg-card/60 backdrop-blur-sm border-border/40 overflow-hidden">
-                <LifeSnapshot 
-                  profileAnswers={profileAnswers} 
-                  onItemClick={handleItemClick}
-                />
+                <LifeSnapshot profileComplete={profile_complete} />
                 
-                {/* Summary below the visual */}
-                {isComplete && (
-                  <div className="text-center mt-6 pt-6 border-t border-border/30">
-                    <p className="text-base font-body text-foreground/80 leading-relaxed italic">
-                      "{summary}"
+                {/* Progress indicator */}
+                <div className="text-center mt-6 pt-6 border-t border-border/30">
+                  {profile_complete ? (
+                    <p className="text-base font-body text-foreground/80 leading-relaxed">
+                      Your profile is complete. You can review or update your answers anytime.
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-base font-body text-muted-foreground leading-relaxed">
+                      Profile {Math.round(profile_progress)}% complete
+                    </p>
+                  )}
+                </div>
               </Card>
 
               {/* Continue CTA */}
               <div className="text-center space-y-4 pt-4">
                 <p className="text-foreground font-body text-base leading-relaxed">
-                  {isComplete 
-                    ? "Whenever you're ready, we can continue."
-                    : "Tap any icon to answer, or continue when you're ready."
+                  {profile_complete 
+                    ? "Whenever you're ready, continue your assessment."
+                    : "Continue to complete your profile."
                   }
                 </p>
                 <Button
@@ -340,7 +221,7 @@ const Profile = () => {
                   size="lg"
                   className="gap-2 font-body"
                 >
-                  Continue
+                  {profile_complete ? "Continue Assessment" : "Complete Profile"}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
@@ -348,19 +229,6 @@ const Profile = () => {
           )}
         </div>
       </div>
-
-      {/* Edit Modal */}
-      {editingItem && (
-        <ProfileEditModal
-          open={!!editingItem}
-          onOpenChange={(open) => !open && setEditingItem(null)}
-          icon={editingItem.icon}
-          label={editingItem.label}
-          questionPrompt={QUESTION_PROMPTS[editingItem.id] || editingItem.label}
-          currentValue={profileAnswers[editingItem.id] as "yes" | "no" | null}
-          onAnswer={handleEditAnswer}
-        />
-      )}
     </AppLayout>
   );
 };

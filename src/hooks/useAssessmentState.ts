@@ -9,10 +9,9 @@ import type {
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
 
+// Only keep subject_id in localStorage for session continuity
 const STORAGE_KEYS = {
   subjectId: "rest-easy.readiness.subject_id",
-  assessmentId: "rest-easy.readiness.assessment_id",
-  cachedState: "rest-easy.readiness.cached_state",
 };
 
 const ASSESSMENT_ID = "readiness_v1";
@@ -113,9 +112,6 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
       if (!mountedRef.current) return null;
 
       const serverState = data.assessment_state || createEmptyState();
-      
-      // Cache state
-      localStorage.setItem(STORAGE_KEYS.cachedState, JSON.stringify(serverState));
 
       setState({
         serverState,
@@ -128,18 +124,17 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     } catch (error) {
       if (!mountedRef.current) return null;
       
-      // Try to use cached state on error
-      const cached = localStorage.getItem(STORAGE_KEYS.cachedState);
-      const cachedState = cached ? JSON.parse(cached) : createEmptyState();
+      // On error, show error state (no localStorage fallback)
+      const emptyState = createEmptyState();
       
       setState({
-        serverState: cachedState,
+        serverState: emptyState,
         syncStatus: "error",
         lastSyncAt: state.lastSyncAt,
         error: error instanceof Error ? error.message : "Unknown error",
       });
       
-      return cachedState;
+      return emptyState;
     } finally {
       if (mountedRef.current) {
         setIsLoading(false);
@@ -237,13 +232,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
       
       if (!mountedRef.current) return;
 
-      // Update localStorage with new assessment ID
-      if (data.assessment_id) {
-        localStorage.setItem(STORAGE_KEYS.assessmentId, data.assessment_id);
-      }
-      
-      // Clear cached state
-      localStorage.removeItem(STORAGE_KEYS.cachedState);
+      // Assessment ID is now managed in-memory only
 
       const serverState = data.assessment_state || createEmptyState();
       
@@ -271,8 +260,9 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
   // Clear local state (for logout/reset)
   const clearState = useCallback(() => {
     localStorage.removeItem(STORAGE_KEYS.subjectId);
-    localStorage.removeItem(STORAGE_KEYS.assessmentId);
-    localStorage.removeItem(STORAGE_KEYS.cachedState);
+    // Also clear legacy keys
+    localStorage.removeItem("rest-easy.readiness.report");
+    localStorage.removeItem("rest-easy.readiness.report_stale");
     setState({
       serverState: createEmptyState(),
       syncStatus: "synced",

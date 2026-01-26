@@ -53,12 +53,11 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
   // Assessment complete (100% progress) but not yet marked as completed status
   // OR status is completed - show report options
   if (overall_progress >= 100 || status === "completed") {
-    // Check if we have an existing report
-    const hasExistingReport = localStorage.getItem("rest-easy.readiness.report") !== null;
-    const isReportStale = localStorage.getItem("rest-easy.readiness.report_stale") === "true";
+    // Check report status from server state
+    const hasReport = report_status === "ready";
 
-    if (hasExistingReport && !isReportStale) {
-      // Have a valid report - show view report option
+    if (hasReport) {
+      // Have a report - show view report option
       return (
         <div className="flex flex-col sm:flex-row gap-3">
           <Button asChild size="lg" className={className}>
@@ -77,23 +76,15 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
       );
     }
 
-    // Assessment complete but no report yet (or stale) - prompt to generate
+    // Assessment complete but no report yet - prompt to generate
     return (
       <div className="flex flex-col sm:flex-row gap-3">
         <Button asChild size="lg" className={className}>
           <Link to="/readiness" className="gap-2">
             <FileText className="h-4 w-4" />
-            {isReportStale ? "Regenerate Report" : "Generate Report"}
+            Generate Report
           </Link>
         </Button>
-        {hasExistingReport && (
-          <Button asChild variant="outline" size="lg">
-            <Link to="/results" className="gap-2">
-              <Eye className="h-4 w-4" />
-              View Previous Report
-            </Link>
-          </Button>
-        )}
       </div>
     );
   }
