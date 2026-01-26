@@ -4,12 +4,12 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
-import { useGuestProfile } from "@/hooks/useGuestProfile";
 import { LogOut, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import {
   ScoreCircle,
+  ProgressCircle,
   SectionProgressCard,
   ReportStatusBadge,
   AssessmentCTA,
@@ -20,7 +20,6 @@ import {
 const Dashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const { completedCount, totalQuestions } = useGuestProfile();
   const {
     assessmentState,
     isLoading,
@@ -29,8 +28,6 @@ const Dashboard = () => {
     isComplete,
     refresh,
   } = useAssessmentState({ autoRefresh: true, refreshInterval: 30000 });
-
-  const profileProgress = Math.round((completedCount / totalQuestions) * 100);
 
   const handleLogout = () => {
     logout();
@@ -92,34 +89,46 @@ const Dashboard = () => {
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden">
           <CardContent className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-              {/* Score Circle */}
+              {/* Score/Progress Circle */}
               <div className="flex-shrink-0">
-                <ScoreCircle
-                  score={assessmentState.overall_score}
-                  tier={assessmentState.tier}
-                  size="lg"
-                  animated={true}
-                />
+                {isComplete ? (
+                  <ScoreCircle
+                    score={assessmentState.overall_score}
+                    tier={assessmentState.tier}
+                    size="lg"
+                    animated={true}
+                  />
+                ) : (
+                  <ProgressCircle
+                    progress={assessmentState.overall_progress}
+                    size="lg"
+                    animated={true}
+                  />
+                )}
               </div>
 
-              {/* Score Details */}
+              {/* Score/Progress Details */}
               <div className="flex-1 text-center sm:text-left space-y-4">
                 <div>
                   <h2 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
-                    Your Readiness Score
+                    {isComplete ? "Your Readiness Score" : "Your Assessment Progress"}
                   </h2>
-                  <div className="mt-2">
-                    <TierBadge tier={assessmentState.tier} size="md" />
-                  </div>
+                  {isComplete && (
+                    <div className="mt-2">
+                      <TierBadge tier={assessmentState.tier} size="md" />
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Overall Progress</span>
-                    <span className="font-medium">{assessmentState.overall_progress}%</span>
+                {!isComplete && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Overall Progress</span>
+                      <span className="font-medium">{Math.round(assessmentState.overall_progress)}%</span>
+                    </div>
+                    <Progress value={assessmentState.overall_progress} className="h-2" />
                   </div>
-                  <Progress value={assessmentState.overall_progress} className="h-2" />
-                </div>
+                )}
 
                 {isComplete && assessmentState.report_status !== "not_started" && (
                   <div className="pt-2">
@@ -143,10 +152,10 @@ const Dashboard = () => {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-display font-medium text-foreground">Profile Completion</h3>
                 <span className="text-sm text-muted-foreground">
-                  {completedCount} of {totalQuestions}
+                  {assessmentState.profile_progress}%
                 </span>
               </div>
-              <Progress value={profileProgress} className="h-2" />
+              <Progress value={assessmentState.profile_progress} className="h-2" />
               <p className="text-xs text-muted-foreground mt-2">
                 Complete your profile to personalize your assessment
               </p>
