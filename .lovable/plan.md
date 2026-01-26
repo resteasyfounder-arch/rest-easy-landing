@@ -1,327 +1,209 @@
 
+# Fix Report Status Sync Between Dashboard and Results
 
-# Refactor Assessment Flow to Backend-Only State Management
+## Problem Summary
+The Dashboard shows "Generate Report" button even though a report exists and is visible on the Results page. This is caused by a data source mismatch after the backend-only refactor.
 
-## Overview
+## Root Cause
 
-This plan removes localStorage caching for assessment data and establishes the backend as the single source of truth. Only the `subject_id` will be kept in localStorage as a session identifier to link browser sessions to server data.
+| Component | Current Data Source | Expected |
+|-----------|-------------------|----------|
+| Dashboard CTA | Server (`report_status` field) | Correct approach |
+| Results Page | localStorage (`rest-easy.readiness.report`) | Should use server |
+| Report Generation | Writes to localStorage only | Should update database |
 
-## Current State Analysis
+The database `report_status` column is never updated when a report is generated, so the Dashboard (correctly) shows "Generate Report" while the Results page (incorrectly) reads from stale localStorage.
 
-### localStorage Keys Currently Used
+## Solution
 
-| Key | Location | Purpose |
-|-----|----------|---------|
-| `rest-easy.readiness.subject_id` | Multiple files | Session identifier (KEEP) |
-| `rest-easy.readiness.assessment_id` | Multiple files | Cached assessment ID (REMOVE) |
-| `rest-easy.readiness.profile_json` | Readiness.tsx, useGuestProfile | Cached profile data (REMOVE) |
-| `rest-easy.readiness.profile_answers` | Readiness.tsx, useGuestProfile | Cached profile answers (REMOVE) |
-| `rest-easy.readiness.answers` | Readiness.tsx | Cached assessment answers (REMOVE) |
-| `rest-easy.readiness.flow_phase` | Readiness.tsx | Cached flow phase (REMOVE) |
-| `rest-easy.readiness.cached_state` | useAssessmentState | Cached server state (REMOVE) |
-| `rest-easy.readiness.report` | Results.tsx, AssessmentCTA | Cached report (REMOVE) |
-| `rest-easy.readiness.report_stale` | Readiness.tsx | Report staleness flag (REMOVE) |
+### Phase 1: Update Report Generation to Persist to Database
 
-### Files Requiring Changes
+**File: `supabase/functions/generate-report/index.ts`**
 
-1. **`supabase/functions/agent/index.ts`** - Expand `get_state` response to include full data
-2. **`src/pages/Readiness.tsx`** - Major refactor to fetch-first pattern
-3. **`src/hooks/useAssessmentState.ts`** - Simplify to server-only fetching
-4. **`src/hooks/useGuestProfile.ts`** - Remove or simplify significantly
-5. **`src/pages/Results.tsx`** - Fetch report from server
-6. **`src/components/dashboard/AssessmentCTA.tsx`** - Remove localStorage checks
+After successfully generating a report:
+1. Accept `assessment_id` in the request payload
+2. Store the report JSON in the database (new `report_data` column or separate table)
+3. Update `assessments.report_status` to `"ready"`
+
+Alternatively, handle this in the calling code (`Readiness.tsx`) by calling a new `save_report` action on the agent.
+
+### Phase 2: Update Readiness.tsx Report Generation Flow
+
+**File: `src/pages/Readiness.tsx`**
+
+After receiving the generated report:
+1. Call the agent with a new action `save_report` that:
+   - Stores the report JSON in the database
+   - Updates `report_status` to `"ready"`
+2. Remove localStorage write for the report
+
+### Phase 3: Update Results Page to Fetch from Server
+
+**File: `src/pages/Results.tsx`**
+
+1. Remove localStorage-based report loading
+2. Add `useEffect` to fetch report from server via the agent edge function
+3. Add a new `get_report` action to the agent that returns the stored report JSON
+
+### Phase 4: Add Report Storage to Agent Edge Function
+
+**File: `supabase/functions/agent/index.ts`**
+
+Add two new actions:
+- `save_report`: Store report JSON in database and update `report_status`
+- `get_report`: Retrieve stored report JSON for a subject/assessment
+
+### Phase 5: Database Schema Update (Optional)
+
+Add a column to store the report JSON:
+```sql
+ALTER TABLE readiness_v1.assessments 
+ADD COLUMN report_data JSONB;
+```
+
+Or create a separate `reports` table for cleaner separation.
 
 ---
 
-## Phase 1: Expand Edge Function Response
+## Implementation Details
 
-### Goal
-Make `get_state` return ALL data needed to hydrate the Readiness page.
+### Agent Edge Function Changes
 
-### Changes to `supabase/functions/agent/index.ts`
-
-Update the `AssessmentState` interface and `computeAssessmentState` function to include:
+Add action handlers:
 
 ```typescript
-interface AssessmentState {
-  // Existing fields...
+// save_report action
+if (action === "save_report") {
+  const { assessment_id, report_data } = body;
   
-  // NEW: Full data for client hydration
-  profile_data: Record<string, unknown>;           // Full profile JSON
-  profile_answers: Record<string, "yes" | "no">;   // Profile question answers
-  answers: Record<string, AnswerRecord>;           // All assessment answers
-  flow_phase: FlowPhase;                           // Current flow phase
+  await readiness
+    .from("assessments")
+    .update({
+      report_status: "ready",
+      report_data: report_data,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", assessment_id);
+    
+  return jsonResponse({ success: true });
+}
+
+// get_report action  
+if (action === "get_report") {
+  const { data } = await readiness
+    .from("assessments")
+    .select("report_data, report_status")
+    .eq("subject_id", subjectId)
+    .eq("assessment_id", assessmentId)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+    
+  return jsonResponse({ 
+    report: data?.report_data, 
+    status: data?.report_status 
+  });
 }
 ```
 
-The edge function will:
-- Return profile data from `profile_intake` table
-- Return all answers from `assessment_answers` table with full details
-- Calculate and return the appropriate `flow_phase` based on progress
+### Readiness.tsx Changes
 
----
+Update `handleGenerateReport`:
 
-## Phase 2: Refactor Readiness.tsx
-
-### Goal
-Remove all localStorage reads/writes for assessment data. Fetch everything from server on mount.
-
-### Key Changes
-
-1. **Remove STORAGE_KEYS object** (except `subjectId`)
-
-2. **Remove localStorage initialization** from useState calls:
-   ```typescript
-   // BEFORE: Reads from localStorage
-   const [answers, setAnswers] = useState<Record<string, AnswerRecord>>(() => {
-     const raw = localStorage.getItem(STORAGE_KEYS.answers);
-     return raw ? JSON.parse(raw) : {};
-   });
-   
-   // AFTER: Empty initial state, populated from server
-   const [answers, setAnswers] = useState<Record<string, AnswerRecord>>({});
-   ```
-
-3. **Remove all localStorage.setItem calls** for:
-   - `profile`
-   - `profileAnswers`
-   - `answers`
-   - `flowPhase`
-   - `assessmentId`
-
-4. **Update bootstrap() function** to hydrate ALL state from server:
-   ```typescript
-   const bootstrap = useCallback(async () => {
-     setLoading(true);
-     try {
-       const storedSubjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-       
-       const [schemaResponse, stateResponse] = await Promise.all([
-         callAgent({
-           action: "get_schema",
-           assessment_id: ASSESSMENT_ID,
-           schema_version: SCHEMA_VERSION,
-         }),
-         callAgent({
-           action: "get_state",
-           subject_id: storedSubjectId ?? undefined,
-           assessment_id: ASSESSMENT_ID,
-         }),
-       ]);
-   
-       setSchema(schemaResponse.schema);
-       
-       // Hydrate ALL state from server response
-       const { assessment_state } = stateResponse;
-       if (assessment_state) {
-         setSubjectId(stateResponse.subject_id);
-         setAssessmentId(stateResponse.assessment_id);
-         setProfile(assessment_state.profile_data || {});
-         setProfileAnswers(assessment_state.profile_answers || {});
-         setAnswers(assessment_state.answers || {});
-         setFlowPhase(assessment_state.flow_phase || "intro");
-         
-         // Store subject_id for session continuity
-         if (stateResponse.subject_id) {
-           localStorage.setItem(STORAGE_KEYS.subjectId, stateResponse.subject_id);
-         }
-       }
-     } catch (err) {
-       setFatalError(err instanceof Error ? err.message : "Unable to load.");
-     } finally {
-       setLoading(false);
-     }
-   }, []);
-   ```
-
-5. **Remove persistence useEffect hooks**:
-   - Remove `useEffect` that saves `profile` to localStorage
-   - Remove `useEffect` that saves `profileAnswers` to localStorage
-   - Remove `useEffect` that saves `answers` to localStorage
-   - Remove `useEffect` that saves `flowPhase` to localStorage
-
-6. **Keep server writes on user actions** (these already exist):
-   - `callAgent()` for profile updates
-   - `callAgent()` for answer submissions
-
----
-
-## Phase 3: Simplify useAssessmentState Hook
-
-### Goal
-Remove localStorage caching, always fetch from server.
-
-### Changes to `src/hooks/useAssessmentState.ts`
-
-1. **Remove STORAGE_KEYS** for `assessmentId` and `cachedState`
-
-2. **Remove localStorage caching** in `fetchState()`:
-   ```typescript
-   // REMOVE these lines
-   localStorage.setItem(STORAGE_KEYS.cachedState, JSON.stringify(serverState));
-   
-   // REMOVE fallback to cached state on error
-   const cached = localStorage.getItem(STORAGE_KEYS.cachedState);
-   ```
-
-3. **Simplify error handling** - show error state instead of stale cache
-
-4. **Update `startFresh()`** to only clear `subject_id` if needed:
-   ```typescript
-   const startFresh = useCallback(async () => {
-     const subjectId = localStorage.getItem("rest-easy.readiness.subject_id");
-     if (!subjectId) return;
-   
-     const response = await fetch(/* start_fresh endpoint */);
-     const data = await response.json();
-     
-     // Update in-memory state with fresh assessment
-     setState({
-       serverState: data.assessment_state,
-       syncStatus: "synced",
-       lastSyncAt: new Date(),
-       error: null,
-     });
-   }, []);
-   ```
-
----
-
-## Phase 4: Remove/Simplify useGuestProfile Hook
-
-### Goal
-This hook becomes unnecessary since all data comes from server.
-
-### Options
-
-**Option A: Remove entirely** and have Readiness.tsx manage profile state from server response.
-
-**Option B: Simplify to read-only** - only used to display profile status on other pages.
-
-### Recommended: Option A
-
-The Readiness page will manage its own profile state hydrated from the server. Other pages (Dashboard) already use `useAssessmentState` which gets profile status from `assessment_state.profile_complete`.
-
----
-
-## Phase 5: Update Results Page and AssessmentCTA
-
-### Changes to `src/pages/Results.tsx`
-
-Remove localStorage-based report loading:
 ```typescript
-// BEFORE: Load from localStorage
-const storedReport = localStorage.getItem(REPORT_STORAGE_KEY);
-
-// AFTER: Fetch from server on mount
-const { data: report, isLoading } = useQuery({
-  queryKey: ["report", subjectId],
-  queryFn: () => fetchReportFromServer(subjectId),
-});
+const handleGenerateReport = async () => {
+  // ... existing generation logic ...
+  
+  if (response.ok && data.report) {
+    // Save to server instead of localStorage
+    await callAgent({
+      action: "save_report",
+      subject_id: subjectId,
+      assessment_id: assessmentId,
+      report_data: data.report,
+    });
+    
+    // Remove localStorage write
+    // localStorage.setItem("rest-easy.readiness.report", JSON.stringify(data.report));
+    
+    navigate("/results");
+  }
+};
 ```
 
-### Changes to `src/components/dashboard/AssessmentCTA.tsx`
+### Results.tsx Changes
 
-Remove localStorage checks:
+Fetch report from server:
+
 ```typescript
-// REMOVE these localStorage reads
-const hasExistingReport = localStorage.getItem("rest-easy.readiness.report");
-const isReportStale = localStorage.getItem("rest-easy.readiness.report_stale");
+const Results = () => {
+  const [report, setReport] = useState<ReadinessReport | null>(null);
+  const [loading, setLoading] = useState(true);
 
-// Use server state instead
-const hasReport = assessmentState.report_status === "ready";
+  useEffect(() => {
+    const fetchReport = async () => {
+      const subjectId = localStorage.getItem("rest-easy.readiness.subject_id");
+      if (!subjectId) {
+        setLoading(false);
+        return;
+      }
+      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+        method: "POST",
+        headers: { /* ... */ },
+        body: JSON.stringify({
+          action: "get_report",
+          subject_id: subjectId,
+          assessment_id: "readiness_v1",
+        }),
+      });
+      
+      const data = await response.json();
+      if (data.report) {
+        setReport(data.report);
+      }
+      setLoading(false);
+    };
+    
+    fetchReport();
+  }, []);
+  
+  // ... rest of component
+};
 ```
 
 ---
 
-## Phase 6: Clean Up Remaining localStorage References
+## Migration Consideration
 
-### Files to check and update:
-- Remove `profile-prompt-dismissed` from sessionStorage (low priority, UX helper)
-- Remove any remaining `rest-easy.readiness.*` keys
-
----
-
-## Data Flow After Refactor
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER                                  │
-├─────────────────────────────────────────────────────────────────┤
-│  localStorage                                                   │
-│  ┌─────────────────────────────────────┐                       │
-│  │ rest-easy.readiness.subject_id      │ ← Only persistent key │
-│  └─────────────────────────────────────┘                       │
-│                                                                 │
-│  React State (in-memory only)                                   │
-│  ┌─────────────────────────────────────┐                       │
-│  │ schema, profile, profileAnswers,    │                       │
-│  │ answers, flowPhase, assessmentId    │                       │
-│  └─────────────────────────────────────┘                       │
-│            ↑ Hydrate on mount    │ Write on user action         │
-└────────────┼─────────────────────┼──────────────────────────────┘
-             │                     │
-             │    get_state        │    save answer/profile
-             │                     ↓
-┌────────────┴─────────────────────────────────────────────────────┐
-│                     EDGE FUNCTION (agent)                        │
-├──────────────────────────────────────────────────────────────────┤
-│  get_state → Returns full hydration payload:                     │
-│    - subject_id, assessment_id                                   │
-│    - profile_data, profile_answers                               │
-│    - answers (all records)                                       │
-│    - flow_phase (calculated)                                     │
-│    - sections, scores, progress                                  │
-│                                                                  │
-│  save (default action) → Persists profile/answers to DB          │
-│                                                                  │
-│  start_fresh → Archives old, creates new assessment              │
-└──────────────────────────────────────────────────────────────────┘
-             │
-             ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                     SUPABASE DATABASE                            │
-├──────────────────────────────────────────────────────────────────┤
-│  readiness_v1.subjects          ← subject_id (session key)       │
-│  readiness_v1.assessments       ← assessment records             │
-│  readiness_v1.profile_intake    ← profile data                   │
-│  readiness_v1.assessment_answers← all answers                    │
-└──────────────────────────────────────────────────────────────────┘
-```
+For existing users who have reports in localStorage but not in the database:
+- On Results page load, if no server report exists but localStorage has one, offer to "save" it to the server
+- Or simply let them regenerate (cleaner approach)
 
 ---
 
-## Implementation Order
+## Files to Modify
 
-1. **Edge Function First** - Expand `get_state` to return all needed data
-2. **Readiness.tsx** - Refactor to server-fetch pattern
-3. **useAssessmentState** - Remove caching
-4. **useGuestProfile** - Remove or deprecate
-5. **Results/AssessmentCTA** - Update to use server state
-6. **Test thoroughly** - Especially "Start Fresh" flow
+1. `supabase/functions/agent/index.ts` - Add `save_report` and `get_report` actions
+2. `src/pages/Readiness.tsx` - Update report generation to save to server
+3. `src/pages/Results.tsx` - Fetch report from server instead of localStorage
+4. Database migration - Add `report_data` JSONB column to assessments table
 
 ---
 
-## Benefits
+## Expected Outcome
 
-- **Single source of truth** - No sync issues between localStorage and server
-- **Simpler debugging** - Check database, not localStorage
-- **Auth-ready** - When auth is added, just pass `user_id` instead of `subject_id`
-- **No stale data** - Fresh data on every page load
-- **Cleaner code** - Remove ~50+ lines of localStorage management
-
-## Tradeoffs
-
-- **More network requests** - Every page load fetches from server (mitigated by server being fast)
-- **No offline support** - Requires network (acceptable for this app)
-- **Slightly slower initial load** - Must wait for server response before showing content
+After implementation:
+- Report generated → saved to database with `report_status = "ready"`
+- Dashboard checks server `report_status` → shows "View Full Report" ✓
+- Results page fetches from server → shows the report ✓
+- No more localStorage dependencies for report data
 
 ---
 
 ## Technical Notes
 
-- The edge function already has the database queries needed; we just need to include the raw data in the response
-- The `flow_phase` calculation can be done server-side based on profile/answer progress
-- The schema is already fetched separately and can remain cached client-side if desired (it's static)
-- Consider adding a loading skeleton that matches the final UI to improve perceived performance
-
+- The report JSON can be large (10-20KB), JSONB storage in PostgreSQL handles this efficiently
+- Consider adding `report_generated_at` timestamp for tracking
+- The `report_stale` concept should be handled server-side by comparing answer timestamps vs report timestamp
