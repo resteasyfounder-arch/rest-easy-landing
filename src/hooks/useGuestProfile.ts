@@ -18,6 +18,7 @@ interface UseGuestProfileReturn {
   updateAnswer: (questionId: string, value: string) => void;
   saveProfile: () => Promise<void>;
   clearProfile: () => void;
+  clearAll: () => void;
   isLoading: boolean;
 }
 
@@ -114,6 +115,19 @@ export function useGuestProfile(): UseGuestProfileReturn {
     localStorage.removeItem(STORAGE_KEYS.PROFILE_ANSWERS);
   }, []);
 
+  const clearAll = useCallback(() => {
+    setProfile({});
+    setProfileAnswers({});
+    setSubjectId(null);
+    setAssessmentId(null);
+    localStorage.removeItem(STORAGE_KEYS.PROFILE_JSON);
+    localStorage.removeItem(STORAGE_KEYS.PROFILE_ANSWERS);
+    localStorage.removeItem(STORAGE_KEYS.SUBJECT_ID);
+    localStorage.removeItem(STORAGE_KEYS.ASSESSMENT_ID);
+    // Also clear cached assessment state
+    localStorage.removeItem("rest-easy.readiness.cached_state");
+  }, []);
+
   return {
     profile,
     profileAnswers,
@@ -125,6 +139,7 @@ export function useGuestProfile(): UseGuestProfileReturn {
     updateAnswer,
     saveProfile,
     clearProfile,
+    clearAll,
     isLoading,
   };
 }

@@ -52,7 +52,7 @@ type AgentAnswerInput = {
 };
 
 type AgentRequest = {
-  action?: "get_schema" | "get_state";
+  action?: "get_schema" | "get_state" | "start_fresh";
   subject_id?: string;
   user_id?: string;
   assessment_id?: string;
@@ -229,11 +229,33 @@ async function computeAssessmentState(
     };
   }
 
-  // Calculate profile progress
+  // Calculate profile progress - check both nested and flat key formats
   const totalProfileQuestions = schema.profile_questions.length;
-  const answeredProfileQuestions = schema.profile_questions.filter(
-    (q) => profile[q.field] !== undefined
-  ).length;
+  const answeredProfileQuestions = schema.profile_questions.filter((q) => {
+    // Check direct field name (e.g., "owns_crypto")
+    if (profile[q.field] !== undefined) return true;
+    
+    // Check flat format with profile. prefix (e.g., "profile.digital.owns_crypto")
+    // The field in schema might be "owns_crypto", but client sends "profile.digital.owns_crypto"
+    // We need to check if any key ends with the field name
+    for (const key of Object.keys(profile)) {
+      if (key.endsWith(`.${q.field}`) || key === `profile.${q.field}`) {
+        return true;
+      }
+    }
+    
+    // Also check nested structure (e.g., profile.digital.owns_crypto as nested object)
+    const parts = q.field.split(".");
+    let current: unknown = profile;
+    for (const part of parts) {
+      if (current && typeof current === "object" && part in (current as Record<string, unknown>)) {
+        current = (current as Record<string, unknown>)[part];
+      } else {
+        return false;
+      }
+    }
+    return current !== undefined;
+  }).length;
   const profileProgress = totalProfileQuestions > 0
     ? Math.round((answeredProfileQuestions / totalProfileQuestions) * 100)
     : 100;
@@ -512,6 +534,65 @@ serve(async (req) => {
       subject_id: payload.subject_id,
       assessment_id: assessment.id,
       assessment_state: assessmentState,
+    });
+  }
+
+  // Handle start_fresh action - archive old assessments and create new one
+  if (payload.action === "start_fresh") {
+    if (!payload.subject_id) {
+      return jsonResponse({ error: "subject_id required for start_fresh" }, 400);
+    }
+
+    console.log(`[start_fresh] Archiving assessments for subject ${payload.subject_id}`);
+
+    // Mark all existing assessments as archived by setting status to 'archived'
+    // and reset their scores to indicate they're no longer active
+    const { error: archiveError } = await readiness
+      .from("assessments")
+      .update({ status: "archived" })
+      .eq("subject_id", payload.subject_id)
+      .eq("assessment_id", assessmentKey);
+
+    if (archiveError) {
+      console.error(`[start_fresh] Archive error:`, archiveError);
+      return jsonResponse({ error: "Failed to archive old assessments" }, 500);
+    }
+
+    // Create a new blank assessment
+    const { data: newAssessment, error: createError } = await readiness
+      .from("assessments")
+      .insert({
+        subject_id: payload.subject_id,
+        assessment_id: assessmentKey,
+        schema_version: "v1",
+        status: "draft",
+        overall_score: 0,
+        report_status: "not_started",
+      })
+      .select("id")
+      .single();
+
+    if (createError || !newAssessment) {
+      console.error(`[start_fresh] Create error:`, createError);
+      return jsonResponse({ error: "Failed to create new assessment" }, 500);
+    }
+
+    console.log(`[start_fresh] Created new assessment ${newAssessment.id}`);
+
+    // Optionally clear the profile to start completely fresh
+    // For now, we keep the profile but return empty assessment state
+    const assessmentState = await computeAssessmentState(
+      readiness,
+      payload.subject_id,
+      newAssessment.id,
+      assessmentKey
+    );
+
+    return jsonResponse({
+      subject_id: payload.subject_id,
+      assessment_id: newAssessment.id,
+      assessment_state: assessmentState,
+      message: "Started fresh assessment. Previous data has been archived.",
     });
   }
 

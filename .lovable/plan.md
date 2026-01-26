@@ -41,34 +41,25 @@ Given that auth will be enabled with 1 assessment per user, here's the recommend
 
 ---
 
-## Phase 1: Immediate Fixes (Do Now)
+## Phase 1: Immediate Fixes ✅ COMPLETED
 
-### 1.1 Add Missing Database Columns
-The `report_status` and `report_url` columns are missing from the assessments table, causing silent errors.
+### 1.1 Add Missing Database Columns ✅
+The `report_status` and `report_url` columns have been added to the assessments table.
 
-```sql
-ALTER TABLE readiness_v1.assessments 
-ADD COLUMN IF NOT EXISTS report_status text DEFAULT 'not_started',
-ADD COLUMN IF NOT EXISTS report_url text;
-```
-
-### 1.2 Add "Start Fresh" Capability
-Since multiple assessments exist per subject, add a way for users to explicitly start a new assessment:
-
-**Changes Required:**
-- Add "Start Fresh Assessment" button to Dashboard (when old data is detected)
-- Create new edge function action `start_fresh` that:
-  - Archives or soft-deletes old assessments for the subject
+### 1.2 Add "Start Fresh" Capability ✅
+- Added `start_fresh` action to the edge function that:
+  - Archives old assessments by setting status to "archived"
   - Creates a new blank assessment
-  - Clears the assessment_answers for old assessments
+  - Returns empty assessment state
+- Added "Start Fresh" button to Dashboard with confirmation dialog
+- Added `startFresh()` method to `useAssessmentState` hook
+- Added `clearAll()` method to `useGuestProfile` hook
 
-### 1.3 Unify Profile Field Format
-Standardize on ONE format for profile fields. The schema uses field names like `owns_crypto`, but the client sends `profile.digital.owns_crypto`.
-
-**Recommendation:** 
-- Keep the flat `profile.xxx.yyy` format in localStorage (matches current UI)
-- Update the edge function's profile completion calculation to check BOTH nested and flat keys
-- OR update the schema profile_questions to use flat field names
+### 1.3 Unify Profile Field Format ✅
+Updated the edge function's profile completion calculation to check:
+- Direct field names (e.g., `owns_crypto`)
+- Flat keys with `profile.` prefix (e.g., `profile.digital.owns_crypto`)
+- Nested object structure (e.g., `profile.digital.owns_crypto` as nested)
 
 ---
 
@@ -138,31 +129,12 @@ USING (subject_id IN (
 
 ---
 
-## Recommended Immediate Action
-
-For the issues you're experiencing RIGHT NOW, I recommend:
-
-1. **Add missing database columns** - Fixes silent errors
-2. **Add "Start Fresh" button** - Lets you clear old data and truly start over
-3. **Fix profile field format** - Aligns server and client profile completion logic
-
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| Database migration | Add `report_status`, `report_url` columns |
-| `supabase/functions/agent/index.ts` | Add `start_fresh` action, fix profile field checking |
-| `src/pages/Dashboard.tsx` | Add "Start Fresh" button when stale data detected |
-| `src/hooks/useGuestProfile.ts` | Add `clearAll()` method that clears subject_id too |
-
----
-
 ## Summary
 
-**Short-term (fix current issues):**
-- Add missing DB columns
-- Add "Start Fresh" capability  
-- Fix profile field format mismatch
+**Short-term (fix current issues): ✅ COMPLETED**
+- ✅ Add missing DB columns
+- ✅ Add "Start Fresh" capability  
+- ✅ Fix profile field format mismatch
 
 **Medium-term (prepare for auth):**
 - Add `user_id` column to subjects
@@ -175,4 +147,3 @@ For the issues you're experiencing RIGHT NOW, I recommend:
 - Enforce one assessment per user constraint
 
 This approach lets you continue developing and testing NOW while building toward the authenticated single-assessment model.
-
