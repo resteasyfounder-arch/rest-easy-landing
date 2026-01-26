@@ -19,6 +19,20 @@ interface SectionState {
   status: SectionStatus;
 }
 
+type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "section-summary" | "section-edit" | "review" | "complete";
+
+interface AnswerRecord {
+  question_id: string;
+  item_id: string;
+  section_id: string;
+  dimension: string;
+  answer_value: AnswerValue;
+  answer_label?: string | null;
+  score_fraction?: number | null;
+  question_text?: string | null;
+  question_meta?: Record<string, unknown>;
+}
+
 interface AssessmentState {
   subject_id: string;
   assessment_id: string;
@@ -36,6 +50,11 @@ interface AssessmentState {
   report_url: string | null;
   last_activity_at: string;
   updated_at: string;
+  // Full hydration data for client
+  profile_data: Record<string, unknown>;
+  profile_answers: Record<string, "yes" | "no">;
+  answers: Record<string, AnswerRecord>;
+  flow_phase: FlowPhase;
 }
 
 type AgentAnswerInput = {
@@ -154,12 +173,7 @@ interface Schema {
   questions: SchemaQuestion[];
 }
 
-interface AnswerRecord {
-  question_id: string;
-  answer_value: AnswerValue;
-  score_fraction: number | null;
-  section_id: string;
-}
+// AnswerRecord is defined above with the AssessmentState interface
 
 async function computeAssessmentState(
   readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
@@ -186,18 +200,68 @@ async function computeAssessmentState(
 
   const profile = (profileData?.profile_json as Record<string, unknown>) || {};
 
-  // Load answers
+  // Load answers with full details for hydration
   const { data: answersData } = await readiness
     .from("assessment_answers")
-    .select("question_id, answer_value, score_fraction, section_id")
+    .select("question_id, item_id, section_id, dimension, answer_value, answer_label, score_fraction, question_text, question_meta")
     .eq("assessment_id", assessmentDbId);
 
   const answers: Record<string, AnswerRecord> = {};
   const answerValues: Record<string, AnswerValue> = {};
   
   for (const row of answersData || []) {
-    answers[row.question_id] = row as AnswerRecord;
+    answers[row.question_id] = {
+      question_id: row.question_id,
+      item_id: row.item_id,
+      section_id: row.section_id,
+      dimension: row.dimension,
+      answer_value: row.answer_value as AnswerValue,
+      answer_label: row.answer_label,
+      score_fraction: row.score_fraction,
+      question_text: row.question_text,
+      question_meta: row.question_meta as Record<string, unknown> | undefined,
+    };
     answerValues[row.question_id] = row.answer_value as AnswerValue;
+  }
+
+  // Calculate profile_answers from profile data
+  // Profile questions have fields like "owns_crypto" that map to boolean values
+  // We need to reverse-engineer the "yes"/"no" answers from the profile values
+  const profileAnswers: Record<string, "yes" | "no"> = {};
+  if (schema) {
+    for (const pq of schema.profile_questions) {
+      // Check various key formats the client might have used
+      let value: unknown = undefined;
+      
+      // Check direct field (e.g., "owns_crypto")
+      if (profile[pq.field] !== undefined) {
+        value = profile[pq.field];
+      }
+      
+      // Check nested path (e.g., profile.digital.owns_crypto stored as nested object)
+      if (value === undefined) {
+        const parts = pq.field.split(".");
+        let current: unknown = profile;
+        for (const part of parts) {
+          if (current && typeof current === "object" && part in (current as Record<string, unknown>)) {
+            current = (current as Record<string, unknown>)[part];
+          } else {
+            current = undefined;
+            break;
+          }
+        }
+        if (current !== undefined) {
+          value = current;
+        }
+      }
+      
+      // Convert boolean value back to "yes"/"no"
+      if (value !== undefined) {
+        // Check value_map to determine the mapping
+        // Default: true = "yes", false = "no"
+        profileAnswers[pq.id] = value === true ? "yes" : "no";
+      }
+    }
   }
 
   // Load assessment status
@@ -226,6 +290,10 @@ async function computeAssessmentState(
       report_url: null,
       last_activity_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      profile_data: profile,
+      profile_answers: {},
+      answers: {},
+      flow_phase: "intro",
     };
   }
 
@@ -305,7 +373,7 @@ async function computeAssessmentState(
     
     for (const q of answeredInSection) {
       const answer = answers[q.id];
-      if (answer && answer.score_fraction !== null) {
+      if (answer && answer.score_fraction !== null && answer.score_fraction !== undefined) {
         sectionScore += answer.score_fraction * 100;
         scoredCount++;
       }
@@ -384,6 +452,18 @@ async function computeAssessmentState(
     status = "draft";
   }
 
+  // Determine flow_phase based on progress
+  let flowPhase: FlowPhase = "intro";
+  if (status === "completed") {
+    flowPhase = "complete";
+  } else if (totalAnsweredQuestions > 0) {
+    flowPhase = "assessment";
+  } else if (profileComplete) {
+    flowPhase = "assessment";
+  } else if (Object.keys(profileAnswers).length > 0) {
+    flowPhase = "profile";
+  }
+
   return {
     subject_id: subjectId,
     assessment_id: assessmentDbId,
@@ -401,6 +481,10 @@ async function computeAssessmentState(
     report_url: assessmentData?.report_url || null,
     last_activity_at: assessmentData?.updated_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    profile_data: profile,
+    profile_answers: profileAnswers,
+    answers,
+    flow_phase: flowPhase,
   };
 }
 

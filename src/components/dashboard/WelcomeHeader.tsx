@@ -1,12 +1,8 @@
-import { useGuestProfile } from "@/hooks/useGuestProfile";
-
 interface WelcomeHeaderProps {
   className?: string;
 }
 
 export function WelcomeHeader({ className }: WelcomeHeaderProps) {
-  const { profile } = useGuestProfile();
-  
   // Get time-based greeting
   const getGreeting = () => {
     const hour = new Date().getHours();

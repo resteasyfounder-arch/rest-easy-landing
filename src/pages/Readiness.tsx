@@ -89,13 +89,9 @@ type AnswerRecord = {
 const ASSESSMENT_ID = "readiness_v1";
 const SCHEMA_VERSION = "v1";
 
+// Only keep subject_id in localStorage for session continuity
 const STORAGE_KEYS = {
   subjectId: "rest-easy.readiness.subject_id",
-  assessmentId: "rest-easy.readiness.assessment_id",
-  profile: "rest-easy.readiness.profile_json",
-  profileAnswers: "rest-easy.readiness.profile_answers",
-  answers: "rest-easy.readiness.answers",
-  flowPhase: "rest-easy.readiness.flow_phase",
 };
 
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
@@ -235,31 +231,18 @@ const Readiness = () => {
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Flow phase state
-  const [flowPhase, setFlowPhase] = useState<FlowPhase>(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.flowPhase);
-    return (stored as FlowPhase) || "intro";
-  });
+  // Flow phase state - initialized to "intro", will be hydrated from server
+  const [flowPhase, setFlowPhase] = useState<FlowPhase>("intro");
 
   const [subjectId, setSubjectId] = useState<string | null>(
     localStorage.getItem(STORAGE_KEYS.subjectId)
   );
-  const [assessmentId, setAssessmentId] = useState<string | null>(
-    localStorage.getItem(STORAGE_KEYS.assessmentId)
-  );
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
 
-  const [profile, setProfile] = useState<Record<string, unknown>>(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.profile);
-    return raw ? JSON.parse(raw) : {};
-  });
-  const [profileAnswers, setProfileAnswers] = useState<Record<string, "yes" | "no">>(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.profileAnswers);
-    return raw ? JSON.parse(raw) : {};
-  });
-  const [answers, setAnswers] = useState<Record<string, AnswerRecord>>(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.answers);
-    return raw ? JSON.parse(raw) : {};
-  });
+  // State hydrated from server - no localStorage initialization
+  const [profile, setProfile] = useState<Record<string, unknown>>({});
+  const [profileAnswers, setProfileAnswers] = useState<Record<string, "yes" | "no">>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerRecord>>({});
 
   const [currentStepId, setCurrentStepId] = useState<string | null>(null);
   const [stepHistory, setStepHistory] = useState<string[]>([]);
@@ -275,12 +258,7 @@ const Readiness = () => {
   const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
   const [viewingCompletedSection, setViewingCompletedSection] = useState(false);
 
-  // Persist flow phase - but NEVER persist "complete" (it's transient)
-  useEffect(() => {
-    if (flowPhase !== "complete") {
-      localStorage.setItem(STORAGE_KEYS.flowPhase, flowPhase);
-    }
-  }, [flowPhase]);
+  // Flow phase is now server-driven, no localStorage persistence needed
 
   // State for explicit report generation
   const [reportGenerating, setReportGenerating] = useState(false);
@@ -289,6 +267,8 @@ const Readiness = () => {
     setLoading(true);
     setFatalError(null);
     try {
+      const storedSubjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
+      
       const [schemaResponse, sessionResponse] = await Promise.all([
         callAgent({
           action: "get_schema",
@@ -296,26 +276,42 @@ const Readiness = () => {
           schema_version: SCHEMA_VERSION,
         }),
         callAgent({
-          subject_id: subjectId ?? undefined,
+          action: "get_state",
+          subject_id: storedSubjectId ?? undefined,
           assessment_id: ASSESSMENT_ID,
         }),
       ]);
 
       setSchema(schemaResponse.schema as Schema);
+      
+      // Hydrate ALL state from server response
       if (sessionResponse?.subject_id) {
         setSubjectId(sessionResponse.subject_id);
         localStorage.setItem(STORAGE_KEYS.subjectId, sessionResponse.subject_id);
       }
       if (sessionResponse?.assessment_id) {
         setAssessmentId(sessionResponse.assessment_id);
-        localStorage.setItem(STORAGE_KEYS.assessmentId, sessionResponse.assessment_id);
+      }
+      
+      // Hydrate state from server
+      const assessmentState = sessionResponse?.assessment_state;
+      if (assessmentState) {
+        setProfile(assessmentState.profile_data || {});
+        setProfileAnswers(assessmentState.profile_answers || {});
+        setAnswers(assessmentState.answers || {});
+        setFlowPhase(assessmentState.flow_phase || "intro");
+        console.log("[Readiness] Hydrated from server:", {
+          profileAnswerCount: Object.keys(assessmentState.profile_answers || {}).length,
+          answerCount: Object.keys(assessmentState.answers || {}).length,
+          flowPhase: assessmentState.flow_phase,
+        });
       }
     } catch (err) {
       setFatalError(err instanceof Error ? err.message : "Unable to load readiness.");
     } finally {
       setLoading(false);
     }
-  }, [subjectId]);
+  }, []);
 
   useEffect(() => {
     bootstrap();
@@ -340,8 +336,6 @@ const Readiness = () => {
     if (flowPhase === "complete" && !hasAnswers) {
       console.log("[Readiness] Resetting stale complete phase - no answers found");
       setFlowPhase("intro");
-      // Clear the assessment ID to force a fresh start
-      localStorage.removeItem(STORAGE_KEYS.assessmentId);
       setAssessmentId(null);
     }
     
@@ -372,17 +366,7 @@ const Readiness = () => {
     }
   }, [schema, loading, flowPhase, profileAnswers, profilePromptDismissed, searchParams]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));
-  }, [profile]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.profileAnswers, JSON.stringify(profileAnswers));
-  }, [profileAnswers]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.answers, JSON.stringify(answers));
-  }, [answers]);
+  // State is now server-driven, no localStorage persistence for profile/answers
 
   const answerValues = useMemo(() => {
     return Object.fromEntries(
@@ -1022,7 +1006,13 @@ const Readiness = () => {
   };
 
   const resetFlow = () => {
-    Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+    // Clear only the subject_id from localStorage
+    localStorage.removeItem(STORAGE_KEYS.subjectId);
+    // Also clear any legacy keys
+    localStorage.removeItem("rest-easy.readiness.report");
+    localStorage.removeItem("rest-easy.readiness.report_stale");
+    setSubjectId(null);
+    setAssessmentId(null);
     setProfile({});
     setProfileAnswers({});
     setAnswers({});
@@ -1158,8 +1148,6 @@ const Readiness = () => {
       if (response.ok && data.report) {
         localStorage.setItem("rest-easy.readiness.report", JSON.stringify(data.report));
         localStorage.removeItem("rest-easy.readiness.report_stale");
-        // Clear complete phase from localStorage on successful generation
-        localStorage.removeItem(STORAGE_KEYS.flowPhase);
         navigate("/results");
       } else {
         console.error("Report generation failed:", data.error);
