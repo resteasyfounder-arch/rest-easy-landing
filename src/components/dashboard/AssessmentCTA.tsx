@@ -24,7 +24,7 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
   }
 
   // Profile incomplete - prompt to complete profile
-  if (!profile_complete && overall_progress < 10) {
+  if (!profile_complete) {
     return (
       <Button asChild size="lg" className={className}>
         <Link to="/readiness" className="gap-2">
