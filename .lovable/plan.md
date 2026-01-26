@@ -1,128 +1,178 @@
 
-## Fix Plan: Dashboard Score and Profile Status Issues
 
-### Problem Summary
-1. **Score display issue**: Users see a score (e.g., 67) after completing only 1 section, which is misleading
-2. **Profile status mismatch**: "Complete Your Profile" button appears while profile is also shown as complete
+## Strategic Path Forward: Preparing for Auth with Single Assessment Per User
 
-### Root Causes
+### Current State Analysis
 
-#### Issue 1: Misleading Score
-The server calculates `overall_score` as a weighted average of **only completed sections**, not all sections. This is technically correct for scoring but confusing when the assessment is in progress.
+Based on my investigation, here's what's happening:
 
-#### Issue 2: Profile Status Conflict
-Two different data sources are used:
-- `useGuestProfile` hook: counts localStorage keys against hardcoded `TOTAL_PROFILE_QUESTIONS = 8`
-- `useAssessmentState` hook: gets `profile_complete` from server (based on schema)
+**Database State for your subject (`2254491d-7086-47ae-a2db-ea2fe3ff80f6`):**
+- **8 assessments** exist for the same subject_id
+- Only **1 assessment** (from Jan 15) has actual answers (57 answers, score 63)
+- **7 other assessments** have 0 answers but are marked as "completed" with score 63
+- The edge function picks the one with answers (the old completed one)
 
-When these disagree, the UI shows contradictory information.
-
----
-
-### Solution
-
-#### Change 1: Show "In Progress" State Instead of Score
-
-When the assessment is not complete, show a different visual treatment on the dashboard that emphasizes progress rather than score.
-
-**File: `src/pages/Dashboard.tsx`**
-
-Replace the Score Card content based on completion status:
-- **Incomplete assessment**: Show progress ring (not score), "Assessment In Progress" label, and progress percentage
-- **Complete assessment**: Show the actual score circle with tier badge as currently
-
-```tsx
-// In the Main Score Card section
-{isComplete ? (
-  // Show actual score - assessment is done
-  <ScoreCircle
-    score={assessmentState.overall_score}
-    tier={assessmentState.tier}
-    size="lg"
-    animated={true}
-  />
-) : (
-  // Show progress ring - assessment in progress
-  <ProgressCircle 
-    progress={assessmentState.overall_progress}
-    label="In Progress"
-  />
-)}
-```
-
-Also update the heading text:
-- Incomplete: "Your Assessment Progress"
-- Complete: "Your Readiness Score"
-
-#### Change 2: Single Source of Truth for Profile Completion
-
-Use **only the server state** (`assessmentState.profile_complete`) for determining profile completion status. The localStorage profile is a cache, not the source of truth.
-
-**File: `src/pages/Dashboard.tsx`**
-
-Update the profile progress card to use server state:
-```tsx
-// Line 139-155 - Use server state for profile progress
-{!assessmentState.profile_complete && (
-  <Card className="border-border/50">
-    <CardContent className="p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-display font-medium text-foreground">Profile Completion</h3>
-        <span className="text-sm text-muted-foreground">
-          {assessmentState.profile_progress}%
-        </span>
-      </div>
-      <Progress value={assessmentState.profile_progress} className="h-2" />
-      ...
-    </CardContent>
-  </Card>
-)}
-```
-
-#### Change 3: Fix AssessmentCTA Logic
-
-**File: `src/components/dashboard/AssessmentCTA.tsx`**
-
-The "Complete Your Profile" logic should only check `profile_complete`, not combine it with `overall_progress`:
-
-```tsx
-// Line 26-35 - Simplify profile check
-// Profile incomplete - prompt to complete profile
-if (!profile_complete) {
-  return (
-    <Button asChild size="lg" className={className}>
-      <Link to="/readiness" className="gap-2">
-        <ArrowRight className="h-4 w-4" />
-        Complete Your Profile
-      </Link>
-    </Button>
-  );
+**Profile Data in Database:**
+```json
+{
+  "digital": {"owns_crypto": false},
+  "emotional": {"has_spiritual_practices": true},
+  "family": {"supports_aging_parent": false},
+  // ... nested structure
+  "profile.digital.owns_crypto": "yes",  // Also has flat keys!
+  "profile.home.owns_real_property": "no"
 }
 ```
 
-#### Change 4: Create ProgressCircle Component (Optional Enhancement)
+**Profile Data in localStorage (via useGuestProfile):**
+- Uses flat keys like `profile.household.has_dependents`
+- Counts 8 keys = complete
 
-**File: `src/components/dashboard/ProgressCircle.tsx`**
-
-Create a new component similar to `ScoreCircle` but designed for "in progress" state:
-- Shows percentage progress (0-100%)
-- Uses a neutral/blue color scheme (not tier-based)
-- Displays "In Progress" text instead of tier label
+**The Mismatch:**
+- Server profile uses NESTED structure (`digital.owns_crypto`)
+- Client/localStorage uses FLAT structure (`profile.digital.owns_crypto`)
+- The edge function checks schema profile_questions which use FIELD names that don't match either format
 
 ---
 
-### Summary of Changes
+### Best Path Forward: Three-Phase Approach
+
+Given that auth will be enabled with 1 assessment per user, here's the recommended strategy:
+
+---
+
+## Phase 1: Immediate Fixes (Do Now)
+
+### 1.1 Add Missing Database Columns
+The `report_status` and `report_url` columns are missing from the assessments table, causing silent errors.
+
+```sql
+ALTER TABLE readiness_v1.assessments 
+ADD COLUMN IF NOT EXISTS report_status text DEFAULT 'not_started',
+ADD COLUMN IF NOT EXISTS report_url text;
+```
+
+### 1.2 Add "Start Fresh" Capability
+Since multiple assessments exist per subject, add a way for users to explicitly start a new assessment:
+
+**Changes Required:**
+- Add "Start Fresh Assessment" button to Dashboard (when old data is detected)
+- Create new edge function action `start_fresh` that:
+  - Archives or soft-deletes old assessments for the subject
+  - Creates a new blank assessment
+  - Clears the assessment_answers for old assessments
+
+### 1.3 Unify Profile Field Format
+Standardize on ONE format for profile fields. The schema uses field names like `owns_crypto`, but the client sends `profile.digital.owns_crypto`.
+
+**Recommendation:** 
+- Keep the flat `profile.xxx.yyy` format in localStorage (matches current UI)
+- Update the edge function's profile completion calculation to check BOTH nested and flat keys
+- OR update the schema profile_questions to use flat field names
+
+---
+
+## Phase 2: Prepare for Auth (Before Enabling)
+
+### 2.1 Update Edge Function Assessment Selection
+Change the logic to support "one assessment per user" paradigm:
+
+```typescript
+// Current: picks assessment with most answers (problematic)
+// Future: when auth is enabled, each user_id maps to exactly one assessment
+
+// Transition approach:
+// 1. If user_id is provided (authenticated), use that as the lookup key
+// 2. If only subject_id (guest mode), use most recent assessment
+```
+
+### 2.2 Add `user_id` Column to Subjects Table
+Prepare the database for authenticated users:
+
+```sql
+ALTER TABLE readiness_v1.subjects 
+ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+
+-- Index for fast lookups
+CREATE INDEX IF NOT EXISTS idx_subjects_user_id 
+ON readiness_v1.subjects(user_id);
+```
+
+### 2.3 Update Assessment State Hook
+Modify `useAssessmentState` to:
+- Accept optional `userId` parameter
+- Pass `user_id` to edge function when authenticated
+- Clear localStorage on logout
+
+---
+
+## Phase 3: Auth Migration (When Enabling)
+
+### 3.1 Guest to User Migration Flow
+When a guest user signs up/logs in:
+1. Check if they have a `subject_id` in localStorage
+2. Link that subject to their `user_id` 
+3. Clear guest localStorage keys
+4. Prevent creating new subjects for authenticated users
+
+### 3.2 Enforce One Assessment Per User
+Add database constraint (optional but recommended):
+
+```sql
+-- After migration, enforce uniqueness
+CREATE UNIQUE INDEX IF NOT EXISTS idx_assessments_user_subject 
+ON readiness_v1.assessments(subject_id, assessment_id);
+```
+
+### 3.3 RLS Policies
+Enable Row Level Security tied to `auth.uid()`:
+
+```sql
+-- Users can only see their own data
+CREATE POLICY "Users can access own assessments"
+ON readiness_v1.assessments FOR ALL
+USING (subject_id IN (
+  SELECT id FROM readiness_v1.subjects WHERE user_id = auth.uid()
+));
+```
+
+---
+
+## Recommended Immediate Action
+
+For the issues you're experiencing RIGHT NOW, I recommend:
+
+1. **Add missing database columns** - Fixes silent errors
+2. **Add "Start Fresh" button** - Lets you clear old data and truly start over
+3. **Fix profile field format** - Aligns server and client profile completion logic
+
+### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/Dashboard.tsx` | Conditionally show progress vs score based on `isComplete`; use server state for profile progress |
-| `src/components/dashboard/AssessmentCTA.tsx` | Fix profile check to only use `profile_complete` flag |
-| `src/components/dashboard/ProgressCircle.tsx` | New component for in-progress visual (optional) |
-| `src/components/dashboard/index.ts` | Export new component |
+| Database migration | Add `report_status`, `report_url` columns |
+| `supabase/functions/agent/index.ts` | Add `start_fresh` action, fix profile field checking |
+| `src/pages/Dashboard.tsx` | Add "Start Fresh" button when stale data detected |
+| `src/hooks/useGuestProfile.ts` | Add `clearAll()` method that clears subject_id too |
 
-### Expected Behavior After Fix
+---
 
-1. **Incomplete assessment**: Dashboard shows "Assessment In Progress" with progress ring showing 12% (or whatever the actual progress is), not a misleading score
-2. **Complete assessment**: Dashboard shows actual score with tier badge
-3. **Profile status**: Single consistent state - either show the profile completion card OR don't, based on server truth
-4. **CTA button**: Shows "Complete Your Profile" only when server says profile is incomplete
+## Summary
+
+**Short-term (fix current issues):**
+- Add missing DB columns
+- Add "Start Fresh" capability  
+- Fix profile field format mismatch
+
+**Medium-term (prepare for auth):**
+- Add `user_id` column to subjects
+- Update edge function to support user_id lookup
+- Design guest-to-user migration flow
+
+**Long-term (enable auth):**
+- Implement auth with migration
+- Add RLS policies
+- Enforce one assessment per user constraint
+
+This approach lets you continue developing and testing NOW while building toward the authenticated single-assessment model.
+
