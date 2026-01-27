@@ -413,18 +413,38 @@ const Readiness = () => {
     });
   }, [schema, applicableQuestions]);
 
-  // Handle URL parameters for section navigation
+  // Handle URL parameters for section and question navigation
   // Must be after applicableSections and applicableQuestions are defined
   useEffect(() => {
     if (loading || !schema) return;
     
     const sectionParam = searchParams.get("section");
+    const questionParam = searchParams.get("question");
+    
+    if (!sectionParam && !questionParam) return;
+    
+    console.log("[Readiness] URL params - section:", sectionParam, "question:", questionParam);
+    
+    // Clear the URL params so we don't re-trigger on subsequent renders
+    setSearchParams({}, { replace: true });
+    
+    // If we have a specific question, find it and navigate directly to it
+    if (questionParam) {
+      const targetQuestion = applicableQuestions.find(q => q.id === questionParam);
+      if (targetQuestion) {
+        console.log("[Readiness] Navigating directly to question:", questionParam);
+        const allQuestionsAnswered = applicableQuestions.every(q => answers[q.id]);
+        setFocusedSectionId(targetQuestion.section_id);
+        setFlowPhase(allQuestionsAnswered ? "review" : "assessment");
+        setCurrentStepId(`question:${questionParam}`);
+        return;
+      } else {
+        console.log("[Readiness] Question not found or not applicable:", questionParam);
+      }
+    }
+    
+    // Fall back to section navigation if no question param or question not found
     if (sectionParam) {
-      console.log("[Readiness] URL has section param:", sectionParam);
-      
-      // Clear the URL param so we don't re-trigger on subsequent renders
-      setSearchParams({}, { replace: true });
-      
       // Check if section exists and is applicable
       const section = applicableSections.find(s => s.id === sectionParam);
       if (!section) {

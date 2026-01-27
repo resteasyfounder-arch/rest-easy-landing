@@ -73,7 +73,7 @@ type AgentAnswerInput = {
 };
 
 type AgentRequest = {
-  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report";
+  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report" | "get_improvement_items";
   subject_id?: string;
   user_id?: string;
   assessment_id?: string;
@@ -535,6 +535,181 @@ serve(async (req) => {
   });
   const readiness = supabase.schema("readiness_v1");
   const assessmentKey = payload.assessment_id ?? "readiness_v1";
+
+  // Handle get_improvement_items action - returns improvable questions for the roadmap
+  if (payload.action === "get_improvement_items") {
+    if (!payload.subject_id) {
+      return jsonResponse({ error: "subject_id required for get_improvement_items" }, 400);
+    }
+
+    console.log(`[get_improvement_items] Fetching for subject ${payload.subject_id}`);
+
+    // Find active assessment
+    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
+    if (!assessment) {
+      return jsonResponse({ items: [], completed_items: [] });
+    }
+
+    // Load schema
+    const { data: schemaData } = await readiness
+      .from("assessment_schemas")
+      .select("schema_json")
+      .eq("assessment_id", assessmentKey)
+      .eq("version", "v1")
+      .maybeSingle();
+
+    const schema = schemaData?.schema_json as Schema | null;
+    if (!schema) {
+      return jsonResponse({ error: "Schema not found" }, 404);
+    }
+
+    // Load profile for applies_if conditions
+    const { data: profileData } = await readiness
+      .from("profile_intake")
+      .select("profile_json")
+      .eq("subject_id", payload.subject_id)
+      .maybeSingle();
+    const profile = (profileData?.profile_json as Record<string, unknown>) || {};
+
+    // Load all answers
+    const { data: answersData } = await readiness
+      .from("assessment_answers")
+      .select("question_id, item_id, section_id, dimension, answer_value, answer_label, score_fraction, question_text")
+      .eq("assessment_id", assessment.id);
+
+    interface AnswerRow {
+      question_id: string;
+      item_id: string;
+      section_id: string;
+      dimension: string;
+      answer_value: string;
+      answer_label: string | null;
+      score_fraction: number | null;
+      question_text: string | null;
+    }
+
+    const answerMap = new Map<string, AnswerRow>();
+    const answerValues: Record<string, AnswerValue> = {};
+    for (const row of (answersData || []) as AnswerRow[]) {
+      answerMap.set(row.question_id, row);
+      answerValues[row.question_id] = row.answer_value as AnswerValue;
+    }
+
+    // Get applicable questions
+    const applicableQuestions = schema.questions.filter((q: SchemaQuestion) =>
+      evaluateCondition(q.applies_if, profile, answerValues)
+    );
+
+    // Build section weight map
+    const sectionWeightMap = new Map<string, number>();
+    for (const section of schema.sections) {
+      sectionWeightMap.set(section.id, section.weight);
+    }
+
+    // Build section label map
+    const sectionLabelMap = new Map<string, string>();
+    for (const section of schema.sections) {
+      sectionLabelMap.set(section.id, section.label);
+    }
+
+    // Helper to calculate priority
+    const calculatePriority = (scoreFraction: number, sectionWeight: number): "HIGH" | "MEDIUM" | "LOW" => {
+      // High priority: High-weight sections with low scores
+      if (sectionWeight >= 15 && scoreFraction < 0.5) return "HIGH";
+      // Medium: Either high-weight with partial, or medium-weight with no
+      if (sectionWeight >= 10 || scoreFraction === 0) return "MEDIUM";
+      return "LOW";
+    };
+
+    // Build improvement items (score_fraction < 1.0)
+    const improvementItems: Array<{
+      question_id: string;
+      section_id: string;
+      section_label: string;
+      question_text: string;
+      current_answer: string;
+      current_answer_label: string;
+      score_fraction: number;
+      improvement_potential: number;
+      section_weight: number;
+      priority: "HIGH" | "MEDIUM" | "LOW";
+      improvement_options: Array<{ value: string; label: string }>;
+    }> = [];
+
+    // Build completed items (score_fraction = 1.0)
+    const completedItems: Array<{
+      question_id: string;
+      section_id: string;
+      section_label: string;
+      question_text: string;
+      current_answer: string;
+      current_answer_label: string;
+    }> = [];
+
+    for (const question of applicableQuestions) {
+      const answer = answerMap.get(question.id);
+      if (!answer) continue; // Skip unanswered questions
+
+      const scoreFraction = answer.score_fraction ?? 0;
+      const sectionWeight = sectionWeightMap.get(question.section_id) || 1;
+      const sectionLabel = sectionLabelMap.get(question.section_id) || question.section_id;
+
+      if (scoreFraction >= 1.0) {
+        // Completed item
+        completedItems.push({
+          question_id: question.id,
+          section_id: question.section_id,
+          section_label: sectionLabel,
+          question_text: answer.question_text || question.prompt,
+          current_answer: answer.answer_value,
+          current_answer_label: answer.answer_label || answer.answer_value,
+        });
+      } else {
+        // Find options that would improve the score
+        const currentScore = scoreFraction;
+        const betterOptions = question.options
+          .filter((opt: { value: AnswerValue; label: string }) => {
+            const optScore = schema.answer_scoring[opt.value];
+            return optScore !== null && optScore !== undefined && optScore > currentScore;
+          })
+          .map((opt: { value: AnswerValue; label: string }) => ({
+            value: opt.value,
+            label: opt.label,
+          }));
+
+        improvementItems.push({
+          question_id: question.id,
+          section_id: question.section_id,
+          section_label: sectionLabel,
+          question_text: answer.question_text || question.prompt,
+          current_answer: answer.answer_value,
+          current_answer_label: answer.answer_label || answer.answer_value,
+          score_fraction: scoreFraction,
+          improvement_potential: 1.0 - scoreFraction,
+          section_weight: sectionWeight,
+          priority: calculatePriority(scoreFraction, sectionWeight),
+          improvement_options: betterOptions,
+        });
+      }
+    }
+
+    // Sort by priority (HIGH first), then by improvement potential
+    const priorityOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    improvementItems.sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.improvement_potential - a.improvement_potential;
+    });
+
+    console.log(`[get_improvement_items] Found ${improvementItems.length} items to improve, ${completedItems.length} completed`);
+
+    return jsonResponse({
+      items: improvementItems,
+      completed_items: completedItems,
+      total_applicable: applicableQuestions.length,
+      total_answered: answerMap.size,
+    });
+  }
 
   // Handle get_schema action
   if (payload.action === "get_schema") {

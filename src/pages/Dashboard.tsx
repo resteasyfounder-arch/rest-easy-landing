@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
+import { useImprovementItems } from "@/hooks/useImprovementItems";
 import { LogOut, RotateCcw, Target, Heart, UserCircle, Sparkles, Trophy, Map } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
@@ -33,6 +34,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
+const STORAGE_KEYS = {
+  subjectId: "rest-easy.readiness.subject_id",
+};
+
 const Dashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -51,6 +56,24 @@ const Dashboard = () => {
     autoRefresh: true,
     refreshInterval: 30000,
     includeReportPreview: true,
+  });
+
+  // Get subject_id from localStorage for the improvement items hook
+  const [subjectId, setSubjectId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const storedSubjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
+    setSubjectId(storedSubjectId);
+  }, []);
+
+  // Fetch schema-driven improvement items for the roadmap
+  const {
+    items: improvementItems,
+    completedItems,
+    isLoading: isLoadingRoadmap,
+  } = useImprovementItems({
+    subjectId,
+    enabled: isComplete && isReportReady,
   });
 
   const handleLogout = () => {
@@ -101,9 +124,9 @@ const Dashboard = () => {
     (s) => s.status === "in_progress" || s.status === "available"
   );
 
-  // Calculate action metrics from report
-  const actionsTotal = reportPreview?.action_plan?.length || 0;
-  const actionsRemaining = actionsTotal; // TODO: Track completed actions
+  // Calculate action metrics from schema-driven roadmap
+  const actionsTotal = improvementItems.length + completedItems.length;
+  const actionsRemaining = improvementItems.length;
 
   return (
     <AppLayout>
@@ -162,11 +185,12 @@ const Dashboard = () => {
               />
             )}
 
-            {/* Roadmap Card */}
-            {reportPreview?.action_plan && reportPreview.action_plan.length > 0 && (
+            {/* Roadmap Card - Schema-driven */}
+            {(improvementItems.length > 0 || completedItems.length > 0 || isLoadingRoadmap) && (
               <RoadmapCard
-                actions={reportPreview.action_plan}
-                completedCount={0}
+                items={improvementItems}
+                completedItems={completedItems}
+                isLoading={isLoadingRoadmap}
                 onViewAll={() => navigate("/results#action-plan")}
               />
             )}
