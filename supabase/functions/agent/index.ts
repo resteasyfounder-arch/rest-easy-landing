@@ -71,7 +71,7 @@ type AgentAnswerInput = {
 };
 
 type AgentRequest = {
-  action?: "get_schema" | "get_state" | "start_fresh";
+  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report";
   subject_id?: string;
   user_id?: string;
   assessment_id?: string;
@@ -538,6 +538,77 @@ serve(async (req) => {
       assessment_id: assessmentKey,
       version: data.version,
       schema: data.schema_json,
+    });
+  }
+
+  // Handle save_report action - store report data and update status
+  if (payload.action === "save_report") {
+    const { assessment_id: assessmentDbId, report_data } = payload as AgentRequest & { report_data?: unknown };
+    
+    if (!assessmentDbId) {
+      return jsonResponse({ error: "assessment_id required for save_report" }, 400);
+    }
+    if (!report_data) {
+      return jsonResponse({ error: "report_data required for save_report" }, 400);
+    }
+
+    console.log(`[save_report] Saving report for assessment ${assessmentDbId}`);
+
+    const { error: updateError } = await readiness
+      .from("assessments")
+      .update({
+        report_status: "ready",
+        report_data: report_data,
+        report_generated_at: new Date().toISOString(),
+      })
+      .eq("id", assessmentDbId);
+
+    if (updateError) {
+      console.error(`[save_report] Error:`, updateError);
+      return jsonResponse({ error: "Failed to save report" }, 500);
+    }
+
+    console.log(`[save_report] Report saved successfully`);
+    return jsonResponse({ success: true });
+  }
+
+  // Handle get_report action - retrieve stored report
+  if (payload.action === "get_report") {
+    if (!payload.subject_id) {
+      return jsonResponse({ error: "subject_id required for get_report" }, 400);
+    }
+
+    console.log(`[get_report] Fetching report for subject ${payload.subject_id}`);
+
+    // Find the most recent completed assessment with a report
+    const { data: assessmentData, error: fetchError } = await readiness
+      .from("assessments")
+      .select("id, report_data, report_status, report_generated_at, overall_score, status")
+      .eq("subject_id", payload.subject_id)
+      .eq("assessment_id", assessmentKey)
+      .in("status", ["completed", "draft", "in_progress"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error(`[get_report] Error:`, fetchError);
+      return jsonResponse({ error: "Failed to fetch report" }, 500);
+    }
+
+    if (!assessmentData || !assessmentData.report_data) {
+      console.log(`[get_report] No report found`);
+      return jsonResponse({ 
+        report: null, 
+        status: assessmentData?.report_status || "not_started" 
+      });
+    }
+
+    console.log(`[get_report] Report found, status: ${assessmentData.report_status}`);
+    return jsonResponse({
+      report: assessmentData.report_data,
+      status: assessmentData.report_status,
+      generated_at: assessmentData.report_generated_at,
     });
   }
 

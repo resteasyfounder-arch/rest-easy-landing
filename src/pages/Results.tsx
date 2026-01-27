@@ -23,7 +23,9 @@ import {
 import { ShareReportDialog } from "@/components/results/ShareReportDialog";
 import restEasyLogo from "@/assets/rest-easy-logo.png";
 
-const REPORT_STORAGE_KEY = "rest-easy.readiness.report";
+const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
+const SUBJECT_ID_KEY = "rest-easy.readiness.subject_id";
 
 const Results = () => {
   const navigate = useNavigate();
@@ -33,15 +35,47 @@ const Results = () => {
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(REPORT_STORAGE_KEY);
-    if (stored) {
-      try {
-        setReport(JSON.parse(stored));
-      } catch (err) {
-        console.error("Failed to parse stored report:", err);
+    const fetchReport = async () => {
+      const subjectId = localStorage.getItem(SUBJECT_ID_KEY);
+      
+      if (!subjectId) {
+        console.log("[Results] No subject_id found, cannot fetch report");
+        setLoading(false);
+        return;
       }
-    }
-    setLoading(false);
+
+      try {
+        console.log("[Results] Fetching report from server...");
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            action: "get_report",
+            subject_id: subjectId,
+            assessment_id: "readiness_v1",
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.report) {
+          console.log("[Results] Report loaded from server");
+          setReport(data.report as ReadinessReport);
+        } else {
+          console.log("[Results] No report found on server");
+        }
+      } catch (err) {
+        console.error("[Results] Failed to fetch report:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReport();
   }, []);
 
   const handleDownloadPDF = async () => {
