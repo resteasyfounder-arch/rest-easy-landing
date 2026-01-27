@@ -35,6 +35,8 @@ function createEmptyState(): AssessmentState {
     tier: "Getting Started",
     profile_progress: 0,
     profile_complete: false,
+    profile_answers: {},
+    profile_data: {},
     sections: [],
     current_section_id: null,
     current_question_id: null,
