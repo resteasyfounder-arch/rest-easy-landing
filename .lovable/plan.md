@@ -1,368 +1,351 @@
 
-# Schema-Driven Roadmap: Backend-Authoritative Action Tracking
+# Strict Report Generation Rules: Background Regeneration on Answer Update
 
-## Core Principle: Schema Drives Everything
+## Current State Analysis
 
-You're absolutely right - the roadmap MUST be schema-driven, not AI-generated. The key insight is:
+### How Report Synchronization Works Today:
+1. **Answer Updates Set `report_stale: true`** (Lines 1027-1042 in `agent/index.ts`)
+   - When answers are saved, the agent checks if `report_status === "ready"`
+   - If so, it marks `report_stale: true` and updates `last_answer_at`
 
-**Every "action" is simply a question that can be improved (score_fraction < 1.0)**
+2. **Report Generation Trigger** (Lines 1125-1134 in `Readiness.tsx`)
+   - Report auto-generates ONLY when `flowPhase === "complete"`
+   - The `hasTriggeredAutoReport` flag prevents double-triggering
+   - Generation happens synchronously before navigating to Results
 
-This means:
-1. The roadmap is a filtered view of **assessment_answers** where the user hasn't scored perfectly
-2. When a user "completes" an action, they're actually **updating their answer** to a better value
-3. The score and report automatically stay in sync because they read from the same answers table
+3. **Results Page Handling** (Lines 38-106 in `Results.tsx`)
+   - Checks `report_status` via `get_state` action
+   - If `generating`, shows loading UI and polls for completion
+   - If `ready`, fetches and displays the report
 
-This is fundamentally different from tracking AI-generated actions - we're tracking **actual question states** from the schema.
+### Current Gap:
+When a user updates an answer from the Dashboard roadmap:
+- Answer is saved → `report_stale` is set to `true`
+- User returns to Dashboard → Dashboard shows updated scores
+- User navigates to Results → **Stale report is displayed** (no regeneration triggered)
 
 ---
 
-## Architecture: Single Source of Truth
+## Proposed Solution: Strict, Explicit Regeneration Rules
+
+### Rule Set (No Automatic/Fuzzy Logic):
+
+| Trigger Event | Action |
+|--------------|--------|
+| **Assessment completes for the first time** | Generate report (existing behavior) |
+| **Any answer is updated** | Trigger background regeneration immediately |
+| **Profile is updated** | Trigger background regeneration immediately |
+| **User visits Results page while `report_status === "generating"`** | Show ReportLoading screen, poll until ready |
+| **User visits Results page while `report_stale === true`** | Show ReportLoading screen, trigger regeneration |
+
+### Implementation: Two-Part Approach
+
+#### Part 1: Background Regeneration After Answer Update
+
+Modify the agent to trigger report regeneration as a **background task** whenever an answer is saved and a report already exists.
 
 ```text
-+------------------------+       +------------------------+
-|   Schema (JSON)        |       |   assessment_answers   |
-|   - questions[]        | <---- |   - question_id        |
-|   - sections[]         |       |   - answer_value       |
-|   - options[]          |       |   - score_fraction     |
-+------------------------+       +------------------------+
-           |                              |
-           v                              v
-+--------------------------------------------------+
-|           computeAssessmentState()               |
-|   - Calculates section scores from answers       |
-|   - Determines tier from weighted average        |
-|   - Identifies applicable questions              |
-+--------------------------------------------------+
-           |
-           v
-+--------------------------------------------------+
-|         Roadmap (Frontend Derived View)          |
-|   Questions where score_fraction < 1.0           |
-|   Grouped by section, sorted by priority/weight  |
-+--------------------------------------------------+
+Answer Saved → Agent marks report_stale
+            → Agent sets report_status = "generating"
+            → Agent triggers generate-report via EdgeRuntime.waitUntil()
+            → User continues immediately (non-blocking)
+```
+
+#### Part 2: Results Page Handles All Stale/Generating States
+
+The Results page already handles `report_status === "generating"`. Add handling for `report_stale === true`:
+
+```text
+User visits /results
+  → Fetch assessment state
+  → If report_status === "generating" OR report_stale === true:
+      → Show ReportLoading
+      → Poll until report_status === "ready" AND report_stale === false
+  → Else:
+      → Display report
 ```
 
 ---
 
-## What the Roadmap Actually Shows
+## Technical Implementation
 
-The Roadmap is NOT a separate list of actions - it's a **filtered view of answered questions that need improvement**:
+### File: `supabase/functions/agent/index.ts`
 
-| Roadmap Item | Source |
-|--------------|--------|
-| "Complete and sign your will" | Question 1.1.B.1 where answer is "partial" (drafted but not signed) |
-| "Get professional legal input" | Question 1.1.A.5 where answer is "no" |
-| "Share documents with family" | Question 1.1.B.11 where answer is "no" |
-
-When the user clicks "Improve This" on any roadmap item:
-1. They navigate directly to that question in the assessment
-2. They update their answer to a better value (e.g., "no" → "yes")
-3. The score recalculates automatically
-4. The report is marked stale and regenerates
-5. The roadmap item disappears (or shows as improved)
-
----
-
-## Data Model: No New Tables Needed
-
-The existing tables already support this model:
-
-### assessment_answers (existing)
-```sql
-- question_id: "1.1.B.1"           -- Links to schema
-- answer_value: "partial"          -- Current answer
-- score_fraction: 0.5              -- Current score (0-1)
-- question_text: "Do you have..."  -- Display text
-- section_id: "1"                  -- For grouping
-```
-
-### Schema question (existing)
-```json
-{
-  "id": "1.1.B.1",
-  "prompt": "Do you currently have a legally valid will?",
-  "weight": 1,
-  "options": [
-    {"value": "yes", "label": "Yes, completed and signed"},
-    {"value": "partial", "label": "Drafted but not signed"},
-    {"value": "no", "label": "No"}
-  ]
-}
-```
-
-### Derived Roadmap Item
-```typescript
-interface RoadmapItem {
-  question_id: string;           // Links to schema question
-  section_id: string;            // For navigation
-  section_label: string;         // "Legal Planning & Decision Makers"
-  question_text: string;         // Display text
-  current_answer: string;        // "partial"
-  current_answer_label: string;  // "Drafted but not signed"
-  score_fraction: number;        // 0.5
-  max_possible_score: 1;         // Always 1.0
-  improvement_potential: number; // 0.5 (1.0 - 0.5)
-  weight: number;                // Question weight for priority
-  improvement_options: {         // Options that would improve score
-    value: string;
-    label: string;
-  }[];
-}
-```
-
----
-
-## Priority Calculation: Schema-Based
-
-Priority is calculated from schema data, not AI:
+#### Change 1: Add Background Report Generation Helper
 
 ```typescript
-function calculatePriority(item: RoadmapItem, section: SchemaSection): "HIGH" | "MEDIUM" | "LOW" {
-  const sectionWeight = section.weight; // 25 for Legal, 5 for Digital, etc.
-  const improvementPotential = item.improvement_potential;
-  const impactScore = sectionWeight * improvementPotential;
+async function triggerReportRegeneration(
+  readiness: ReturnType<...>,
+  assessmentDbId: string,
+  subjectId: string,
+  assessmentKey: string
+) {
+  console.log(`[agent] Triggering background report regeneration for ${assessmentDbId}`);
   
-  // High priority: High-weight sections with low scores
-  if (sectionWeight >= 15 && item.score_fraction < 0.5) return "HIGH";
-  // Medium: Either high-weight with partial, or medium-weight with no
-  if (sectionWeight >= 10 || item.score_fraction === 0) return "MEDIUM";
-  return "LOW";
-}
-```
-
----
-
-## Agent Enhancement: get_improvement_items Action
-
-Add a new action to the agent that returns improvable items:
-
-```typescript
-if (payload.action === "get_improvement_items") {
-  const { data: answers } = await readiness
-    .from("assessment_answers")
-    .select("*")
-    .eq("assessment_id", assessmentDbId)
-    .lt("score_fraction", 1.0)  // Only imperfect answers
-    .order("section_id");
+  // Set status to generating BEFORE starting background task
+  await readiness
+    .from("assessments")
+    .update({
+      report_status: "generating",
+      report_stale: true,
+    })
+    .eq("id", assessmentDbId);
+    
+  // Build report payload from current state
+  const assessmentState = await computeAssessmentState(
+    readiness, subjectId, assessmentDbId, assessmentKey
+  );
   
-  // Load schema for question details
+  // Load schema for section labels/weights
   const { data: schemaData } = await readiness
     .from("assessment_schemas")
     .select("schema_json")
-    .eq("assessment_id", "readiness_v1")
+    .eq("assessment_id", assessmentKey)
+    .eq("version", "v1")
     .single();
   
-  const schema = schemaData.schema_json;
+  const schema = schemaData?.schema_json;
   
-  // Build improvement items
-  const items = answers.map(answer => {
-    const question = schema.questions.find(q => q.id === answer.question_id);
-    const section = schema.sections.find(s => s.id === answer.section_id);
-    
-    // Find options that would improve the score
-    const currentScoreIndex = question.options.findIndex(o => o.value === answer.answer_value);
-    const betterOptions = question.options.filter((o, i) => 
-      schema.answer_scoring[o.value] > answer.score_fraction
-    );
-    
-    return {
-      question_id: answer.question_id,
-      section_id: answer.section_id,
-      section_label: section.label,
-      question_text: question.prompt,
-      current_answer: answer.answer_value,
-      current_answer_label: answer.answer_label,
-      score_fraction: answer.score_fraction,
-      improvement_potential: 1.0 - answer.score_fraction,
-      section_weight: section.weight,
-      priority: calculatePriority(answer, section),
-      improvement_options: betterOptions,
+  // Build section scores with labels
+  const sectionScores: Record<string, { score: number; label: string; weight: number }> = {};
+  for (const section of assessmentState.sections) {
+    sectionScores[section.id] = {
+      score: section.score,
+      label: section.label,
+      weight: schema?.sections?.find(s => s.id === section.id)?.weight || 1,
     };
+  }
+  
+  // Build answers array
+  const answersForReport = Object.values(assessmentState.answers).map(answer => ({
+    question_id: answer.question_id,
+    section_id: answer.section_id,
+    question_text: answer.question_text || "",
+    answer_value: answer.answer_value,
+    answer_label: answer.answer_label || answer.answer_value,
+    score_fraction: answer.score_fraction ?? null,
+  }));
+  
+  // Call generate-report
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+    },
+    body: JSON.stringify({
+      userName: "Friend",
+      profile: assessmentState.profile_data,
+      overallScore: assessmentState.overall_score,
+      tier: assessmentState.tier,
+      sectionScores,
+      answers: answersForReport,
+      schema: {
+        answer_scoring: schema?.answer_scoring || {},
+        score_bands: schema?.score_bands || [],
+        sections: schema?.sections || [],
+      },
+    }),
   });
   
-  return jsonResponse({ items });
+  const data = await response.json();
+  
+  if (response.ok && data.report) {
+    // Save report and clear stale flag
+    await readiness
+      .from("assessments")
+      .update({
+        report_status: "ready",
+        report_data: data.report,
+        report_generated_at: new Date().toISOString(),
+        report_stale: false,
+      })
+      .eq("id", assessmentDbId);
+    console.log(`[agent] Background report regeneration complete`);
+  } else {
+    // Mark as failed
+    await readiness
+      .from("assessments")
+      .update({
+        report_status: "failed",
+      })
+      .eq("id", assessmentDbId);
+    console.error(`[agent] Background report regeneration failed:`, data.error);
+  }
 }
 ```
+
+#### Change 2: Modify Answer Save Logic to Trigger Background Regeneration
+
+Replace the current stale-marking logic (lines 1027-1050) with:
+
+```typescript
+if (payload.answers && payload.answers.length > 0) {
+  // ... existing answer save logic ...
+  
+  // Check if report exists and needs regeneration
+  const { data: currentAssessment } = await readiness
+    .from("assessments")
+    .select("report_status, report_data")
+    .eq("id", assessmentResult.id)
+    .maybeSingle();
+
+  // Only trigger regeneration if a report has been generated before
+  if (currentAssessment?.report_data && currentAssessment?.report_status === "ready") {
+    console.log(`[agent] Answer updated, triggering background report regeneration`);
+    
+    // Use EdgeRuntime.waitUntil for background execution
+    EdgeRuntime.waitUntil(
+      triggerReportRegeneration(
+        readiness,
+        assessmentResult.id,
+        subjectResult.id,
+        assessmentKey
+      )
+    );
+  } else {
+    // Just update last_answer_at if no report exists yet
+    await readiness
+      .from("assessments")
+      .update({
+        last_answer_at: new Date().toISOString(),
+      })
+      .eq("id", assessmentResult.id);
+  }
+}
+```
+
+#### Change 3: Same Logic for Profile Updates
+
+When profile is saved (around line 986-1000), add similar logic to trigger regeneration if report exists.
 
 ---
 
-## Frontend: RoadmapCard Becomes a Query View
+### File: `src/pages/Results.tsx`
 
-The RoadmapCard no longer needs its own action list - it displays query results from the backend:
+#### Change: Handle `report_stale` Same as `generating`
 
-### New Hook: useImprovementItems
+Update the fetchReport logic (lines 48-75):
 
 ```typescript
-// src/hooks/useImprovementItems.ts
-export function useImprovementItems(subjectId: string) {
-  const [items, setItems] = useState<RoadmapItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  const fetchItems = async () => {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-      method: "POST",
-      headers: { ... },
-      body: JSON.stringify({
-        action: "get_improvement_items",
-        subject_id: subjectId,
+const stateData = await stateResponse.json();
+const reportStatus = stateData?.assessment_state?.report_status;
+const reportStale = stateData?.assessment_state?.report_stale;
+
+// If generating OR stale, show loading and poll
+if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
+  console.log("[Results] Report is generating or stale, showing progress UI");
+  setIsGenerating(true);
+  setLoading(false);
+  pollForReport(subjectId);
+  return;
+}
+```
+
+#### Change: Update Polling to Check Stale Flag
+
+```typescript
+const pollForReport = async (subjectId: string) => {
+  const poll = async () => {
+    // Fetch BOTH report and state to check stale flag
+    const [reportResponse, stateResponse] = await Promise.all([
+      fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+        method: "POST",
+        headers: { ... },
+        body: JSON.stringify({
+          action: "get_report",
+          subject_id: subjectId,
+          assessment_id: "readiness_v1",
+        }),
       }),
-    });
-    const data = await response.json();
-    setItems(data.items || []);
+      fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+        method: "POST",
+        headers: { ... },
+        body: JSON.stringify({
+          action: "get_state",
+          subject_id: subjectId,
+          assessment_id: "readiness_v1",
+        }),
+      }),
+    ]);
+    
+    const reportData = await reportResponse.json();
+    const stateData = await stateResponse.json();
+    
+    const reportStale = stateData?.assessment_state?.report_stale;
+    
+    // Only show report if it exists AND is not stale
+    if (reportResponse.ok && reportData.report && !reportStale) {
+      setReport(reportData.report);
+      setIsGenerating(false);
+      return;
+    }
+    
+    // Continue polling
+    if (attempts < maxAttempts) {
+      setTimeout(poll, 2000);
+    }
   };
   
-  return { items, isLoading, refresh: fetchItems };
-}
-```
-
-### Updated RoadmapCard Props
-
-```typescript
-interface RoadmapCardProps {
-  items: RoadmapItem[];       // From get_improvement_items
-  onImprove: (item: RoadmapItem) => void;  // Navigate to question
-  isLoading: boolean;
-}
-```
-
-### Navigation to Question
-
-When user clicks "Improve This":
-
-```typescript
-const handleImprove = (item: RoadmapItem) => {
-  // Navigate to readiness page with specific question
-  navigate(`/readiness?section=${item.section_id}&question=${item.question_id}`);
+  poll();
 };
 ```
 
 ---
 
-## Answer Update Flow: Keeping Everything in Sync
+### File: `src/pages/Readiness.tsx`
 
-When user updates an answer from the Roadmap navigation:
+#### Change: Remove Manual Generation from Complete Phase (Optional Cleanup)
 
-```text
-1. User clicks "Improve This" on Roadmap item
-2. Navigate to /readiness?section=1&question=1.1.B.1
-3. User selects "Yes, completed and signed" (was "Drafted but not signed")
-4. Frontend calls agent with new answer
-5. Agent updates assessment_answers table
-6. Agent marks report_stale = true (if report exists)
-7. computeAssessmentState() recalculates:
-   - Section score goes up
-   - Overall score goes up
-   - Tier may change
-8. Dashboard refreshes:
-   - Score card shows new score
-   - Roadmap no longer shows that item (score_fraction = 1.0)
-9. When user views Results page:
-   - Report regenerates automatically
-   - AI generates fresh insights based on new answers
-```
+Since regeneration now happens in the background on every answer update, the complete phase no longer needs to trigger generation. However, we should KEEP the first-time generation logic for new assessments that have never had a report.
+
+The current auto-trigger logic (lines 1125-1134) can remain as a fallback for first-time report generation.
 
 ---
 
-## Completed Items: Also Schema-Driven
+## Strict Rule Summary
 
-"Completed" items are simply questions where score_fraction = 1.0:
-
-```typescript
-if (payload.action === "get_completed_items") {
-  const { data: answers } = await readiness
-    .from("assessment_answers")
-    .select("*")
-    .eq("assessment_id", assessmentDbId)
-    .eq("score_fraction", 1.0);  // Perfect answers
-  
-  // Return with schema enrichment
-}
-```
-
-This allows a "Completed" filter toggle on the Roadmap without any additional state.
+| Rule | Implementation |
+|------|---------------|
+| Report generates on first completion | Existing logic in Readiness.tsx complete phase |
+| Report regenerates on answer update | Agent triggers `EdgeRuntime.waitUntil()` background task |
+| Report regenerates on profile update | Agent triggers `EdgeRuntime.waitUntil()` background task |
+| Results shows loading if generating | Check `report_status === "generating"` |
+| Results shows loading if stale | Check `report_stale === true` |
+| No manual regenerate button | Already removed per previous requirements |
 
 ---
-
-## Progress Calculation: Real Data
-
-Roadmap progress is calculated from actual answer data:
-
-```typescript
-const totalApplicableQuestions = items.length + completedItems.length;
-const completedCount = completedItems.length;
-const progressPercent = Math.round((completedCount / totalApplicableQuestions) * 100);
-```
-
-This is the same calculation used for `overall_progress` in `computeAssessmentState()`, ensuring consistency.
-
----
-
-## What About AI-Generated Actions?
-
-The AI report still generates `action_plan[]` items, but these serve a **different purpose**:
-
-| Schema-Driven Roadmap | AI Action Plan (in Report) |
-|-----------------------|---------------------------|
-| "Update your will to completed" | "Consider working with an estate attorney to finalize your will and trust documents" |
-| Direct 1:1 to question | Holistic advice across multiple questions |
-| Clicking updates answer | Clicking may navigate or just inform |
-| Affects score immediately | Doesn't affect score |
-| Disappears when done | Part of static report |
-
-The Roadmap is for **tracking and action**. The Report Action Plan is for **guidance and context**.
-
----
-
-## Implementation Sequence
-
-### Phase 1: Backend (Agent Enhancement)
-1. Add `get_improvement_items` action to agent
-2. Add `get_completed_items` action to agent
-3. Both return schema-enriched answer data
-
-### Phase 2: Frontend Hook
-4. Create `useImprovementItems` hook
-5. Integrate with Dashboard
-6. Update RoadmapCard to use new data shape
-
-### Phase 3: Navigation & Answer Update
-7. Add `?question=X` parameter support to Readiness page
-8. Scroll to and highlight the specific question
-9. Ensure answer update refreshes Dashboard state
-
-### Phase 4: Polish
-10. Add "Completed" filter toggle
-11. Add progress animation when items complete
-12. Mobile responsiveness
-
----
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/hooks/useImprovementItems.ts` | Fetch improvable questions from backend |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/agent/index.ts` | Add get_improvement_items, get_completed_items actions |
-| `src/components/dashboard/RoadmapCard.tsx` | Update to use RoadmapItem shape from backend |
-| `src/pages/Dashboard.tsx` | Use useImprovementItems hook |
-| `src/pages/Readiness.tsx` | Support ?question= param for direct navigation |
-| `src/types/assessment.ts` | Add RoadmapItem interface |
+| `supabase/functions/agent/index.ts` | Add `triggerReportRegeneration()` helper, modify answer/profile save to call it via `EdgeRuntime.waitUntil()` |
+| `src/pages/Results.tsx` | Handle `report_stale === true` same as `generating`, update polling to check stale flag |
 
 ---
 
-## Why This Approach Is Better
+## Edge Cases Handled
 
-1. **Single Source of Truth**: All data comes from assessment_answers + schema
-2. **No Drift**: Roadmap items ARE questions, not a separate list
-3. **Automatic Sync**: Updating an answer updates the score, report, and roadmap
-4. **No Manual Completion**: You don't "mark as done" - you improve your answer
-5. **Schema-Authoritative**: Priority, weight, and options come from the schema
-6. **Simpler Database**: No new tables or columns needed
-7. **Consistent Calculation**: Same scoring logic everywhere
+1. **User updates answer → immediately goes to Results**
+   - `report_status` is already `"generating"` (set synchronously before background task starts)
+   - Results page shows loading screen
+   - Polling picks up the new report when ready
 
-The Roadmap becomes a **lens into the assessment data**, not a separate tracking system.
+2. **User updates multiple answers quickly**
+   - Each update triggers a new background regeneration
+   - Latest regeneration will "win" (overwrites previous)
+   - `report_stale` stays `true` until final regeneration completes
+
+3. **Report generation fails**
+   - `report_status` is set to `"failed"`
+   - Results page can show error state (already handled)
+   - User can retry from Results page
+
+4. **New user completing assessment for first time**
+   - No `report_data` exists yet
+   - Readiness.tsx complete phase triggers first generation
+   - No background regeneration happens (no existing report to regenerate)
