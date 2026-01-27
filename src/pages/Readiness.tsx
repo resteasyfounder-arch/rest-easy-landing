@@ -260,8 +260,10 @@ const Readiness = () => {
 
   // Flow phase is now server-driven, no localStorage persistence needed
 
-  // State for explicit report generation
+  // State for report generation (auto-triggered, no manual button)
   const [reportGenerating, setReportGenerating] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [hasTriggeredAutoReport, setHasTriggeredAutoReport] = useState(false);
 
   const bootstrap = useCallback(async () => {
     setLoading(true);
@@ -885,23 +887,15 @@ const Readiness = () => {
       }
       setAnswers(newAnswers);
 
-      // Persist to backend
+      // Persist to backend (backend will mark report as stale automatically)
       await callAgent({
         subject_id: subjectId,
         assessment_id: ASSESSMENT_ID,
         answers: updatedAnswers,
       });
 
-      // Mark report as stale if it exists
-      const existingReport = localStorage.getItem("rest-easy.readiness.report");
-      if (existingReport) {
-        localStorage.setItem("rest-easy.readiness.report_stale", "true");
-        localStorage.setItem("rest-easy.readiness.last_edit_at", new Date().toISOString());
-      }
-
       // Clear any cached section insights for this section
       if (focusedSectionId) {
-        // Clear cached insights for this section (they're stale now)
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
@@ -1077,11 +1071,23 @@ const Readiness = () => {
     persistScore();
   }, [flowPhase, results, subjectId, scoreSaved]);
 
-  // Explicit report generation - only called by user action
+  // Auto-trigger report generation when assessment is complete
+  useEffect(() => {
+    if (flowPhase !== "complete" || !results || reportGenerating || hasTriggeredAutoReport) return;
+    
+    // Auto-generate if no report exists or report is stale
+    // Note: This runs on first completion AND when returning to complete phase with stale data
+    console.log("[Readiness] Auto-triggering report generation");
+    setHasTriggeredAutoReport(true);
+    handleGenerateReport();
+  }, [flowPhase, results, reportGenerating, hasTriggeredAutoReport]);
+
+  // Report generation - auto-triggered, handles both first generation and updates
   const handleGenerateReport = useCallback(async () => {
     if (!results || !schema || reportGenerating) return;
     
     setReportGenerating(true);
+    setReportError(null);
     
     try {
       // Build section scores with labels and weights
@@ -1146,7 +1152,7 @@ const Readiness = () => {
       const data = await response.json();
       
       if (response.ok && data.report) {
-        // Save report to server instead of localStorage
+        // Save report to server (this also resets report_stale flag)
         try {
           await callAgent({
             action: "save_report",
@@ -1157,21 +1163,25 @@ const Readiness = () => {
           console.log("[Readiness] Report saved to server");
         } catch (saveErr) {
           console.error("[Readiness] Failed to save report to server:", saveErr);
-          // Still navigate - report will be fetched from server if available
         }
         navigate("/results");
       } else {
         console.error("Report generation failed:", data.error);
-        // Fallback: still navigate but report won't be there
-        navigate("/results");
+        setReportError(data.error || "Failed to generate report. Please try again.");
       }
     } catch (err) {
       console.error("Error generating report:", err);
-      navigate("/results");
+      setReportError(err instanceof Error ? err.message : "An error occurred. Please try again.");
     } finally {
       setReportGenerating(false);
     }
   }, [results, schema, answers, profile, navigate, reportGenerating, subjectId, assessmentId]);
+
+  // Retry report generation (only for error cases)
+  const handleRetryReport = () => {
+    setReportError(null);
+    setHasTriggeredAutoReport(false);
+  };
 
   // Handle going back to review sections from complete phase
   const handleReviewSections = () => {
@@ -1240,14 +1250,46 @@ const Readiness = () => {
     );
   }
 
-  // Complete Phase - Show completion screen with explicit CTA
+  // Complete Phase - Auto-generate report, show loading/error states
   if (flowPhase === "complete") {
-    // If report is generating, show loading
-    if (reportGenerating) {
+    // Report generation error - show retry option
+    if (reportError) {
       return (
         <AppLayout hideNav>
           <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
             <div className="text-center space-y-6 max-w-sm">
+              <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-destructive" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="font-display text-xl font-semibold text-foreground">
+                  Unable to Generate Report
+                </h2>
+                <p className="font-body text-sm text-muted-foreground">
+                  {reportError}
+                </p>
+              </div>
+              <div className="space-y-3 pt-4">
+                <Button onClick={handleRetryReport} size="lg" className="w-full gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Try Again
+                </Button>
+                <Button variant="ghost" onClick={handleBackToDashboard} className="w-full text-muted-foreground">
+                  Back to Dashboard
+                </Button>
+              </div>
+            </div>
+          </div>
+        </AppLayout>
+      );
+    }
+
+    // Report is generating (auto-triggered) - show seamless loading
+    if (reportGenerating) {
+      return (
+        <AppLayout hideNav>
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
+            <div className="text-center space-y-6 max-w-sm animate-fade-up">
               <div className="relative mx-auto w-20 h-20">
                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                   <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -1255,7 +1297,7 @@ const Readiness = () => {
               </div>
               <div className="space-y-2">
                 <h2 className="font-display text-xl font-semibold text-foreground">
-                  Generating Your Report
+                  Preparing Your Report
                 </h2>
                 <p className="font-body text-sm text-muted-foreground">
                   Our AI is analyzing your responses to create personalized recommendations...
@@ -1267,49 +1309,23 @@ const Readiness = () => {
       );
     }
 
-    // Show completion screen with explicit actions
+    // Briefly show completion before auto-redirect (fallback if report already exists)
     return (
       <AppLayout hideNav>
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
-          <div className="text-center space-y-8 max-w-sm">
-            <div className="relative mx-auto w-24 h-24">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-4xl">🎉</span>
+          <div className="text-center space-y-6 max-w-sm animate-fade-up">
+            <div className="relative mx-auto w-20 h-20">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
               </div>
             </div>
-            <div className="space-y-3">
-              <h2 className="font-display text-2xl font-semibold text-foreground">
+            <div className="space-y-2">
+              <h2 className="font-display text-xl font-semibold text-foreground">
                 Assessment Complete!
               </h2>
-              <p className="font-body text-muted-foreground">
-                You've answered all {applicableQuestions.length} questions. 
-                Your overall score is <span className="font-semibold text-primary">{results?.overallScore || 0}%</span>.
+              <p className="font-body text-sm text-muted-foreground">
+                Preparing your personalized report...
               </p>
-            </div>
-            
-            <div className="space-y-3 pt-4">
-              <Button 
-                onClick={handleGenerateReport} 
-                size="lg" 
-                className="w-full gap-2"
-              >
-                Generate Your Report
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleReviewSections} 
-                size="lg" 
-                className="w-full"
-              >
-                Review Your Answers
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={handleBackToDashboard} 
-                className="w-full text-muted-foreground"
-              >
-                Back to Dashboard
-              </Button>
             </div>
           </div>
         </div>

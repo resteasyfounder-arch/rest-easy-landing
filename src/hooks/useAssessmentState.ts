@@ -41,7 +41,9 @@ function createEmptyState(): AssessmentState {
     next_question_id: null,
     report_status: "not_started",
     report_url: null,
+    report_stale: false,
     last_activity_at: new Date().toISOString(),
+    last_answer_at: null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -191,6 +193,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
   const isComplete = assessmentState.status === "completed";
   const isReportReady = assessmentState.report_status === "ready";
   const isReportGenerating = assessmentState.report_status === "generating";
+  const isReportStale = assessmentState.report_stale;
 
   // Manual refresh
   const refresh = useCallback(() => {
@@ -284,6 +287,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     isComplete,
     isReportReady,
     isReportGenerating,
+    isReportStale,
     
     // Actions
     refresh,

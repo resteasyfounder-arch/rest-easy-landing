@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, FileText, RotateCcw, Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Play, FileText, Eye, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { AssessmentState } from "@/types/assessment";
 
@@ -9,7 +10,7 @@ interface AssessmentCTAProps {
 }
 
 export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps) {
-  const { status, report_status, overall_progress, profile_complete } = assessmentState;
+  const { status, report_status, report_stale, overall_progress, profile_complete } = assessmentState;
 
   // Not started - prompt to begin
   if (status === "not_started" || overall_progress === 0) {
@@ -50,20 +51,34 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
     );
   }
 
-  // Assessment complete (100% progress) but not yet marked as completed status
-  // OR status is completed - show report options
+  // Assessment complete (100% progress) - check report status
   if (overall_progress >= 100 || status === "completed") {
-    // Check report status from server state
     const hasReport = report_status === "ready";
+    const isGenerating = report_status === "generating";
+
+    // Report is generating - show loading state
+    if (isGenerating) {
+      return (
+        <Button disabled size="lg" className={className}>
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          Preparing Report...
+        </Button>
+      );
+    }
 
     if (hasReport) {
-      // Have a report - show view report option
+      // Have a report - show view report option with stale indicator if needed
       return (
         <div className="flex flex-col sm:flex-row gap-3">
           <Button asChild size="lg" className={className}>
             <Link to="/results" className="gap-2">
               <FileText className="h-4 w-4" />
               View Full Report
+              {report_stale && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  Update Available
+                </Badge>
+              )}
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
@@ -76,16 +91,15 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
       );
     }
 
-    // Assessment complete but no report yet - prompt to generate
+    // Assessment complete but no report yet - auto-generation pending
+    // Redirect to readiness which will auto-trigger generation
     return (
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button asChild size="lg" className={className}>
-          <Link to="/readiness" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Generate Report
-          </Link>
-        </Button>
-      </div>
+      <Button asChild size="lg" className={className}>
+        <Link to="/readiness" className="gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Preparing Report...
+        </Link>
+      </Button>
     );
   }
 

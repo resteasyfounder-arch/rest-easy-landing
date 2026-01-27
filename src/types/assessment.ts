@@ -43,9 +43,11 @@ export interface AssessmentState {
   // Report Status
   report_status: ReportStatus;
   report_url: string | null;
+  report_stale: boolean;           // True when answers/profile changed after report generation
   
   // Timestamps
   last_activity_at: string;
+  last_answer_at: string | null;
   updated_at: string;
 }
 
