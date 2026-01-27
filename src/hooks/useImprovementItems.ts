@@ -89,40 +89,29 @@ export function useImprovementItems({
     }
   }, [subjectId, enabled]);
 
-  // Initial fetch and cleanup
+  // Initial fetch, cleanup, and auto-refresh listeners (consolidated into single useEffect)
   useEffect(() => {
     mountedRef.current = true;
     fetchItems();
-    
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [fetchItems]);
 
-  // Auto-refresh on visibility change (when user returns to the tab/page)
-  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && enabled && subjectId) {
-        fetchItems(true); // Silent refresh
+        fetchItems(true);
+      }
+    };
+
+    const handleFocus = () => {
+      if (enabled && subjectId) {
+        fetchItems(true);
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [fetchItems, enabled, subjectId]);
-
-  // Auto-refresh on focus (catches navigation back scenarios)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (enabled && subjectId) {
-        fetchItems(true); // Silent refresh
-      }
-    };
-
     window.addEventListener("focus", handleFocus);
+    
     return () => {
+      mountedRef.current = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
     };
   }, [fetchItems, enabled, subjectId]);
