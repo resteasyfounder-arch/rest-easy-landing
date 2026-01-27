@@ -9,3 +9,6 @@ export { CategoryBreakdown } from "./CategoryBreakdown";
 export { ReportSummaryCard } from "./ReportSummaryCard";
 export { QuickActionsCard } from "./QuickActionsCard";
 export { LockedPreviewCard } from "./LockedPreviewCard";
+export { ReadinessScoreCard } from "./ReadinessScoreCard";
+export { VaultPreviewCard } from "./VaultPreviewCard";
+export { RoadmapCard } from "./RoadmapCard";

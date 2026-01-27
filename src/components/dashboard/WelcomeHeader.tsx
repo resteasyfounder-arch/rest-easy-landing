@@ -1,12 +1,21 @@
-import { Heart } from "lucide-react";
+import { Heart, Calendar } from "lucide-react";
+import { format } from "date-fns";
 
 interface WelcomeHeaderProps {
   className?: string;
+  userName?: string;
+  assessedDate?: string;
   hasStarted?: boolean;
   isComplete?: boolean;
 }
 
-export function WelcomeHeader({ className, hasStarted = false, isComplete = false }: WelcomeHeaderProps) {
+export function WelcomeHeader({
+  className,
+  userName,
+  assessedDate,
+  hasStarted = false,
+  isComplete = false,
+}: WelcomeHeaderProps) {
   // Get time-based greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -15,12 +24,17 @@ export function WelcomeHeader({ className, hasStarted = false, isComplete = fals
     return "Good evening";
   };
 
-  // Get context-aware sub-message
-  const getContextMessage = () => {
-    if (isComplete) return "Your readiness journey is complete";
-    if (hasStarted) return "Let's continue where you left off";
-    return "Ready to begin your journey?";
-  };
+  // Build greeting text with optional name
+  const greetingText = userName
+    ? `${getGreeting()}, ${userName}`
+    : hasStarted
+    ? "Welcome back"
+    : getGreeting();
+
+  // Format the assessed date
+  const formattedDate = assessedDate
+    ? format(new Date(assessedDate), "MMM d, yyyy")
+    : null;
 
   return (
     <div className={className}>
@@ -30,11 +44,22 @@ export function WelcomeHeader({ className, hasStarted = false, isComplete = fals
         </div>
         <div>
           <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">
-            {getGreeting()}
+            {greetingText}
           </h1>
-          <p className="text-muted-foreground font-body text-sm">
-            {getContextMessage()}
-          </p>
+          {isComplete && formattedDate ? (
+            <div className="flex items-center gap-1.5 text-muted-foreground font-body text-sm">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>Assessed: {formattedDate}</span>
+            </div>
+          ) : (
+            <p className="text-muted-foreground font-body text-sm">
+              {isComplete
+                ? "Your readiness journey is complete"
+                : hasStarted
+                ? "Let's continue where you left off"
+                : "Ready to begin your journey?"}
+            </p>
+          )}
         </div>
       </div>
     </div>
