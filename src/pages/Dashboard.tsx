@@ -96,7 +96,7 @@ const Dashboard = () => {
             {/* Sync status indicator */}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {syncStatus === "syncing" && (
-                <RefreshCw className="h-3 w-3 animate-spin" />
+                <RefreshCw className="h-3 w-3" />
               )}
               {syncStatus === "synced" && (
                 <Wifi className="h-3 w-3 text-emerald-500" />
@@ -206,7 +206,7 @@ const Dashboard = () => {
                       className="gap-1.5 text-muted-foreground hover:text-destructive"
                       disabled={isStartingFresh}
                     >
-                      <RotateCcw className={`h-3.5 w-3.5 ${isStartingFresh ? "animate-spin" : ""}`} />
+                      <RotateCcw className="h-3.5 w-3.5" />
                       Start Fresh
                     </Button>
                   </AlertDialogTrigger>
@@ -232,7 +232,7 @@ const Dashboard = () => {
                   onClick={() => refresh()}
                   className="gap-1.5 text-muted-foreground"
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+                  <RefreshCw className="h-3.5 w-3.5" />
                   Refresh
                 </Button>
               </div>
