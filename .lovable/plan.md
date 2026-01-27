@@ -1,319 +1,443 @@
 
 
-# Plan: Polish the Dashboard Home Page - Warm & Compelling Design
+# Dashboard v2: Warm, Journey-Based Home Experience
+
+## Executive Summary
+
+Transform the existing Dashboard from a functional status display into an emotionally engaging "home base" that clearly differentiates between Completed and Incomplete assessment states, guides users toward progress without overwhelm, and maintains a calm, trust-forward visual language suitable for an older audience.
+
+---
 
 ## Current State Analysis
 
-The Dashboard currently has functional components but feels utilitarian rather than warm and inviting:
+### What Exists Today
 
-1. **Header Area**: Simple greeting + logout button - minimal personality
-2. **Main Score Card**: Functional but flat, uses generic gradient
-3. **Section Progress**: Grid of cards without visual hierarchy or journey feel
-4. **Empty State**: Basic dashed card with emoji - could be more inviting
-5. **Visual Issues**:
-   - DesktopLayout header shows "Sign In" button even when logged in
-   - No personal touch or brand warmth
-   - Missing visual breathing room
-   - Cards feel disconnected from each other
+| Component | Purpose | Status |
+|-----------|---------|--------|
+| `WelcomeHeader` | Time-aware greeting with context message | Working |
+| `ScoreCircle` / `ProgressCircle` | Visual score or progress display | Working |
+| `TierBadge` | Readiness tier label (e.g., "On Your Way") | Working |
+| `SectionProgressCard` | Section-level progress with status icons | Working |
+| `AssessmentCTA` | Smart CTA button based on state | Working |
+| `ReportStatusBadge` | Report generation status | Working |
 
-## Design Philosophy
+### Current Gaps Identified
 
-Create a Dashboard that feels like **coming home to a trusted friend** - calm, organized, and encouraging. The design should:
+1. **No distinct "Incomplete" visual state** - Dashboard looks similar whether assessment is 10% or 100% complete
+2. **Missing Report Summary** on completed dashboard - Users must navigate to Results page
+3. **No Roadmap/Action Preview** - Action items from report not surfaced on dashboard
+4. **Missing Category Breakdown visualization** - Only section progress, no visual strength/opportunity bars
+5. **No "locked/blurred" preview sections** for incomplete users to show what they'll unlock
+6. **Transition between states** is abrupt - no celebratory moment when completing
 
-- **Welcome warmly** with personalized, time-aware greetings
-- **Show clear progress** without overwhelming
-- **Celebrate small wins** to motivate continued engagement
-- **Feel spacious and calm** with generous whitespace
-- **Connect visually** through consistent styling and subtle animations
+---
 
-## Visual Improvements
+## Design Architecture
+
+### State-Driven Layout Strategy
 
 ```text
-CURRENT LAYOUT (Functional but flat)
-+------------------------------------------+
-| Good morning              [Log Out]      |
-| Here's your readiness overview           |
-+------------------------------------------+
-| ┌──────────────────────────────────────┐ |
-| │ [Circle]  Your Assessment Progress   │ |
-| │           Making progress!            │ |
-| │           ────────────────            │ |
-| └──────────────────────────────────────┘ |
-+------------------------------------------+
-| Assessment Sections      [Start Fresh]   |
-| ┌─────────────┐ ┌─────────────┐          |
-| │ Section 1   │ │ Section 2   │          |
-| └─────────────┘ └─────────────┘          |
-+------------------------------------------+
-
-PROPOSED LAYOUT (Warm and inviting)
-+------------------------------------------+
-|                                          |
-| Good morning, welcome back          [👤] |
-| Let's continue your journey              |
-|                                          |
-+------------------------------------------+
-| ┌──────────────────────────────────────┐ |
-| │      YOUR PROGRESS                   │ |
-| │                                      │ |
-| │    [Large Animated Circle]           │ |
-| │         42%                          │ |
-| │      You're making progress!         │ |
-| │                                      │ |
-| │  🎯 3 of 7 sections completed        │ |
-| │  ✨ "Complete all sections to        │ |
-| │     reveal your personalized         │ |
-| │     Readiness Score"                 │ |
-| │                                      │ |
-| │     [  Continue Your Journey  ]      │ |
-| └──────────────────────────────────────┘ |
-|                                          |
-| ───── Your Assessment Journey ─────     |
-|                                          |
-| ┌─────────────────────────────────────┐  |
-| │ ✓ Personal & Family          78%    │  |
-| │   Completed                         │  |
-| └─────────────────────────────────────┘  |
-| ┌─────────────────────────────────────┐  |
-| │ → Financial Affairs        In Prog  │  |
-| │   Continue where you left off       │  |
-| └─────────────────────────────────────┘  |
-| ┌─────────────────────────────────────┐  |
-| │ ○ Legal Documents          Ready    │  |
-| │   Tap to begin                      │  |
-| └─────────────────────────────────────┘  |
-|                                          |
-| ─────────────────────────────────────── |
-| Need to start over? [Start Fresh]        |
-+------------------------------------------+
++---------------------------------------------------+
+|                 DASHBOARD ROUTER                   |
++---------------------------------------------------+
+               |                    |
+     [isComplete === false]  [isComplete === true]
+               |                    |
+               v                    v
++---------------------------+  +---------------------------+
+|   INCOMPLETE DASHBOARD    |  |   COMPLETED DASHBOARD     |
++---------------------------+  +---------------------------+
+| - Progress-focused header |  | - Score + Tier header     |
+| - Assessment Progress Card|  | - Readiness Summary Card  |
+| - Blurred Preview Cards   |  | - Category Breakdown      |
+| - Gentle re-engagement    |  | - Quick Actions/Roadmap   |
+| - Section Journey         |  | - Section Review          |
++---------------------------+  +---------------------------+
 ```
 
-## Detailed Changes
+---
 
-### 1. Fix Desktop Layout Header (Bug Fix)
+## Completed Assessment Dashboard
 
-**File**: `src/components/layout/DesktopLayout.tsx`
+### Section 1: Score Hero (Top)
 
-Remove the "Sign In" button from the header - users are already logged in on the Dashboard. This is confusing and redundant since the sidebar already has navigation.
+**Purpose**: "Where am I?" - Immediate status clarity
 
-```tsx
-// Remove lines 42-52 (the Sign In button in the header)
-// Keep just the breadcrumb/title area
+```text
++-------------------------------------------------------+
+|  ┌─────────────────────────────────────────────────┐  |
+|  │                                                 │  |
+|  │    [72]           "Well Prepared"               │  |
+|  │   ───────         ★ Award Icon                  │  |
+|  │                                                 │  |
+|  │   "Last updated Jan 25, 2025"                  │  |
+|  │                                                 │  |
+|  │   [View Full Report]   [Share Report]          │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
++-------------------------------------------------------+
 ```
 
-### 2. Enhanced Welcome Header
+**Components**:
+- Large `ScoreCircle` (size="lg") centered
+- `TierBadge` prominently displayed
+- Last completed date from `report.generatedAt`
+- Primary CTA: "View Full Report" → `/results`
+- Secondary: Share capability
 
-**File**: `src/components/dashboard/WelcomeHeader.tsx`
+### Section 2: Insight Summary Card (Middle)
 
-Add more personality and context:
-- Include encouraging sub-message based on progress
-- Add subtle visual icon or avatar placeholder
-- Make the greeting feel more personal
+**Purpose**: "What does this mean?" - Plain-language interpretation
 
-```tsx
-// Enhanced greeting with journey context
-<div className={className}>
-  <div className="flex items-center gap-3">
-    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-      <Heart className="h-5 w-5 text-primary" />
-    </div>
-    <div>
-      <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">
-        {getGreeting()}
-      </h1>
-      <p className="text-muted-foreground font-body text-sm">
-        {getContextMessage(hasStarted, progress)}
-      </p>
-    </div>
-  </div>
-</div>
+```text
++-------------------------------------------------------+
+|  ┌─────────────────────────────────────────────────┐  |
+|  │  📋 Your Readiness Summary                      │  |
+|  │  ─────────────────────────────                  │  |
+|  │                                                 │  |
+|  │  "You've made strong progress in preparing     │  |
+|  │  for life's transitions. Your legal documents  │  |
+|  │  and healthcare wishes are well documented..." │  |
+|  │                                                 │  |
+|  │  ✓ 6 strengths identified                      │  |
+|  │  ○ 4 areas to address                          │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
++-------------------------------------------------------+
 ```
 
-Context messages:
-- Not started: "Ready to begin your journey?"
-- In progress: "Let's continue where you left off"
-- Complete: "Your readiness journey is complete"
+**Data Source**: Fetch report `executive_summary` (first 2-3 sentences truncated) + `metrics`
 
-### 3. Main Progress Card Enhancement
+### Section 3: Category Breakdown (Middle)
 
-**File**: `src/pages/Dashboard.tsx`
+**Purpose**: Visual strength vs. opportunity at-a-glance
 
-Improve the main card with:
-- Better visual hierarchy with centered content
-- Larger, more prominent progress circle
-- Clear milestone indicators
-- More inviting CTA button styling
-- Subtle animation on page load
-
-```tsx
-<Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden shadow-soft">
-  <CardContent className="p-8 sm:p-10">
-    <div className="flex flex-col items-center text-center space-y-6">
-      {/* Centered progress/score circle with animation */}
-      <div className="animate-fade-up">
-        {isComplete ? (
-          <ScoreCircle ... />
-        ) : (
-          <ProgressCircle size="lg" ... />
-        )}
-      </div>
-      
-      {/* Progress details with better typography */}
-      <div className="space-y-3 max-w-sm">
-        <h2 className="font-display text-xl font-semibold">
-          {isComplete ? "Your Readiness Score" : "Your Journey Progress"}
-        </h2>
-        
-        {/* Milestone chips */}
-        <div className="flex items-center justify-center gap-2 text-sm">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary">
-            <Target className="h-3.5 w-3.5" />
-            {completedSectionsCount} of {totalSections} sections
-          </span>
-        </div>
-        
-        {/* Encouraging prompt */}
-        <p className="text-muted-foreground text-sm italic">
-          {isComplete 
-            ? "You've completed your readiness assessment" 
-            : "Complete all sections to reveal your personalized Readiness Score"}
-        </p>
-      </div>
-      
-      {/* Prominent CTA */}
-      <AssessmentCTA className="mt-4" />
-    </div>
-  </CardContent>
-</Card>
+```text
++-------------------------------------------------------+
+|  ┌─────────────────────────────────────────────────┐  |
+|  │  Category Scores                  [View Details]│  |
+|  │  ─────────────────────────────                  │  |
+|  │                                                 │  |
+|  │  Legal Documents        ████████████░░  85%    │  |
+|  │  Healthcare Wishes      ██████████░░░░  72%    │  |
+|  │  Financial Affairs      ████████░░░░░░  58%    │  |
+|  │  Digital Assets         █████░░░░░░░░░  42%    │  |
+|  │  Family Communication   ████████████░░  89%    │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
++-------------------------------------------------------+
 ```
 
-### 4. Section Cards as Journey Steps
+**Component**: New `CategoryBreakdown` component
+- Uses data from `assessmentState.sections` (already has scores)
+- Color-coded bars: Green (70+), Amber (40-69), Red (<40)
+- "View Details" links to specific section in report
 
-**File**: `src/pages/Dashboard.tsx`
+### Section 4: Quick Actions / Roadmap (Bottom)
 
-Restyle the sections area to feel like a journey:
-- Change from grid to stacked list on mobile for cleaner flow
-- Add section header with visual separator
-- Highlight the "next" section to continue
-- Move "Start Fresh" to a quieter location at the bottom
+**Purpose**: "What should I do next?" - Lightweight, achievable tasks
 
-```tsx
-{/* Journey section header */}
-<div className="flex items-center gap-4">
-  <div className="h-px flex-1 bg-border" />
-  <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
-    Your Assessment Journey
-  </h2>
-  <div className="h-px flex-1 bg-border" />
-</div>
-
-{/* Stacked sections with visual flow */}
-<div className="space-y-3">
-  {applicableSections.map((section, index) => (
-    <SectionProgressCard
-      key={section.id}
-      section={section}
-      isNext={findNextSection(section, applicableSections)}
-      onClick={() => navigate(`/readiness?section=${section.id}`)}
-    />
-  ))}
-</div>
-
-{/* Quieter Start Fresh at bottom */}
-<div className="pt-6 border-t border-border/50 mt-8">
-  <div className="flex items-center justify-between text-sm text-muted-foreground">
-    <span>Need to begin again?</span>
-    <AlertDialog>...</AlertDialog>
-  </div>
-</div>
+```text
++-------------------------------------------------------+
+|  ┌─────────────────────────────────────────────────┐  |
+|  │  Recommended Next Steps              [View All] │  |
+|  │  ─────────────────────────────                  │  |
+|  │                                                 │  |
+|  │  🔴 HIGH: Review your healthcare directive     │  |
+|  │     "Ensure your wishes are clearly documented" │  |
+|  │     [Start Task]                                │  |
+|  │                                                 │  |
+|  │  🟡 MEDIUM: Organize digital account access    │  |
+|  │     "Create a secure list of important logins" │  |
+|  │     [Start Task]                                │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
++-------------------------------------------------------+
 ```
 
-### 5. Enhanced Empty State
+**Data Source**: Top 2-3 items from report `action_plan` or `immediate_actions`
+- Show priority badge (HIGH/MEDIUM)
+- Keep descriptions short (one line)
+- "View All" → `/results` (scrolls to Action Plan section)
 
-**File**: `src/pages/Dashboard.tsx`
+---
 
-Make the empty state warmer and more inviting:
+## Incomplete Assessment Dashboard
 
-```tsx
-<Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-soft">
-  <CardContent className="p-10 text-center">
-    <div className="max-w-md mx-auto space-y-6">
-      {/* Warm illustration */}
-      <div className="relative w-24 h-24 mx-auto">
-        <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse-soft" />
-        <div className="absolute inset-2 rounded-full bg-primary/20 flex items-center justify-center">
-          <Heart className="h-10 w-10 text-primary" />
-        </div>
-      </div>
-      
-      <div className="space-y-3">
-        <h3 className="font-display text-2xl font-semibold text-foreground">
-          Welcome to Rest Easy
-        </h3>
-        <p className="text-muted-foreground font-body leading-relaxed">
-          Take a few moments to understand your readiness. 
-          Our gentle assessment will help you see where you stand 
-          and guide your next steps.
-        </p>
-      </div>
-      
-      <AssessmentCTA assessmentState={assessmentState} />
-      
-      <p className="text-xs text-muted-foreground/70">
-        Takes about 15-20 minutes • Save progress anytime
-      </p>
-    </div>
-  </CardContent>
-</Card>
+### Section 1: Progress Hero (Top - Primary Focus)
+
+**Purpose**: Clear re-engagement with progress visibility
+
+```text
++-------------------------------------------------------+
+|  ┌─────────────────────────────────────────────────┐  |
+|  │                                                 │  |
+|  │    [42%]          "You're making progress!"    │  |
+|  │    ○○○○●          3 of 7 sections completed    │  |
+|  │                                                 │  |
+|  │    ─────────────────────────────                │  |
+|  │    ████████████████░░░░░░░░░░░░░░               │  |
+|  │                                                 │  |
+|  │    "Your readiness score will appear once      │  |
+|  │     your assessment is complete"               │  |
+|  │                                                 │  |
+|  │    [  ▶ Continue Your Assessment  ]            │  |
+|  │                                                 │  |
+|  │    "Most people complete this in 10-15 min"    │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
++-------------------------------------------------------+
 ```
 
-### 6. Profile Completion Card Polish
+**Key Elements**:
+- `ProgressCircle` (size="lg") with percentage
+- Section milestone chip ("3 of 7 sections")
+- Progress bar
+- Explicit message: score reveals on completion
+- Primary CTA: "Continue Your Assessment"
+- Reassurance microcopy
 
-Improve the profile card styling to match the new design language:
+### Section 2: Section Journey (In-Progress State)
 
-```tsx
-<Card className="border-amber-200/50 bg-gradient-to-r from-amber-50/50 to-amber-100/30 shadow-soft">
-  <CardContent className="p-5">
-    <div className="flex items-start gap-4">
-      <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-        <UserCircle className="h-5 w-5 text-amber-600" />
-      </div>
-      <div className="flex-1">
-        <h3 className="font-display font-medium text-foreground">
-          Complete Your Profile
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Help us personalize your assessment experience
-        </p>
-        <Progress value={assessmentState.profile_progress} className="h-1.5 mt-3" />
-      </div>
-    </div>
-  </CardContent>
-</Card>
+**Purpose**: Show progress and highlight next section
+
+```text
++-------------------------------------------------------+
+|  ───── Your Assessment Journey ─────                  |
+|                                                       |
+|  ✓ Personal & Family Information       Complete  78% |
+|  ✓ Healthcare Wishes                   Complete  85% |
+|  → Financial Affairs                   Continue  40% | ← Highlighted
+|  ○ Legal Documents                     Locked        |
+|  ○ Digital Assets                      Locked        |
++-------------------------------------------------------+
 ```
 
-## Files to Modify
+**Enhancement**: Add `isNext` prop to `SectionProgressCard` to highlight the recommended next section
+
+### Section 3: Locked Preview Cards (New)
+
+**Purpose**: Show users what they'll unlock - creates anticipation
+
+```text
++-------------------------------------------------------+
+|  ┌─────────────────────────────────────────────────┐  |
+|  │  🔒 Your Readiness Score                        │  |
+|  │  ─────────────────────────────                  │  |
+|  │                                                 │  |
+|  │  [      BLURRED/MUTED PREVIEW      ]           │  |
+|  │  [      of ScoreCircle component   ]           │  |
+|  │                                                 │  |
+|  │  "Complete the assessment to see your          │  |
+|  │   personalized readiness score"                │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
+|                                                       |
+|  ┌─────────────────────────────────────────────────┐  |
+|  │  🔒 Your Personalized Roadmap                   │  |
+|  │  ─────────────────────────────                  │  |
+|  │                                                 │  |
+|  │  [      BLURRED PREVIEW of action items  ]     │  |
+|  │                                                 │  |
+|  │  "Unlock your step-by-step action plan"        │  |
+|  │                                                 │  |
+|  └─────────────────────────────────────────────────┘  |
++-------------------------------------------------------+
+```
+
+**Component**: New `LockedPreviewCard` component
+- Semi-transparent overlay with lock icon
+- Placeholder content that hints at value
+- Encouraging unlock message
+
+---
+
+## New Components to Create
+
+### 1. `CategoryBreakdown.tsx`
+
+Horizontal bar chart showing section scores with color coding.
+
+```typescript
+interface CategoryBreakdownProps {
+  sections: SectionState[];
+  onCategoryClick?: (sectionId: string) => void;
+}
+```
+
+### 2. `QuickActionsCard.tsx`
+
+Displays top 2-3 action items from the report.
+
+```typescript
+interface QuickActionsCardProps {
+  actions: ImmediateAction[] | ActionItem[];
+  maxItems?: number;
+  onViewAll?: () => void;
+}
+```
+
+### 3. `ReportSummaryCard.tsx`
+
+Truncated executive summary with key metrics.
+
+```typescript
+interface ReportSummaryCardProps {
+  summary: string;
+  metrics: ReportMetrics;
+  onViewReport?: () => void;
+}
+```
+
+### 4. `LockedPreviewCard.tsx`
+
+Blurred/muted preview of completed features.
+
+```typescript
+interface LockedPreviewCardProps {
+  title: string;
+  description: string;
+  previewContent?: ReactNode;
+  icon?: LucideIcon;
+}
+```
+
+---
+
+## Data Flow Changes
+
+### Report Data on Dashboard
+
+Currently, the Dashboard only uses `assessmentState` from `useAssessmentState`. For the completed dashboard to show report summary and actions, we need to:
+
+**Option A (Recommended)**: Extend `useAssessmentState` to optionally fetch report preview data
+```typescript
+const { assessmentState, reportPreview } = useAssessmentState({ 
+  autoRefresh: true,
+  includeReportPreview: isComplete  // Only fetch if complete
+});
+```
+
+**Option B**: Create a lightweight `/agent` action that returns dashboard-specific report snippets
+```json
+{
+  "action": "get_dashboard_preview",
+  "subject_id": "...",
+  "fields": ["executive_summary", "immediate_actions", "metrics"]
+}
+```
+
+For v2, **Option A is simpler** - we fetch the full report data only when `isComplete` is true.
+
+---
+
+## Transition Animations
+
+### Assessment Completion Moment
+
+When assessment goes from 99% to 100%:
+
+1. Progress circle animates to 100%
+2. Brief pause (500ms)
+3. Circle morphs into ScoreCircle with score reveal animation
+4. TierBadge fades in with scale animation
+5. New dashboard sections fade in sequentially
+
+**CSS Animations** (already available in project):
+- `animate-fade-in`
+- `animate-scale-in`
+- Custom: `animate-score-reveal` (counter animation)
+
+---
+
+## Accessibility Considerations
+
+| Element | Consideration |
+|---------|---------------|
+| Font sizes | Minimum 16px body, 14px secondary |
+| Color contrast | All text meets WCAG AA (4.5:1) |
+| Progress bars | Include text percentage, not just visual |
+| Buttons | Large touch targets (44px minimum) |
+| Icons | Always paired with text labels |
+| Focus states | Visible focus rings on all interactive elements |
+
+---
+
+## Files to Create/Modify
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `src/components/dashboard/CategoryBreakdown.tsx` | Section score bars |
+| `src/components/dashboard/QuickActionsCard.tsx` | Top action items |
+| `src/components/dashboard/ReportSummaryCard.tsx` | Executive summary preview |
+| `src/components/dashboard/LockedPreviewCard.tsx` | Blurred incomplete-state cards |
+
+### Modified Files
 
 | File | Changes |
 |------|---------|
-| `src/components/layout/DesktopLayout.tsx` | Remove redundant "Sign In" button from header |
-| `src/components/dashboard/WelcomeHeader.tsx` | Add icon, contextual sub-messages, props for progress awareness |
-| `src/pages/Dashboard.tsx` | Restructure layout, enhance cards, improve empty state, move Start Fresh to bottom |
+| `src/pages/Dashboard.tsx` | Complete restructure with state-driven layout |
+| `src/components/dashboard/SectionProgressCard.tsx` | Add `isNext` highlighting prop |
+| `src/components/dashboard/index.ts` | Export new components |
+| `src/hooks/useAssessmentState.ts` | Add optional report preview fetch |
 
-## Technical Notes
+---
 
-- All existing navigation logic remains unchanged
-- Assessment state hooks remain the same
-- Only visual/layout changes - no data flow modifications
-- New animations use existing CSS utility classes
-- Mobile responsiveness maintained through Tailwind patterns
+## Implementation Sequence
+
+1. **Phase 1: Incomplete Dashboard Enhancement**
+   - Add `LockedPreviewCard` component
+   - Enhance `SectionProgressCard` with `isNext` highlighting
+   - Improve progress messaging and microcopy
+   - Add reassurance elements
+
+2. **Phase 2: Completed Dashboard Features**
+   - Create `CategoryBreakdown` component
+   - Create `ReportSummaryCard` component
+   - Create `QuickActionsCard` component
+   - Integrate report data fetching
+
+3. **Phase 3: Polish & Transitions**
+   - Add completion celebration animation
+   - Smooth state transitions
+   - Final spacing and visual refinements
+   - Mobile responsiveness testing
+
+---
+
+## Visual Design Tokens
+
+Consistent with existing Rest Easy brand:
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--primary` | Sage green `hsl(155 30% 50%)` | CTAs, progress indicators |
+| `--accent` | Mint `hsl(160 35% 85%)` | Card backgrounds |
+| Border radius | `0.75rem` (12px) | Soft, rounded cards |
+| Shadows | `--shadow-soft` | Subtle depth |
+| Spacing | `space-y-6` to `space-y-8` | Generous breathing room |
+
+---
 
 ## Expected Outcome
 
-A Dashboard that:
-1. **Feels welcoming** - warm colors, friendly language, personal touch
-2. **Shows clear journey** - progress feels like a path, not a checklist
-3. **Motivates completion** - celebrates progress, encourages next steps
-4. **Looks polished** - consistent spacing, visual hierarchy, subtle animations
-5. **Aligns with brand** - uses Rest Easy's sage green palette and warm tone
+### For Incomplete Users
+- Clear understanding of progress
+- Gentle motivation to continue
+- Preview of value they'll unlock
+- No confusion about missing score
+
+### For Completed Users
+- Immediate clarity on readiness status
+- Actionable next steps visible
+- Easy access to full report
+- Pride in accomplishment
+
+### Overall
+- Calm, trustworthy visual experience
+- Works beautifully on mobile and desktop
+- Accessible for older audience
+- Seamless transitions between states
 
