@@ -631,8 +631,37 @@ serve(async (req) => {
 
   // Handle get_state action - use unified findActiveAssessment
   if (payload.action === "get_state") {
+    // If no subject_id provided, return empty state for new user
     if (!payload.subject_id) {
-      return jsonResponse({ error: "subject_id required for get_state" }, 400);
+      console.log(`[get_state] No subject_id provided - returning empty state for new user`);
+      return jsonResponse({
+        subject_id: null,
+        assessment_id: null,
+        assessment_state: {
+          subject_id: "",
+          assessment_id: "",
+          status: "not_started",
+          overall_score: 0,
+          overall_progress: 0,
+          tier: "Getting Started",
+          profile_progress: 0,
+          profile_complete: false,
+          sections: [],
+          current_section_id: null,
+          current_question_id: null,
+          next_question_id: null,
+          report_status: "not_started",
+          report_url: null,
+          report_stale: false,
+          last_activity_at: new Date().toISOString(),
+          last_answer_at: null,
+          updated_at: new Date().toISOString(),
+          profile_data: {},
+          profile_answers: {},
+          answers: {},
+          flow_phase: "intro",
+        },
+      });
     }
 
     // Use the unified helper
