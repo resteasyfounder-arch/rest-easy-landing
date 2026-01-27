@@ -1146,8 +1146,19 @@ const Readiness = () => {
       const data = await response.json();
       
       if (response.ok && data.report) {
-        localStorage.setItem("rest-easy.readiness.report", JSON.stringify(data.report));
-        localStorage.removeItem("rest-easy.readiness.report_stale");
+        // Save report to server instead of localStorage
+        try {
+          await callAgent({
+            action: "save_report",
+            subject_id: subjectId,
+            assessment_id: assessmentId,
+            report_data: data.report,
+          });
+          console.log("[Readiness] Report saved to server");
+        } catch (saveErr) {
+          console.error("[Readiness] Failed to save report to server:", saveErr);
+          // Still navigate - report will be fetched from server if available
+        }
         navigate("/results");
       } else {
         console.error("Report generation failed:", data.error);
@@ -1160,7 +1171,7 @@ const Readiness = () => {
     } finally {
       setReportGenerating(false);
     }
-  }, [results, schema, answers, profile, navigate, reportGenerating]);
+  }, [results, schema, answers, profile, navigate, reportGenerating, subjectId, assessmentId]);
 
   // Handle going back to review sections from complete phase
   const handleReviewSections = () => {
