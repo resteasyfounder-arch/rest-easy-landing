@@ -709,15 +709,23 @@ const Readiness = () => {
         setProfileAnswers(nextProfileAnswers);
         setProfile(nextProfile);
 
-        if (subjectId) {
-          await callAgent({
-            subject_id: subjectId,
-            assessment_id: ASSESSMENT_ID,
-            profile: {
-              profile_json: nextProfile,
-              version: SCHEMA_VERSION,
-            },
-          });
+        // Always save to server - agent will create subject if needed
+        const response = await callAgent({
+          subject_id: subjectId ?? undefined,
+          assessment_id: ASSESSMENT_ID,
+          profile: {
+            profile_json: nextProfile,
+            version: SCHEMA_VERSION,
+          },
+        });
+
+        // Store subject_id if we got one back (new user case)
+        if (response.subject_id && !subjectId) {
+          setSubjectId(response.subject_id);
+          localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id);
+        }
+        if (response.assessment_id && !assessmentId) {
+          setAssessmentId(response.assessment_id);
         }
 
         const isProfileNowComplete = schema.profile_questions.every(
@@ -750,12 +758,20 @@ const Readiness = () => {
         nextAnswers = { ...answers, [currentQuestion.id]: answerRecord };
         setAnswers(nextAnswers);
 
-        if (subjectId) {
-          await callAgent({
-            subject_id: subjectId,
-            assessment_id: ASSESSMENT_ID,
-            answers: [answerRecord],
-          });
+        // Always save to server - agent will create subject if needed
+        const response = await callAgent({
+          subject_id: subjectId ?? undefined,
+          assessment_id: ASSESSMENT_ID,
+          answers: [answerRecord],
+        });
+
+        // Store subject_id if we got one back (new user case)
+        if (response.subject_id && !subjectId) {
+          setSubjectId(response.subject_id);
+          localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id);
+        }
+        if (response.assessment_id && !assessmentId) {
+          setAssessmentId(response.assessment_id);
         }
 
         // Determine next step based on whether we're focused on a section
