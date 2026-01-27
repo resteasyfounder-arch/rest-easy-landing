@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,12 +47,19 @@ const priorityConfig = {
 function RoadmapActionItem({
   item,
   onNavigate,
+  isNew,
 }: {
   item: RoadmapItem;
   onNavigate: () => void;
+  isNew?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+    <div 
+      className={cn(
+        "flex items-center justify-between py-2.5 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all group",
+        isNew && "animate-fade-in"
+      )}
+    >
       <button
         onClick={onNavigate}
         className="flex items-center gap-3 min-w-0 flex-1 text-left"
@@ -86,10 +93,18 @@ function RoadmapActionItem({
   );
 }
 
-function CompletedActionItem({ item }: { item: CompletedItem }) {
+function CompletedActionItem({ item, isNew }: { item: CompletedItem; isNew?: boolean }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-muted/20">
-      <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+    <div 
+      className={cn(
+        "flex items-center gap-3 py-2.5 px-3 rounded-lg bg-muted/20 transition-all",
+        isNew && "animate-scale-in"
+      )}
+    >
+      <CheckCircle2 className={cn(
+        "h-4 w-4 text-primary flex-shrink-0",
+        isNew && "animate-[pulse_0.5s_ease-in-out]"
+      )} />
       <div className="min-w-0 flex-1">
         <span className="text-sm text-muted-foreground line-through line-clamp-1">
           {item.question_text}
@@ -101,6 +116,7 @@ function CompletedActionItem({ item }: { item: CompletedItem }) {
     </div>
   );
 }
+
 
 export function RoadmapCard({
   items,
@@ -122,6 +138,48 @@ export function RoadmapCard({
     MEDIUM: 3,
     LOW: 3,
   });
+  
+  // Track previous items for animation detection
+  const prevItemsRef = useRef<Set<string>>(new Set());
+  const prevCompletedRef = useRef<Set<string>>(new Set());
+  const [newItems, setNewItems] = useState<Set<string>>(new Set());
+  const [newCompleted, setNewCompleted] = useState<Set<string>>(new Set());
+  
+  // Detect changes to items for animations
+  useEffect(() => {
+    const currentItemIds = new Set(items.map(i => i.question_id));
+    const currentCompletedIds = new Set(completedItems.map(i => i.question_id));
+    
+    // Find newly completed items (were in items, now in completed)
+    const justCompleted = new Set<string>();
+    prevItemsRef.current.forEach(id => {
+      if (currentCompletedIds.has(id) && !prevCompletedRef.current.has(id)) {
+        justCompleted.add(id);
+      }
+    });
+    
+    // Find new items that appeared
+    const justAdded = new Set<string>();
+    currentItemIds.forEach(id => {
+      if (!prevItemsRef.current.has(id)) {
+        justAdded.add(id);
+      }
+    });
+    
+    if (justCompleted.size > 0) {
+      setNewCompleted(justCompleted);
+      // Clear animation state after animation completes
+      setTimeout(() => setNewCompleted(new Set()), 600);
+    }
+    
+    if (justAdded.size > 0) {
+      setNewItems(justAdded);
+      setTimeout(() => setNewItems(new Set()), 600);
+    }
+    
+    prevItemsRef.current = currentItemIds;
+    prevCompletedRef.current = currentCompletedIds;
+  }, [items, completedItems]);
 
   const totalItems = items.length + completedItems.length;
   const completedCount = completedItems.length;
@@ -154,8 +212,8 @@ export function RoadmapCard({
   };
 
   const handleNavigateToQuestion = (item: RoadmapItem) => {
-    // Navigate to the readiness page with the section parameter
-    navigate(`/readiness?section=${item.section_id}&question=${item.question_id}`);
+    // Navigate to the readiness page with returnTo=dashboard so user comes back after answering
+    navigate(`/readiness?section=${item.section_id}&question=${item.question_id}&returnTo=dashboard`);
   };
 
   const renderPrioritySection = (priority: "HIGH" | "MEDIUM" | "LOW") => {
@@ -193,6 +251,7 @@ export function RoadmapCard({
                 key={item.question_id}
                 item={item}
                 onNavigate={() => handleNavigateToQuestion(item)}
+                isNew={newItems.has(item.question_id)}
               />
             ))}
             {hasMore && (
@@ -304,7 +363,11 @@ export function RoadmapCard({
             </div>
             <div className="space-y-2 pl-4">
               {completedItems.slice(0, 5).map((item) => (
-                <CompletedActionItem key={item.question_id} item={item} />
+                <CompletedActionItem 
+                  key={item.question_id} 
+                  item={item} 
+                  isNew={newCompleted.has(item.question_id)}
+                />
               ))}
               {completedItems.length > 5 && (
                 <p className="text-xs text-muted-foreground text-center py-2">

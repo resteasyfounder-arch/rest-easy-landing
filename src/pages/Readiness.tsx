@@ -257,6 +257,7 @@ const Readiness = () => {
   const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
   const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
   const [viewingCompletedSection, setViewingCompletedSection] = useState(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
 
   // Flow phase is now server-driven, no localStorage persistence needed
 
@@ -420,10 +421,16 @@ const Readiness = () => {
     
     const sectionParam = searchParams.get("section");
     const questionParam = searchParams.get("question");
+    const returnToParam = searchParams.get("returnTo");
     
     if (!sectionParam && !questionParam) return;
     
-    console.log("[Readiness] URL params - section:", sectionParam, "question:", questionParam);
+    console.log("[Readiness] URL params - section:", sectionParam, "question:", questionParam, "returnTo:", returnToParam);
+    
+    // Store returnTo destination if coming from dashboard
+    if (returnToParam) {
+      setReturnTo(returnToParam);
+    }
     
     // Clear the URL params so we don't re-trigger on subsequent renders
     setSearchParams({}, { replace: true });
@@ -792,6 +799,14 @@ const Readiness = () => {
         }
         if (response.assessment_id && !assessmentId) {
           setAssessmentId(response.assessment_id);
+        }
+
+        // If coming from dashboard (returnTo is set), navigate back immediately after saving
+        if (returnTo === "dashboard") {
+          console.log("[Readiness] Answer saved, returning to dashboard");
+          setReturnTo(null); // Clear the returnTo state
+          navigate("/dashboard");
+          return;
         }
 
         // Determine next step based on whether we're focused on a section
