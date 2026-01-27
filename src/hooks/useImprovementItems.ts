@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { RoadmapItem, CompletedItem, ImprovementItemsResponse } from "@/types/assessment";
 
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
@@ -29,15 +29,26 @@ export function useImprovementItems({
   const [totalAnswered, setTotalAnswered] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const lastFetchRef = useRef<number>(0);
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (silent = false) => {
     if (!subjectId || !enabled) {
       setItems([]);
       setCompletedItems([]);
       return;
     }
 
-    setIsLoading(true);
+    // Debounce: skip if fetched within last 500ms
+    const now = Date.now();
+    if (now - lastFetchRef.current < 500) {
+      return;
+    }
+    lastFetchRef.current = now;
+
+    if (!silent) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -60,21 +71,61 @@ export function useImprovementItems({
 
       const data: ImprovementItemsResponse = await response.json();
       
-      setItems(data.items || []);
-      setCompletedItems(data.completed_items || []);
-      setTotalApplicable(data.total_applicable || 0);
-      setTotalAnswered(data.total_answered || 0);
+      if (mountedRef.current) {
+        setItems(data.items || []);
+        setCompletedItems(data.completed_items || []);
+        setTotalApplicable(data.total_applicable || 0);
+        setTotalAnswered(data.total_answered || 0);
+      }
     } catch (err) {
       console.error("[useImprovementItems] Error:", err);
-      setError(err instanceof Error ? err.message : "Failed to load items");
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : "Failed to load items");
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current && !silent) {
+        setIsLoading(false);
+      }
     }
   }, [subjectId, enabled]);
 
+  // Initial fetch and cleanup
   useEffect(() => {
+    mountedRef.current = true;
     fetchItems();
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchItems]);
+
+  // Auto-refresh on visibility change (when user returns to the tab/page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && enabled && subjectId) {
+        fetchItems(true); // Silent refresh
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchItems, enabled, subjectId]);
+
+  // Auto-refresh on focus (catches navigation back scenarios)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (enabled && subjectId) {
+        fetchItems(true); // Silent refresh
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [fetchItems, enabled, subjectId]);
 
   return {
     items,
@@ -83,7 +134,7 @@ export function useImprovementItems({
     totalAnswered,
     isLoading,
     error,
-    refresh: fetchItems,
+    refresh: () => fetchItems(false),
   };
 }
 
