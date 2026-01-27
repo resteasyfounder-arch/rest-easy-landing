@@ -180,6 +180,9 @@ const Profile = () => {
       const updatedAnswers = { ...profile_answers, [questionId]: value };
       const profileJson = buildProfileJson(updatedAnswers);
 
+      console.log("[Profile] Saving update:", questionId, "=", value);
+      console.log("[Profile] Profile JSON to send:", profileJson);
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
         method: "POST",
         headers: {
@@ -202,14 +205,23 @@ const Profile = () => {
         throw new Error("Failed to save profile update");
       }
 
-      // Refresh state to get updated data
+      // Consume the response to get updated state
+      const responseData = await response.json();
+      console.log("[Profile] Server response profile_answers:", responseData.assessment_state?.profile_answers);
+
+      // Refresh state to ensure hook is synced
       const newState = await refresh();
+      console.log("[Profile] After refresh, profile_answers:", newState?.profile_answers);
+
+      if (!newState) {
+        throw new Error("Failed to refresh state");
+      }
 
       // Detect if new questions were unlocked
-      if (newState && (
+      if (
         newState.overall_progress < previousProgress ||
         (previousStatus === "completed" && newState.status === "in_progress")
-      )) {
+      ) {
         toast({
           title: "New Questions Unlocked",
           description: "Your profile update has unlocked additional questions.",
@@ -223,7 +235,7 @@ const Profile = () => {
             </Button>
           ),
         });
-      } else if (!wasStale && newState?.report_stale) {
+      } else if (!wasStale && newState.report_stale) {
         toast({
           title: "Report Update Available",
           description: "Your report can be updated to reflect this change.",
@@ -235,7 +247,7 @@ const Profile = () => {
         });
       }
     } catch (error) {
-      console.error("Error saving profile:", error);
+      console.error("[Profile] Error saving profile:", error);
       toast({
         title: "Error saving",
         description: "Please try again.",
