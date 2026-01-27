@@ -175,7 +175,42 @@ interface Schema {
   questions: SchemaQuestion[];
 }
 
-// AnswerRecord is defined above with the AssessmentState interface
+// ============================================================================
+// UNIFIED ASSESSMENT SELECTION HELPER
+// With the unique constraint, there's exactly ONE non-archived assessment per subject.
+// This helper is used by all actions to ensure consistent selection.
+// ============================================================================
+async function findActiveAssessment(
+  readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
+  subjectId: string,
+  assessmentKey: string
+): Promise<{
+  id: string;
+  status: string;
+  overall_score: number;
+  report_status: string;
+  report_data: unknown;
+  report_generated_at: string | null;
+  report_stale: boolean;
+  last_answer_at: string | null;
+  created_at: string;
+} | null> {
+  // With the unique constraint, there's at most ONE non-archived assessment
+  const { data, error } = await readiness
+    .from("assessments")
+    .select("id, status, overall_score, report_status, report_data, report_generated_at, report_stale, last_answer_at, created_at")
+    .eq("subject_id", subjectId)
+    .eq("assessment_id", assessmentKey)
+    .neq("status", "archived")
+    .maybeSingle();
+
+  if (error) {
+    console.error(`[findActiveAssessment] Error:`, error);
+    return null;
+  }
+
+  return data;
+}
 
 async function computeAssessmentState(
   readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
@@ -227,20 +262,15 @@ async function computeAssessmentState(
   }
 
   // Calculate profile_answers from profile data
-  // Profile questions have fields like "owns_crypto" that map to boolean values
-  // We need to reverse-engineer the "yes"/"no" answers from the profile values
   const profileAnswers: Record<string, "yes" | "no"> = {};
   if (schema) {
     for (const pq of schema.profile_questions) {
-      // Check various key formats the client might have used
       let value: unknown = undefined;
       
-      // Check direct field (e.g., "owns_crypto")
       if (profile[pq.field] !== undefined) {
         value = profile[pq.field];
       }
       
-      // Check nested path (e.g., profile.digital.owns_crypto stored as nested object)
       if (value === undefined) {
         const parts = pq.field.split(".");
         let current: unknown = profile;
@@ -257,10 +287,7 @@ async function computeAssessmentState(
         }
       }
       
-      // Convert boolean value back to "yes"/"no"
       if (value !== undefined) {
-        // Check value_map to determine the mapping
-        // Default: true = "yes", false = "no"
         profileAnswers[pq.id] = value === true ? "yes" : "no";
       }
     }
@@ -301,22 +328,17 @@ async function computeAssessmentState(
     };
   }
 
-  // Calculate profile progress - check both nested and flat key formats
+  // Calculate profile progress
   const totalProfileQuestions = schema.profile_questions.length;
   const answeredProfileQuestions = schema.profile_questions.filter((q) => {
-    // Check direct field name (e.g., "owns_crypto")
     if (profile[q.field] !== undefined) return true;
     
-    // Check flat format with profile. prefix (e.g., "profile.digital.owns_crypto")
-    // The field in schema might be "owns_crypto", but client sends "profile.digital.owns_crypto"
-    // We need to check if any key ends with the field name
     for (const key of Object.keys(profile)) {
       if (key.endsWith(`.${q.field}`) || key === `profile.${q.field}`) {
         return true;
       }
     }
     
-    // Also check nested structure (e.g., profile.digital.owns_crypto as nested object)
     const parts = q.field.split(".");
     let current: unknown = profile;
     for (const part of parts) {
@@ -351,7 +373,6 @@ async function computeAssessmentState(
     );
     
     if (sectionQuestions.length === 0) {
-      // Section not applicable
       sections.push({
         id: section.id,
         label: section.label,
@@ -371,7 +392,6 @@ async function computeAssessmentState(
     const totalCount = sectionQuestions.length;
     const progress = Math.round((answeredCount / totalCount) * 100);
 
-    // Calculate section score
     let sectionScore = 0;
     let scoredCount = 0;
     
@@ -385,7 +405,6 @@ async function computeAssessmentState(
     
     const avgSectionScore = scoredCount > 0 ? Math.round(sectionScore / scoredCount) : 0;
 
-    // Determine section status
     let status: SectionStatus = "available";
     if (answeredCount === totalCount) {
       status = "completed";
@@ -405,7 +424,6 @@ async function computeAssessmentState(
       status,
     });
 
-    // Accumulate for overall score
     totalApplicableQuestions += totalCount;
     totalAnsweredQuestions += answeredCount;
     
@@ -415,7 +433,6 @@ async function computeAssessmentState(
     }
   }
 
-  // Calculate overall progress and score
   const overallProgress = totalApplicableQuestions > 0
     ? Math.round((totalAnsweredQuestions / totalApplicableQuestions) * 100)
     : 0;
@@ -426,12 +443,10 @@ async function computeAssessmentState(
 
   const tier = getTierFromScore(overallScore);
 
-  // Determine current position
   let currentSectionId: string | null = null;
   let currentQuestionId: string | null = null;
   let nextQuestionId: string | null = null;
 
-  // Find first unanswered question
   for (const q of applicableQuestions) {
     if (!answers[q.id]) {
       if (!currentQuestionId) {
@@ -444,7 +459,6 @@ async function computeAssessmentState(
     }
   }
 
-  // Determine assessment status
   let status: AssessmentStatus = "not_started";
   if (totalAnsweredQuestions > 0) {
     if (totalAnsweredQuestions >= totalApplicableQuestions) {
@@ -456,7 +470,6 @@ async function computeAssessmentState(
     status = "draft";
   }
 
-  // Determine flow_phase based on progress
   let flowPhase: FlowPhase = "intro";
   if (status === "completed") {
     flowPhase = "complete";
@@ -566,7 +579,7 @@ serve(async (req) => {
         report_status: "ready",
         report_data: report_data,
         report_generated_at: new Date().toISOString(),
-        report_stale: false, // Reset stale flag when new report is saved
+        report_stale: false,
       })
       .eq("id", assessmentDbId);
 
@@ -579,7 +592,7 @@ serve(async (req) => {
     return jsonResponse({ success: true });
   }
 
-  // Handle get_report action - retrieve stored report
+  // Handle get_report action - use unified findActiveAssessment
   if (payload.action === "get_report") {
     if (!payload.subject_id) {
       return jsonResponse({ error: "subject_id required for get_report" }, 400);
@@ -587,80 +600,46 @@ serve(async (req) => {
 
     console.log(`[get_report] Fetching report for subject ${payload.subject_id}`);
 
-    // Find the most recent completed assessment with a report
-    const { data: assessmentData, error: fetchError } = await readiness
-      .from("assessments")
-      .select("id, report_data, report_status, report_generated_at, overall_score, status")
-      .eq("subject_id", payload.subject_id)
-      .eq("assessment_id", assessmentKey)
-      .in("status", ["completed", "draft", "in_progress"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Use the unified helper - guaranteed to get the same assessment as get_state
+    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
 
-    if (fetchError) {
-      console.error(`[get_report] Error:`, fetchError);
-      return jsonResponse({ error: "Failed to fetch report" }, 500);
-    }
-
-    if (!assessmentData || !assessmentData.report_data) {
-      console.log(`[get_report] No report found`);
+    if (!assessment) {
+      console.log(`[get_report] No active assessment found`);
       return jsonResponse({ 
         report: null, 
-        status: assessmentData?.report_status || "not_started" 
+        status: "not_started" 
       });
     }
 
-    console.log(`[get_report] Report found, status: ${assessmentData.report_status}`);
+    console.log(`[get_report] Using assessment ${assessment.id}, report_status: ${assessment.report_status}`);
+
+    if (!assessment.report_data) {
+      console.log(`[get_report] No report data in assessment`);
+      return jsonResponse({ 
+        report: null, 
+        status: assessment.report_status || "not_started" 
+      });
+    }
+
+    console.log(`[get_report] Report found, status: ${assessment.report_status}`);
     return jsonResponse({
-      report: assessmentData.report_data,
-      status: assessmentData.report_status,
-      generated_at: assessmentData.report_generated_at,
+      report: assessment.report_data,
+      status: assessment.report_status,
+      generated_at: assessment.report_generated_at,
     });
   }
 
-  // Handle get_state action
+  // Handle get_state action - use unified findActiveAssessment
   if (payload.action === "get_state") {
     if (!payload.subject_id) {
       return jsonResponse({ error: "subject_id required for get_state" }, 400);
     }
 
-    // Find the best assessment - prefer ones with actual answers
-    // First, get all assessments for this subject
-    const { data: assessments } = await readiness
-      .from("assessments")
-      .select("id, status, overall_score, created_at")
-      .eq("subject_id", payload.subject_id)
-      .eq("assessment_id", assessmentKey)
-      .order("created_at", { ascending: false });
-
-    let assessment = null;
-
-    if (assessments && assessments.length > 0) {
-      // For each assessment, check if it has answers
-      for (const a of assessments) {
-        const { count } = await readiness
-          .from("assessment_answers")
-          .select("*", { count: "exact", head: true })
-          .eq("assessment_id", a.id);
-
-        if (count && count > 0) {
-          // Found an assessment with answers - use this one
-          assessment = a;
-          console.log(`[get_state] Using assessment ${a.id} with ${count} answers`);
-          break;
-        }
-      }
-
-      // If no assessment has answers, use the most recent one
-      if (!assessment) {
-        assessment = assessments[0];
-        console.log(`[get_state] No assessment has answers, using most recent: ${assessment.id}`);
-      }
-    }
+    // Use the unified helper
+    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
 
     if (!assessment) {
-      // No assessment exists - return empty state
+      console.log(`[get_state] No active assessment for subject ${payload.subject_id}`);
       return jsonResponse({
         subject_id: payload.subject_id,
         assessment_id: null,
@@ -679,11 +658,19 @@ serve(async (req) => {
           next_question_id: null,
           report_status: "not_started",
           report_url: null,
+          report_stale: false,
           last_activity_at: new Date().toISOString(),
+          last_answer_at: null,
           updated_at: new Date().toISOString(),
+          profile_data: {},
+          profile_answers: {},
+          answers: {},
+          flow_phase: "intro",
         },
       });
     }
+
+    console.log(`[get_state] Using assessment ${assessment.id}`);
 
     const assessmentState = await computeAssessmentState(
       readiness,
@@ -699,25 +686,25 @@ serve(async (req) => {
     });
   }
 
-  // Handle start_fresh action - archive old assessments and create new one
+  // Handle start_fresh action - archive old assessment and create new one
   if (payload.action === "start_fresh") {
     if (!payload.subject_id) {
       return jsonResponse({ error: "subject_id required for start_fresh" }, 400);
     }
 
-    console.log(`[start_fresh] Archiving assessments for subject ${payload.subject_id}`);
+    console.log(`[start_fresh] Archiving assessment for subject ${payload.subject_id}`);
 
-    // Mark all existing assessments as archived by setting status to 'archived'
-    // and reset their scores to indicate they're no longer active
+    // Archive the current active assessment (unique constraint ensures only one)
     const { error: archiveError } = await readiness
       .from("assessments")
       .update({ status: "archived" })
       .eq("subject_id", payload.subject_id)
-      .eq("assessment_id", assessmentKey);
+      .eq("assessment_id", assessmentKey)
+      .neq("status", "archived");
 
     if (archiveError) {
       console.error(`[start_fresh] Archive error:`, archiveError);
-      return jsonResponse({ error: "Failed to archive old assessments" }, 500);
+      return jsonResponse({ error: "Failed to archive old assessment" }, 500);
     }
 
     // Create a new blank assessment
@@ -741,8 +728,6 @@ serve(async (req) => {
 
     console.log(`[start_fresh] Created new assessment ${newAssessment.id}`);
 
-    // Optionally clear the profile to start completely fresh
-    // For now, we keep the profile but return empty assessment state
     const assessmentState = await computeAssessmentState(
       readiness,
       payload.subject_id,
@@ -795,7 +780,7 @@ serve(async (req) => {
       return jsonResponse({ error: "Failed to save profile" }, 500);
     }
 
-    // Check if report exists and mark as stale (profile change may affect applicable questions)
+    // Check if report exists and mark as stale
     const { data: currentAssessment } = await readiness
       .from("assessments")
       .select("report_status")
@@ -852,7 +837,6 @@ serve(async (req) => {
         })
         .eq("id", assessmentResult.id);
     } else {
-      // Still update last_answer_at even if no report exists
       await readiness
         .from("assessments")
         .update({
@@ -958,6 +942,10 @@ async function ensureSubject(
   return { id: created.id };
 }
 
+// ============================================================================
+// REFACTORED: ensureAssessment now finds ANY non-archived assessment
+// With the unique constraint, there's at most ONE active assessment per subject.
+// ============================================================================
 async function ensureAssessment(
   readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
   subjectId: string,
@@ -965,20 +953,27 @@ async function ensureAssessment(
 ): Promise<{ id?: string; error?: string }> {
   const assessmentKey = assessmentId ?? "readiness_v1";
 
-  const { data: existing } = await readiness
+  // Find ANY existing non-archived assessment (not just 'draft')
+  const { data: existing, error: fetchError } = await readiness
     .from("assessments")
     .select("id")
     .eq("subject_id", subjectId)
     .eq("assessment_id", assessmentKey)
-    .eq("status", "draft")
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .neq("status", "archived")
     .maybeSingle();
 
+  if (fetchError) {
+    console.error(`[ensureAssessment] Fetch error:`, fetchError);
+    return { error: fetchError.message };
+  }
+
   if (existing?.id) {
+    console.log(`[ensureAssessment] Found existing assessment ${existing.id}`);
     return { id: existing.id };
   }
 
+  // Create new only if none exists
+  console.log(`[ensureAssessment] Creating new assessment for subject ${subjectId}`);
   const { data: created, error } = await readiness
     .from("assessments")
     .insert({
@@ -991,8 +986,10 @@ async function ensureAssessment(
     .single();
 
   if (error) {
+    console.error(`[ensureAssessment] Create error:`, error);
     return { error: error.message };
   }
 
+  console.log(`[ensureAssessment] Created new assessment ${created.id}`);
   return { id: created.id };
 }
