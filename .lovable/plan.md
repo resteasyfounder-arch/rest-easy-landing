@@ -1,60 +1,152 @@
 
-# Plan: Remove Sync Status Indicator and Manual Refresh Button
+# Plan: Hide Partial Scores & Show Motivational Progress
 
-## Summary
+## Problem
 
-Remove the visible sync status indicator (the wifi/refresh icons near logout) and the manual Refresh button from the Dashboard. The data synchronization will continue to work seamlessly in the background without exposing these implementation details to users.
+Currently, when a user completes only 1 of several sections, they see a "Readiness Score" of 51 with a tier badge like "On Your Way" - but this is the score for just that one section, not their overall readiness. This creates confusion and sets misleading expectations.
 
-## Changes
+## Solution Overview
 
-### File: `src/pages/Dashboard.tsx`
+Replace numeric scores with progress-focused UI throughout the app until the assessment is fully complete. Users will see:
 
-**1. Remove sync status indicator near logout button**
+- **Progress percentage** (how much they've completed)
+- **Section counts** ("3 of 7 sections completed")
+- **Motivational messages** ("You're making great progress!")
+- **Visual journey progress** (filled sections on a path)
 
-Delete lines 96-107:
-```tsx
-{/* Sync status indicator */}
-<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-  {syncStatus === "syncing" && (
-    <RefreshCw className="h-3 w-3" />
-  )}
-  {syncStatus === "synced" && (
-    <Wifi className="h-3 w-3 text-emerald-500" />
-  )}
-  {syncStatus === "error" && (
-    <WifiOff className="h-3 w-3 text-destructive" />
-  )}
-</div>
+Once complete, the full score and tier are revealed as a "moment of accomplishment."
+
+## Visual Concept
+
+```text
++------------------------------------------+
+|  DURING ASSESSMENT (Current: Misleading) |
++------------------------------------------+
+|   ┌────────────┐                         |
+|   │    51     │  "On Your Way" Badge    |
+|   │   Score    │  ← MISLEADING!          |
+|   └────────────┘                         |
++------------------------------------------+
+
++------------------------------------------+
+|  DURING ASSESSMENT (Proposed: Clear)     |
++------------------------------------------+
+|   ┌────────────┐                         |
+|   │    25%    │  "Making Great Progress" |
+|   │  Complete  │  3 of 7 sections done   |
+|   └────────────┘                         |
+|                                          |
+|   "Complete all sections to see your     |
+|    personalized Readiness Score"         |
++------------------------------------------+
+
++------------------------------------------+
+|  AFTER COMPLETION (Score Revealed)       |
++------------------------------------------+
+|   ┌────────────┐                         |
+|   │    78     │  🎉 "Well Prepared"      |
+|   │   Score    │  "Your Life Readiness"  |
+|   └────────────┘                         |
++------------------------------------------+
 ```
 
-**2. Remove the manual Refresh button**
+## Detailed Changes
 
-Delete lines 229-237:
+### 1. Dashboard Main Card (src/pages/Dashboard.tsx)
+
+**Currently shows**: ScoreCircle with `overall_score` + TierBadge when not complete
+
+**Change to**: 
+- Show ProgressCircle (already exists) with percentage complete
+- Add motivational text based on progress milestone
+- Add section count ("3 of 7 sections completed")
+- Add gentle prompt: "Complete all sections to reveal your score"
+
 ```tsx
-<Button
-  variant="ghost"
-  size="sm"
-  onClick={() => refresh()}
-  className="gap-1.5 text-muted-foreground"
->
-  <RefreshCw className="h-3.5 w-3.5" />
-  Refresh
-</Button>
+// Instead of ScoreCircle during progress
+<ProgressCircle progress={assessmentState.overall_progress} />
+<p className="text-muted-foreground">
+  {completedSectionsCount} of {totalSections} sections completed
+</p>
+<p className="text-sm text-muted-foreground/80 italic">
+  Complete all sections to see your personalized Readiness Score
+</p>
 ```
 
-**3. Clean up unused imports**
+### 2. Sidebar Score Preview (src/components/layout/AppSidebar.tsx)
 
-Remove `RefreshCw`, `Wifi`, and `WifiOff` from the lucide-react imports (line 8), and remove `syncStatus` and `refresh` from the useAssessmentState destructuring (lines 40-43).
+**Currently shows**: Numeric `overall_score` + TierBadge + Progress bar
 
-## What Remains Working
+**Change to**:
+- During assessment: Show progress percentage + section count
+- After completion: Reveal score + tier badge
+- Add conditional rendering based on `isComplete`
 
-| Feature | Status |
-|---------|--------|
-| Auto-refresh every 30 seconds | Continues working |
-| Refresh when tab becomes visible | Continues working |
-| Refresh after profile updates | Continues working |
-| Start Fresh button | Remains available |
+```tsx
+// In-progress state
+<span className="text-lg font-display font-bold text-primary">
+  {isComplete ? assessmentState.overall_score : `${Math.round(assessmentState.overall_progress)}%`}
+</span>
+<span className="text-xs text-muted-foreground">
+  {isComplete ? "Your Score" : "Progress"}
+</span>
+```
 
-## Result
+### 3. Section Progress Cards (src/components/dashboard/SectionProgressCard.tsx)
 
-The header area will be cleaner with just the logout button. Users won't see any syncing indicators - the data will simply stay up to date automatically in the background.
+**Currently shows**: Section score badge when completed (e.g., "73%")
+
+**Option A (Conservative)**: Keep section scores visible - they're accurate for that section
+**Option B (Cleaner)**: Hide section scores too, just show ✓ checkmark
+
+Recommendation: **Option A** - Keep section scores as they are accurate and help users understand their performance in each area. The problem is the *overall* score, not section scores.
+
+### 4. New Motivational Messages Component
+
+Create a helper function that returns encouraging messages based on progress:
+
+```tsx
+const getProgressMessage = (progress: number, sectionsComplete: number, totalSections: number) => {
+  if (sectionsComplete === 0) return "Ready to begin your journey?";
+  if (sectionsComplete === 1) return "Great start! Keep going.";
+  if (progress < 50) return "You're making progress!";
+  if (progress < 75) return "More than halfway there!";
+  if (progress < 100) return "Almost finished!";
+  return "Assessment complete!";
+};
+```
+
+### 5. Results Page Guard (Already OK)
+
+The Results page (src/pages/Results.tsx) already fetches from the server and only shows the report if it exists. No changes needed here.
+
+## Summary of Component Changes
+
+| Component | Current Behavior | New Behavior |
+|-----------|------------------|--------------|
+| Dashboard main card | Shows `overall_score` + tier during progress | Shows `overall_progress %` + section count + motivational text |
+| AppSidebar | Shows `overall_score` always | Shows `% complete` during progress, score after completion |
+| SectionProgressCard | Shows section score % on completion | No change (section scores are accurate) |
+| TierBadge | Shown during progress | Only shown after assessment is complete |
+
+## Files to Modify
+
+1. **src/pages/Dashboard.tsx** - Update main score card rendering logic
+2. **src/components/layout/AppSidebar.tsx** - Conditional score vs. progress display
+3. **src/components/dashboard/index.ts** - Export any new components (if created)
+
+## Edge Cases Handled
+
+- **Returning user at 0%**: Shows "Ready to begin?" prompt
+- **One section done**: Shows "1 of 7 sections • Great start!"
+- **99% complete**: Shows "Almost finished!" encouragement
+- **100% complete**: Reveals score with celebration moment
+- **Report generating**: Shows "Preparing your report..." state (already exists)
+
+## Benefits
+
+- No more misleading partial scores
+- Clear progress tracking motivates completion
+- Score reveal becomes a rewarding moment
+- Simpler UI during the assessment journey
+- Aligns with "system invisible" UX principle from project memory
