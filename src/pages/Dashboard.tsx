@@ -83,6 +83,18 @@ const Dashboard = () => {
   }
 
   const applicableSections = assessmentState.sections.filter((s) => s.is_applicable);
+  const completedSectionsCount = applicableSections.filter((s) => s.progress === 100).length;
+  const totalSections = applicableSections.length;
+
+  // Motivational message based on progress
+  const getProgressMessage = () => {
+    if (completedSectionsCount === 0) return "Ready to begin your journey?";
+    if (completedSectionsCount === 1) return "Great start! Keep going.";
+    if (assessmentState.overall_progress < 50) return "You're making progress!";
+    if (assessmentState.overall_progress < 75) return "More than halfway there!";
+    if (assessmentState.overall_progress < 100) return "Almost finished!";
+    return "Assessment complete!";
+  };
 
   return (
     <AppLayout>
@@ -124,20 +136,29 @@ const Dashboard = () => {
                   <h2 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
                     {isComplete ? "Your Readiness Score" : "Your Assessment Progress"}
                   </h2>
-                  {isComplete && (
+                  {isComplete ? (
                     <div className="mt-2">
                       <TierBadge tier={assessmentState.tier} size="md" />
                     </div>
+                  ) : hasStarted && (
+                    <p className="mt-2 text-primary font-medium">
+                      {getProgressMessage()}
+                    </p>
                   )}
                 </div>
 
-                {!isComplete && (
-                  <div className="space-y-2">
+                {!isComplete && hasStarted && (
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Overall Progress</span>
+                      <span className="text-muted-foreground">
+                        {completedSectionsCount} of {totalSections} sections completed
+                      </span>
                       <span className="font-medium">{Math.round(assessmentState.overall_progress)}%</span>
                     </div>
                     <Progress value={assessmentState.overall_progress} className="h-2" />
+                    <p className="text-sm text-muted-foreground/80 italic">
+                      Complete all sections to see your personalized Readiness Score
+                    </p>
                   </div>
                 )}
 

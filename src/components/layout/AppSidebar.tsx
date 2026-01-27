@@ -32,7 +32,11 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const { assessmentState, hasStarted } = useAssessmentState();
+  const { assessmentState, hasStarted, isComplete } = useAssessmentState();
+
+  const applicableSections = assessmentState.sections.filter((s) => s.is_applicable);
+  const completedSectionsCount = applicableSections.filter((s) => s.progress === 100).length;
+  const totalSections = applicableSections.length;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -91,16 +95,26 @@ const AppSidebar = () => {
             <div className={`px-3 py-4 ${isCollapsed ? "hidden" : ""}`}>
               <div className="rounded-lg bg-gradient-to-br from-primary/5 to-accent/10 p-4 border border-primary/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground">Readiness Score</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {isComplete ? "Readiness Score" : "Progress"}
+                  </span>
                   <span className="text-lg font-display font-bold text-primary">
-                    {hasStarted ? assessmentState.overall_score : "--"}
+                    {isComplete 
+                      ? assessmentState.overall_score 
+                      : hasStarted 
+                        ? `${Math.round(assessmentState.overall_progress)}%` 
+                        : "--"}
                   </span>
                 </div>
                 <Progress value={assessmentState.overall_progress} className="h-2 bg-muted" />
-                {hasStarted ? (
+                {isComplete ? (
                   <div className="mt-3">
                     <TierBadge tier={assessmentState.tier} size="sm" />
                   </div>
+                ) : hasStarted ? (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    {completedSectionsCount} of {totalSections} sections done
+                  </p>
                 ) : (
                   <p className="text-xs text-muted-foreground mt-3">
                     Complete an assessment to see your score
@@ -112,7 +126,11 @@ const AppSidebar = () => {
               <div className="flex justify-center py-2">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-xs font-bold text-primary">
-                    {hasStarted ? assessmentState.overall_score : "--"}
+                    {isComplete 
+                      ? assessmentState.overall_score 
+                      : hasStarted 
+                        ? `${Math.round(assessmentState.overall_progress)}%` 
+                        : "--"}
                   </span>
                 </div>
               </div>
