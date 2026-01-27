@@ -108,11 +108,131 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void;
+};
+
 function getTierFromScore(score: number): ScoreTier {
   if (score >= 85) return "Rest Easy Ready";
   if (score >= 65) return "Well Prepared";
   if (score >= 40) return "On Your Way";
   return "Getting Started";
+}
+
+// ============================================================================
+// BACKGROUND REPORT REGENERATION HELPER
+// Triggers report regeneration as a background task after answer/profile updates
+// ============================================================================
+async function triggerReportRegeneration(
+  readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
+  assessmentDbId: string,
+  subjectId: string,
+  assessmentKey: string
+): Promise<void> {
+  console.log(`[agent] Starting background report regeneration for ${assessmentDbId}`);
+  
+  try {
+    // Build report payload from current state
+    const assessmentState = await computeAssessmentState(
+      readiness, subjectId, assessmentDbId, assessmentKey
+    );
+    
+    // Load schema for section labels/weights
+    const { data: schemaData } = await readiness
+      .from("assessment_schemas")
+      .select("schema_json")
+      .eq("assessment_id", assessmentKey)
+      .eq("version", "v1")
+      .single();
+    
+    const schema = schemaData?.schema_json as {
+      answer_scoring?: Record<string, number | null>;
+      score_bands?: unknown[];
+      sections?: Array<{ id: string; weight: number }>;
+    } | null;
+    
+    // Build section scores with labels
+    const sectionScores: Record<string, { score: number; label: string; weight: number }> = {};
+    for (const section of assessmentState.sections) {
+      sectionScores[section.id] = {
+        score: section.score,
+        label: section.label,
+        weight: schema?.sections?.find(s => s.id === section.id)?.weight || 1,
+      };
+    }
+    
+    // Build answers array
+    const answersForReport = Object.values(assessmentState.answers).map(answer => ({
+      question_id: answer.question_id,
+      section_id: answer.section_id,
+      question_text: answer.question_text || "",
+      answer_value: answer.answer_value,
+      answer_label: answer.answer_label || answer.answer_value,
+      score_fraction: answer.score_fraction ?? null,
+    }));
+    
+    // Call generate-report
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    console.log(`[agent] Calling generate-report edge function`);
+    
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+      },
+      body: JSON.stringify({
+        userName: "Friend",
+        profile: assessmentState.profile_data,
+        overallScore: assessmentState.overall_score,
+        tier: assessmentState.tier,
+        sectionScores,
+        answers: answersForReport,
+        schema: {
+          answer_scoring: schema?.answer_scoring || {},
+          score_bands: schema?.score_bands || [],
+          sections: schema?.sections || [],
+        },
+      }),
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok && data.report) {
+      // Save report and clear stale flag
+      await readiness
+        .from("assessments")
+        .update({
+          report_status: "ready",
+          report_data: data.report,
+          report_generated_at: new Date().toISOString(),
+          report_stale: false,
+        })
+        .eq("id", assessmentDbId);
+      console.log(`[agent] Background report regeneration complete for ${assessmentDbId}`);
+    } else {
+      // Mark as failed
+      await readiness
+        .from("assessments")
+        .update({
+          report_status: "failed",
+        })
+        .eq("id", assessmentDbId);
+      console.error(`[agent] Background report regeneration failed:`, data.error || "Unknown error");
+    }
+  } catch (err) {
+    console.error(`[agent] Background report regeneration error:`, err);
+    // Mark as failed on exception
+    await readiness
+      .from("assessments")
+      .update({
+        report_status: "failed",
+      })
+      .eq("id", assessmentDbId);
+  }
 }
 
 function evaluateCondition(
@@ -984,19 +1104,35 @@ serve(async (req) => {
       return jsonResponse({ error: "Failed to save profile" }, 500);
     }
 
-    // Check if report exists and mark as stale
-    const { data: currentAssessment } = await readiness
+    // Check if report exists and needs regeneration
+    const { data: currentAssessmentForProfile } = await readiness
       .from("assessments")
-      .select("report_status")
+      .select("report_status, report_data")
       .eq("id", assessmentResult.id)
       .maybeSingle();
 
-    if (currentAssessment?.report_status === "ready") {
-      console.log(`[agent] Marking report as stale after profile update`);
+    // Trigger background regeneration if a report has been generated before
+    if (currentAssessmentForProfile?.report_data && currentAssessmentForProfile?.report_status === "ready") {
+      console.log(`[agent] Profile updated, triggering background report regeneration`);
+      
+      // Set status to generating synchronously before background task
       await readiness
         .from("assessments")
-        .update({ report_stale: true })
+        .update({
+          report_status: "generating",
+          report_stale: true,
+        })
         .eq("id", assessmentResult.id);
+      
+      // Use EdgeRuntime.waitUntil for background execution
+      EdgeRuntime.waitUntil(
+        triggerReportRegeneration(
+          readiness,
+          assessmentResult.id,
+          subjectResult.id,
+          assessmentKey
+        )
+      );
     }
   }
 
@@ -1024,23 +1160,38 @@ serve(async (req) => {
       return jsonResponse({ error: "Failed to save answers" }, 500);
     }
 
-    // Check if report exists and mark as stale
-    const { data: currentAssessment } = await readiness
+    // Check if report exists and needs regeneration
+    const { data: currentAssessmentForAnswer } = await readiness
       .from("assessments")
-      .select("report_status")
+      .select("report_status, report_data")
       .eq("id", assessmentResult.id)
       .maybeSingle();
 
-    if (currentAssessment?.report_status === "ready") {
-      console.log(`[agent] Marking report as stale after answer update`);
+    // Trigger background regeneration if a report has been generated before
+    if (currentAssessmentForAnswer?.report_data && currentAssessmentForAnswer?.report_status === "ready") {
+      console.log(`[agent] Answer updated, triggering background report regeneration`);
+      
+      // Set status to generating synchronously before background task
       await readiness
         .from("assessments")
         .update({
+          report_status: "generating",
           report_stale: true,
           last_answer_at: new Date().toISOString(),
         })
         .eq("id", assessmentResult.id);
+      
+      // Use EdgeRuntime.waitUntil for background execution
+      EdgeRuntime.waitUntil(
+        triggerReportRegeneration(
+          readiness,
+          assessmentResult.id,
+          subjectResult.id,
+          assessmentKey
+        )
+      );
     } else {
+      // Just update last_answer_at if no report exists yet
       await readiness
         .from("assessments")
         .update({
