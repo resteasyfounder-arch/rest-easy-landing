@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Map, Circle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Map, ChevronDown, ChevronUp, ArrowRight, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ActionItem } from "@/types/report";
+import type { RoadmapItem, CompletedItem } from "@/types/assessment";
 
 interface RoadmapCardProps {
-  actions: ActionItem[];
-  completedCount?: number;
-  onActionStart?: (action: ActionItem) => void;
-  onViewAll?: () => void;
+  items: RoadmapItem[];
+  completedItems: CompletedItem[];
+  isLoading?: boolean;
   className?: string;
+  onViewAll?: () => void;
 }
 
 type PriorityFilter = "all" | "HIGH" | "MEDIUM" | "LOW";
@@ -44,47 +45,71 @@ const priorityConfig = {
 };
 
 function RoadmapActionItem({
-  action,
-  onStart,
+  item,
+  onNavigate,
 }: {
-  action: ActionItem;
-  onStart?: () => void;
+  item: RoadmapItem;
+  onNavigate: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <span className="text-sm font-medium text-foreground truncate">
-          {action.title}
+    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+      <button
+        onClick={onNavigate}
+        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+      >
+        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0 group-hover:border-primary transition-colors" />
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-medium text-foreground line-clamp-2">
+            {item.question_text}
+          </span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-muted-foreground truncate">
+              {item.section_label}
+            </span>
+            <span className="text-xs text-muted-foreground">•</span>
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              Currently: {item.current_answer_label}
+            </span>
+          </div>
+        </div>
+      </button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-primary h-8 gap-1 flex-shrink-0 ml-2"
+        onClick={onNavigate}
+      >
+        Improve
+        <ArrowRight className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
+
+function CompletedActionItem({ item }: { item: CompletedItem }) {
+  return (
+    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-muted/20">
+      <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+      <div className="min-w-0 flex-1">
+        <span className="text-sm text-muted-foreground line-through line-clamp-1">
+          {item.question_text}
         </span>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        <Badge variant="outline" className="text-xs hidden sm:inline-flex">
-          {action.timeline}
-        </Badge>
-        {onStart && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-primary h-7 gap-1"
-            onClick={onStart}
-          >
-            Start
-            <ExternalLink className="h-3 w-3" />
-          </Button>
-        )}
+        <span className="text-xs text-muted-foreground/70 block truncate">
+          {item.section_label}
+        </span>
       </div>
     </div>
   );
 }
 
 export function RoadmapCard({
-  actions,
-  completedCount = 0,
-  onActionStart,
+  items,
+  completedItems,
+  isLoading = false,
   onViewAll,
   className,
 }: RoadmapCardProps) {
+  const navigate = useNavigate();
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("remaining");
   const [expandedPriority, setExpandedPriority] = useState<Record<string, boolean>>({
@@ -98,25 +123,26 @@ export function RoadmapCard({
     LOW: 3,
   });
 
-  const totalActions = actions.length;
-  const remainingCount = totalActions - completedCount;
-  const progressPercent = totalActions > 0 
-    ? Math.round((completedCount / totalActions) * 100) 
+  const totalItems = items.length + completedItems.length;
+  const completedCount = completedItems.length;
+  const remainingCount = items.length;
+  const progressPercent = totalItems > 0 
+    ? Math.round((completedCount / totalItems) * 100) 
     : 0;
 
-  // Filter actions
-  const filteredActions = actions.filter((action) => {
-    if (priorityFilter !== "all" && action.priority !== priorityFilter) {
+  // Filter items by priority
+  const filteredItems = items.filter((item) => {
+    if (priorityFilter !== "all" && item.priority !== priorityFilter) {
       return false;
     }
     return true;
   });
 
   // Group by priority
-  const groupedActions = {
-    HIGH: filteredActions.filter((a) => a.priority === "HIGH"),
-    MEDIUM: filteredActions.filter((a) => a.priority === "MEDIUM"),
-    LOW: filteredActions.filter((a) => a.priority === "LOW"),
+  const groupedItems = {
+    HIGH: filteredItems.filter((a) => a.priority === "HIGH"),
+    MEDIUM: filteredItems.filter((a) => a.priority === "MEDIUM"),
+    LOW: filteredItems.filter((a) => a.priority === "LOW"),
   };
 
   const toggleExpanded = (priority: string) => {
@@ -127,15 +153,20 @@ export function RoadmapCard({
     setShowMoreCounts((prev) => ({ ...prev, [priority]: prev[priority] + 5 }));
   };
 
+  const handleNavigateToQuestion = (item: RoadmapItem) => {
+    // Navigate to the readiness page with the section parameter
+    navigate(`/readiness?section=${item.section_id}&question=${item.question_id}`);
+  };
+
   const renderPrioritySection = (priority: "HIGH" | "MEDIUM" | "LOW") => {
-    const items = groupedActions[priority];
-    if (items.length === 0) return null;
+    const sectionItems = groupedItems[priority];
+    if (sectionItems.length === 0) return null;
 
     const config = priorityConfig[priority];
     const isExpanded = expandedPriority[priority];
     const showCount = showMoreCounts[priority];
-    const displayedItems = items.slice(0, showCount);
-    const hasMore = items.length > showCount;
+    const displayedItems = sectionItems.slice(0, showCount);
+    const hasMore = sectionItems.length > showCount;
 
     return (
       <div key={priority}>
@@ -147,7 +178,7 @@ export function RoadmapCard({
           <span className={cn("font-medium text-sm", config.text)}>
             {config.label}
           </span>
-          <span className="text-xs text-muted-foreground">({items.length})</span>
+          <span className="text-xs text-muted-foreground">({sectionItems.length})</span>
           {isExpanded ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground ml-auto" />
           ) : (
@@ -157,11 +188,11 @@ export function RoadmapCard({
 
         {isExpanded && (
           <div className="space-y-2 pl-4">
-            {displayedItems.map((action, index) => (
+            {displayedItems.map((item) => (
               <RoadmapActionItem
-                key={`${action.title}-${index}`}
-                action={action}
-                onStart={onActionStart ? () => onActionStart(action) : undefined}
+                key={item.question_id}
+                item={item}
+                onNavigate={() => handleNavigateToQuestion(item)}
               />
             ))}
             {hasMore && (
@@ -171,7 +202,7 @@ export function RoadmapCard({
                 className="text-muted-foreground w-full"
                 onClick={() => showMore(priority)}
               >
-                Show {items.length - showCount} more
+                Show {sectionItems.length - showCount} more
               </Button>
             )}
           </div>
@@ -179,6 +210,21 @@ export function RoadmapCard({
       </div>
     );
   };
+
+  if (isLoading) {
+    return (
+      <Card className={cn("border-border/50 animate-pulse", className)}>
+        <CardHeader className="pb-4">
+          <div className="h-6 w-32 bg-muted rounded" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-4 w-full bg-muted rounded" />
+          <div className="h-12 w-full bg-muted rounded" />
+          <div className="h-12 w-full bg-muted rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className={cn("border-border/50", className)}>
@@ -191,7 +237,7 @@ export function RoadmapCard({
             <div>
               <CardTitle className="font-display text-lg">Your Roadmap</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {remainingCount} remaining, {completedCount} completed
+                {remainingCount} to improve, {completedCount} completed
               </p>
             </div>
           </div>
@@ -239,13 +285,54 @@ export function RoadmapCard({
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {renderPrioritySection("HIGH")}
-        {renderPrioritySection("MEDIUM")}
-        {renderPrioritySection("LOW")}
+        {/* Show remaining items */}
+        {statusFilter !== "completed" && (
+          <>
+            {renderPrioritySection("HIGH")}
+            {renderPrioritySection("MEDIUM")}
+            {renderPrioritySection("LOW")}
+          </>
+        )}
 
-        {filteredActions.length === 0 && (
+        {/* Show completed items */}
+        {statusFilter !== "remaining" && completedItems.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm text-primary">Completed</span>
+              <span className="text-xs text-muted-foreground">({completedItems.length})</span>
+            </div>
+            <div className="space-y-2 pl-4">
+              {completedItems.slice(0, 5).map((item) => (
+                <CompletedActionItem key={item.question_id} item={item} />
+              ))}
+              {completedItems.length > 5 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  + {completedItems.length - 5} more completed
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Empty states */}
+        {statusFilter === "remaining" && filteredItems.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No actions found matching your filters.</p>
+            {items.length === 0 ? (
+              <div className="space-y-2">
+                <CheckCircle2 className="h-8 w-8 text-primary mx-auto" />
+                <p className="text-sm font-medium text-foreground">All done!</p>
+                <p className="text-xs">You've maximized your readiness score.</p>
+              </div>
+            ) : (
+              <p className="text-sm">No items match your filter.</p>
+            )}
+          </div>
+        )}
+
+        {statusFilter === "completed" && completedItems.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">No completed items yet. Keep going!</p>
           </div>
         )}
 
@@ -256,7 +343,7 @@ export function RoadmapCard({
               className="w-full text-primary"
               onClick={onViewAll}
             >
-              View Full Action Plan
+              View Full Report
             </Button>
           </div>
         )}

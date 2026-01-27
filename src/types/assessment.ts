@@ -70,3 +70,39 @@ export interface LocalAssessmentState {
   lastSyncAt: Date | null;
   error: string | null;
 }
+
+// Schema-driven Roadmap Item - represents a question that can be improved
+export interface RoadmapItem {
+  question_id: string;
+  section_id: string;
+  section_label: string;
+  question_text: string;
+  current_answer: string;
+  current_answer_label: string;
+  score_fraction: number;
+  improvement_potential: number;
+  section_weight: number;
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  improvement_options: Array<{
+    value: string;
+    label: string;
+  }>;
+}
+
+// Completed item - question with perfect score
+export interface CompletedItem {
+  question_id: string;
+  section_id: string;
+  section_label: string;
+  question_text: string;
+  current_answer: string;
+  current_answer_label: string;
+}
+
+// Response from get_improvement_items action
+export interface ImprovementItemsResponse {
+  items: RoadmapItem[];
+  completed_items: CompletedItem[];
+  total_applicable: number;
+  total_answered: number;
+}
