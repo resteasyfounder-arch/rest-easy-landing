@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
-import { LogOut, RefreshCw, Wifi, WifiOff, RotateCcw } from "lucide-react";
+import { LogOut, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import {
@@ -37,10 +37,8 @@ const Dashboard = () => {
   const {
     assessmentState,
     isLoading,
-    syncStatus,
     hasStarted,
     isComplete,
-    refresh,
     startFresh,
   } = useAssessmentState({ autoRefresh: true, refreshInterval: 30000 });
 
@@ -92,24 +90,10 @@ const Dashboard = () => {
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <WelcomeHeader />
-          <div className="flex items-center gap-2">
-            {/* Sync status indicator */}
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {syncStatus === "syncing" && (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              {syncStatus === "synced" && (
-                <Wifi className="h-3 w-3 text-emerald-500" />
-              )}
-              {syncStatus === "error" && (
-                <WifiOff className="h-3 w-3 text-destructive" />
-              )}
-            </div>
-            <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Log Out</span>
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Log Out</span>
+          </Button>
         </div>
 
         {/* Main Score Card */}
@@ -197,45 +181,34 @@ const Dashboard = () => {
               <h2 className="font-display text-lg font-semibold text-foreground">
                 Assessment Sections
               </h2>
-              <div className="flex items-center gap-2">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 text-muted-foreground hover:text-destructive"
-                      disabled={isStartingFresh}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      Start Fresh
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Start a Fresh Assessment?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will archive your current assessment and start a new one from scratch. 
-                        Your previous answers will be saved but no longer active.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleStartFresh}>
-                        Yes, Start Fresh
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refresh()}
-                  className="gap-1.5 text-muted-foreground"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh
-                </Button>
-              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground hover:text-destructive"
+                    disabled={isStartingFresh}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Start Fresh
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Start a Fresh Assessment?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will archive your current assessment and start a new one from scratch. 
+                      Your previous answers will be saved but no longer active.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleStartFresh}>
+                      Yes, Start Fresh
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
