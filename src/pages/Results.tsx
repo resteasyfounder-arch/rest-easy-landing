@@ -318,9 +318,6 @@ const Results = () => {
       {/* Bottom Actions */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 print:hidden">
         <div className="max-w-3xl mx-auto flex gap-3">
-          <Button variant="outline" onClick={() => navigate("/readiness")} className="flex-1">
-            Retake Assessment
-          </Button>
           <ShareReportDialog report={report} />
           <Button onClick={handleDownloadPDF} disabled={downloading} className="flex-1 gap-2">
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
