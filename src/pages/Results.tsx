@@ -64,9 +64,11 @@ const Results = () => {
 
         const stateData = await stateResponse.json();
         const reportStatus = stateData?.assessment_state?.report_status;
+        const reportStale = stateData?.assessment_state?.report_stale;
         
-        if (reportStatus === "generating") {
-          console.log("[Results] Report is being generated, showing progress UI");
+        // If generating OR stale, show loading and poll
+        if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
+          console.log("[Results] Report is generating or stale, showing progress UI");
           setIsGenerating(true);
           setLoading(false);
           // Poll for report completion
@@ -112,25 +114,46 @@ const Results = () => {
       const poll = async () => {
         attempts++;
         try {
-          const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              apikey: SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              action: "get_report",
-              subject_id: subjectId,
-              assessment_id: "readiness_v1",
+          // Fetch BOTH report and state to check stale flag
+          const [reportResponse, stateResponse] = await Promise.all([
+            fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                apikey: SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                action: "get_report",
+                subject_id: subjectId,
+                assessment_id: "readiness_v1",
+              }),
             }),
-          });
+            fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                apikey: SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                action: "get_state",
+                subject_id: subjectId,
+                assessment_id: "readiness_v1",
+              }),
+            }),
+          ]);
 
-          const data = await response.json();
+          const reportData = await reportResponse.json();
+          const stateData = await stateResponse.json();
           
-          if (response.ok && data.report) {
-            console.log("[Results] Report ready after polling");
-            setReport(data.report as ReadinessReport);
+          const reportStale = stateData?.assessment_state?.report_stale;
+          const reportStatus = stateData?.assessment_state?.report_status;
+          
+          // Only show report if it exists AND is not stale AND status is ready
+          if (reportResponse.ok && reportData.report && !reportStale && reportStatus === "ready") {
+            console.log("[Results] Report ready after polling (not stale)");
+            setReport(reportData.report as ReadinessReport);
             setIsGenerating(false);
             return;
           }
