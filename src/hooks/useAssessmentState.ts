@@ -5,6 +5,7 @@ import type {
   SyncStatus,
   ScoreTier,
 } from "@/types/assessment";
+import type { ReadinessReport } from "@/types/report";
 
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
@@ -53,10 +54,11 @@ function createEmptyState(): AssessmentState {
 interface UseAssessmentStateOptions {
   autoRefresh?: boolean;
   refreshInterval?: number; // ms
+  includeReportPreview?: boolean; // fetch report data for completed assessments
 }
 
 export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
-  const { autoRefresh = false, refreshInterval = 30000 } = options;
+  const { autoRefresh = false, refreshInterval = 30000, includeReportPreview = false } = options;
   
   const [state, setState] = useState<LocalAssessmentState>({
     serverState: null,
@@ -64,6 +66,9 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     lastSyncAt: null,
     error: null,
   });
+  
+  const [reportPreview, setReportPreview] = useState<ReadinessReport | null>(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
   
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -197,6 +202,51 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
   const isReportGenerating = assessmentState.report_status === "generating";
   const isReportStale = assessmentState.report_stale;
 
+  // Fetch report preview when assessment is complete and report is ready
+  const fetchReportPreview = useCallback(async () => {
+    const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
+    if (!subjectId || !includeReportPreview) return;
+    
+    setIsLoadingReport(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: "get_report",
+          subject_id: subjectId,
+          assessment_id: ASSESSMENT_ID,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch report");
+      }
+
+      const data = await response.json();
+      if (mountedRef.current && data.report) {
+        setReportPreview(data.report);
+      }
+    } catch (error) {
+      console.error("Error fetching report preview:", error);
+    } finally {
+      if (mountedRef.current) {
+        setIsLoadingReport(false);
+      }
+    }
+  }, [includeReportPreview]);
+
+  // Fetch report when assessment becomes complete and report is ready
+  useEffect(() => {
+    if (isComplete && isReportReady && includeReportPreview && !reportPreview && !isLoadingReport) {
+      fetchReportPreview();
+    }
+  }, [isComplete, isReportReady, includeReportPreview, reportPreview, isLoadingReport, fetchReportPreview]);
+
   // Manual refresh
   const refresh = useCallback(() => {
     return fetchState(false);
@@ -237,7 +287,8 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
       
       if (!mountedRef.current) return;
 
-      // Assessment ID is now managed in-memory only
+      // Clear report preview when starting fresh
+      setReportPreview(null);
 
       const serverState = data.assessment_state || createEmptyState();
       
@@ -268,6 +319,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     // Also clear legacy keys
     localStorage.removeItem("rest-easy.readiness.report");
     localStorage.removeItem("rest-easy.readiness.report_stale");
+    setReportPreview(null);
     setState({
       serverState: createEmptyState(),
       syncStatus: "synced",
@@ -284,6 +336,10 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     lastSyncAt: state.lastSyncAt,
     error: state.error,
     
+    // Report preview
+    reportPreview,
+    isLoadingReport,
+    
     // Computed
     hasStarted,
     isComplete,
@@ -295,6 +351,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
     refresh,
     startFresh,
     clearState,
+    fetchReportPreview,
     
     // Utilities
     getTierFromScore,

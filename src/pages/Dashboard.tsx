@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
-import { LogOut, RotateCcw, Target, Heart, UserCircle } from "lucide-react";
+import { LogOut, RotateCcw, Target, Heart, UserCircle, FileText, Share2, Clock, Sparkles, Trophy, Map } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import {
@@ -16,6 +16,10 @@ import {
   AssessmentCTA,
   WelcomeHeader,
   TierBadge,
+  CategoryBreakdown,
+  ReportSummaryCard,
+  QuickActionsCard,
+  LockedPreviewCard,
 } from "@/components/dashboard";
 import {
   AlertDialog,
@@ -29,6 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 const Dashboard = () => {
   const { logout } = useAuth();
@@ -39,8 +44,16 @@ const Dashboard = () => {
     isLoading,
     hasStarted,
     isComplete,
+    isReportReady,
+    isReportGenerating,
+    reportPreview,
+    isLoadingReport,
     startFresh,
-  } = useAssessmentState({ autoRefresh: true, refreshInterval: 30000 });
+  } = useAssessmentState({ 
+    autoRefresh: true, 
+    refreshInterval: 30000,
+    includeReportPreview: true 
+  });
 
   const handleLogout = () => {
     logout();
@@ -81,16 +94,16 @@ const Dashboard = () => {
   const applicableSections = assessmentState.sections.filter((s) => s.is_applicable);
   const completedSectionsCount = applicableSections.filter((s) => s.progress === 100).length;
   const totalSections = applicableSections.length;
+  
+  // Find the next section to continue
+  const nextSection = applicableSections.find((s) => 
+    s.status === "in_progress" || s.status === "available"
+  );
 
-  // Motivational message based on progress
-  const getProgressMessage = () => {
-    if (completedSectionsCount === 0) return "Ready to begin your journey?";
-    if (completedSectionsCount === 1) return "Great start! Keep going.";
-    if (assessmentState.overall_progress < 50) return "You're making progress!";
-    if (assessmentState.overall_progress < 75) return "More than halfway there!";
-    if (assessmentState.overall_progress < 100) return "Almost finished!";
-    return "Assessment complete!";
-  };
+  // Format report date
+  const reportDate = reportPreview?.generatedAt 
+    ? format(new Date(reportPreview.generatedAt), "MMM d, yyyy")
+    : null;
 
   return (
     <AppLayout>
@@ -104,45 +117,125 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* Main Progress Card */}
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden shadow-sm">
-          <CardContent className="p-8 sm:p-10">
-            <div className="flex flex-col items-center text-center space-y-6">
-              {/* Score/Progress Circle with animation */}
-              <div className="animate-fade-in">
-                {isComplete ? (
-                  <ScoreCircle
-                    score={assessmentState.overall_score}
-                    tier={assessmentState.tier}
-                    size="lg"
-                    animated={true}
-                  />
-                ) : (
-                  <ProgressCircle
-                    progress={assessmentState.overall_progress}
-                    size="lg"
-                    animated={true}
-                  />
-                )}
-              </div>
+        {/* ==================== COMPLETED ASSESSMENT VIEW ==================== */}
+        {isComplete ? (
+          <div className="space-y-6 animate-fade-in">
+            {/* Score Hero Card */}
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden shadow-sm">
+              <CardContent className="p-8 sm:p-10">
+                <div className="flex flex-col items-center text-center space-y-6">
+                  <div className="animate-fade-in">
+                    <ScoreCircle
+                      score={assessmentState.overall_score}
+                      tier={assessmentState.tier}
+                      size="lg"
+                      animated={true}
+                    />
+                  </div>
 
-              {/* Progress Details */}
-              <div className="space-y-4 max-w-sm">
-                <h2 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
-                  {isComplete ? "Your Readiness Score" : "Your Journey Progress"}
-                </h2>
-                
-                {isComplete ? (
                   <div className="space-y-3">
                     <TierBadge tier={assessmentState.tier} size="md" />
-                    {assessmentState.report_status !== "not_started" && (
+                    
+                    {reportDate && (
+                      <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        Last updated {reportDate}
+                      </div>
+                    )}
+                    
+                    {isReportGenerating && (
                       <div className="pt-2">
-                        <ReportStatusBadge status={assessmentState.report_status} />
+                        <ReportStatusBadge status="generating" />
                       </div>
                     )}
                   </div>
-                ) : hasStarted ? (
-                  <div className="space-y-4">
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    {isReportReady && (
+                      <>
+                        <Button onClick={() => navigate("/results")} className="gap-2">
+                          <FileText className="h-4 w-4" />
+                          View Full Report
+                        </Button>
+                        <Button variant="outline" size="icon" title="Share Report">
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Report Summary Card */}
+            {reportPreview?.executive_summary && (
+              <ReportSummaryCard
+                summary={reportPreview.executive_summary}
+                metrics={reportPreview.metrics}
+                onViewReport={() => navigate("/results")}
+              />
+            )}
+
+            {/* Category Breakdown */}
+            <CategoryBreakdown
+              sections={assessmentState.sections}
+              onCategoryClick={(sectionId) => navigate(`/results#${sectionId}`)}
+              onViewDetails={() => navigate("/results")}
+            />
+
+            {/* Quick Actions / Roadmap */}
+            {reportPreview?.immediate_actions && reportPreview.immediate_actions.length > 0 && (
+              <QuickActionsCard
+                actions={reportPreview.immediate_actions}
+                maxItems={3}
+                onViewAll={() => navigate("/results#action-plan")}
+              />
+            )}
+
+            {/* Section Review (collapsible) */}
+            {applicableSections.length > 0 && (
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-px flex-1 bg-border" />
+                  <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Assessment Sections
+                  </h2>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <div className="space-y-3">
+                  {applicableSections.map((section) => (
+                    <SectionProgressCard
+                      key={section.id}
+                      section={section}
+                      onClick={() => navigate(`/readiness?section=${section.id}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : hasStarted ? (
+          /* ==================== IN-PROGRESS ASSESSMENT VIEW ==================== */
+          <div className="space-y-6">
+            {/* Progress Hero Card */}
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden shadow-sm">
+              <CardContent className="p-8 sm:p-10">
+                <div className="flex flex-col items-center text-center space-y-6">
+                  <div className="animate-fade-in">
+                    <ProgressCircle
+                      progress={assessmentState.overall_progress}
+                      size="lg"
+                      animated={true}
+                    />
+                  </div>
+
+                  <div className="space-y-4 max-w-sm">
+                    <h2 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
+                      You're Making Progress!
+                    </h2>
+                    
                     {/* Milestone chip */}
                     <div className="flex items-center justify-center">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
@@ -154,76 +247,107 @@ const Dashboard = () => {
                     {/* Progress bar */}
                     <div className="space-y-2">
                       <Progress value={assessmentState.overall_progress} className="h-2" />
-                      <p className="text-primary font-medium text-sm">
-                        {getProgressMessage()}
-                      </p>
                     </div>
 
-                    {/* Encouraging prompt */}
-                    <p className="text-muted-foreground/80 text-sm italic">
-                      Complete all sections to reveal your personalized Readiness Score
-                    </p>
+                    {/* Score reveal message */}
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-left">
+                      <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-muted-foreground">
+                        Your personalized <span className="font-medium text-foreground">Readiness Score</span> will 
+                        appear once you complete all sections.
+                      </p>
+                    </div>
                   </div>
-                ) : null}
-              </div>
 
-              {/* CTA */}
-              <AssessmentCTA assessmentState={assessmentState} className="mt-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Profile Completion Card */}
-        {!assessmentState.profile_complete && (
-          <Card className="border-amber-200/50 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/20 dark:to-amber-900/10 dark:border-amber-800/30">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-4">
-                <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
-                  <UserCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-medium text-foreground">
-                    Complete Your Profile
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Help us personalize your assessment experience
+                  {/* CTA */}
+                  <AssessmentCTA assessmentState={assessmentState} className="mt-2" />
+                  
+                  <p className="text-xs text-muted-foreground/70">
+                    Most people complete this in 10-15 minutes
                   </p>
-                  <div className="mt-3 space-y-1">
-                    <Progress value={assessmentState.profile_progress} className="h-1.5" />
-                    <p className="text-xs text-muted-foreground">
-                      {assessmentState.profile_progress}% complete
-                    </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Profile Completion Card */}
+            {!assessmentState.profile_complete && (
+              <Card className="border-amber-200/50 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/20 dark:to-amber-900/10 dark:border-amber-800/30">
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
+                      <UserCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-display font-medium text-foreground">
+                        Complete Your Profile
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Help us personalize your assessment experience
+                      </p>
+                      <div className="mt-3 space-y-1">
+                        <Progress value={assessmentState.profile_progress} className="h-1.5" />
+                        <p className="text-xs text-muted-foreground">
+                          {assessmentState.profile_progress}% complete
+                        </p>
+                      </div>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Section Journey */}
+            {applicableSections.length > 0 && (
+              <div className="space-y-5">
+                <div className="flex items-center gap-4">
+                  <div className="h-px flex-1 bg-border" />
+                  <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Your Assessment Journey
+                  </h2>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <div className="space-y-3">
+                  {applicableSections.map((section) => (
+                    <SectionProgressCard
+                      key={section.id}
+                      section={section}
+                      isNext={nextSection?.id === section.id}
+                      onClick={() => navigate(`/readiness?section=${section.id}`)}
+                    />
+                  ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
 
-        {/* Section Progress - Journey Style */}
-        {hasStarted && applicableSections.length > 0 && (
-          <div className="space-y-5">
-            {/* Journey section header */}
-            <div className="flex items-center gap-4">
-              <div className="h-px flex-1 bg-border" />
-              <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Your Assessment Journey
-              </h2>
-              <div className="h-px flex-1 bg-border" />
-            </div>
+            {/* Locked Preview Cards */}
+            <div className="space-y-4 pt-4">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-border" />
+                <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  What You'll Unlock
+                </h2>
+                <div className="h-px flex-1 bg-border" />
+              </div>
 
-            {/* Stacked sections */}
-            <div className="space-y-3">
-              {applicableSections.map((section) => (
-                <SectionProgressCard
-                  key={section.id}
-                  section={section}
-                  onClick={() => navigate(`/readiness?section=${section.id}`)}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <LockedPreviewCard
+                  title="Your Readiness Score"
+                  description="Complete the assessment to see your personalized readiness score"
+                  icon={Trophy}
+                  previewContent={
+                    <div className="text-6xl font-bold text-primary">??</div>
+                  }
                 />
-              ))}
+                <LockedPreviewCard
+                  title="Your Action Roadmap"
+                  description="Unlock your step-by-step guide to getting prepared"
+                  icon={Map}
+                />
+              </div>
             </div>
 
-            {/* Quieter Start Fresh at bottom */}
+            {/* Start Fresh */}
             <div className="pt-6 border-t border-border/50 mt-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Need to begin again?</span>
@@ -258,10 +382,8 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-        )}
-
-        {/* Empty State - Not Started */}
-        {!hasStarted && (
+        ) : (
+          /* ==================== NOT STARTED (EMPTY STATE) ==================== */
           <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-sm">
             <CardContent className="p-10 text-center">
               <div className="max-w-md mx-auto space-y-6">

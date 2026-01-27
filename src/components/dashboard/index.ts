@@ -5,3 +5,7 @@ export { ReportStatusBadge } from "./ReportStatusBadge";
 export { AssessmentCTA } from "./AssessmentCTA";
 export { WelcomeHeader } from "./WelcomeHeader";
 export { TierBadge } from "./TierBadge";
+export { CategoryBreakdown } from "./CategoryBreakdown";
+export { ReportSummaryCard } from "./ReportSummaryCard";
+export { QuickActionsCard } from "./QuickActionsCard";
+export { LockedPreviewCard } from "./LockedPreviewCard";

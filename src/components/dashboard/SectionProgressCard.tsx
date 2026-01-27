@@ -6,6 +6,7 @@ import type { SectionState, SectionStatus } from "@/types/assessment";
 interface SectionProgressCardProps {
   section: SectionState;
   onClick?: () => void;
+  isNext?: boolean;
   className?: string;
 }
 
@@ -26,6 +27,7 @@ const statusColors: Record<SectionStatus, string> = {
 export function SectionProgressCard({
   section,
   onClick,
+  isNext = false,
   className,
 }: SectionProgressCardProps) {
   const Icon = statusIcons[section.status];
@@ -42,6 +44,8 @@ export function SectionProgressCard({
           : "bg-muted/30 border-border/50 opacity-60",
         isClickable && "cursor-pointer",
         !isClickable && "cursor-default",
+        // Highlight "next" section with subtle ring
+        isNext && "ring-2 ring-primary/30 border-primary/50 bg-primary/5",
         className
       )}
     >
