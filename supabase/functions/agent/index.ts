@@ -48,7 +48,9 @@ interface AssessmentState {
   next_question_id: string | null;
   report_status: ReportStatus;
   report_url: string | null;
+  report_stale: boolean;
   last_activity_at: string;
+  last_answer_at: string | null;
   updated_at: string;
   // Full hydration data for client
   profile_data: Record<string, unknown>;
@@ -264,10 +266,10 @@ async function computeAssessmentState(
     }
   }
 
-  // Load assessment status
+  // Load assessment status including stale flag
   const { data: assessmentData } = await readiness
     .from("assessments")
-    .select("status, overall_score, updated_at, report_status, report_url")
+    .select("status, overall_score, updated_at, report_status, report_url, report_stale, last_answer_at")
     .eq("id", assessmentDbId)
     .maybeSingle();
 
@@ -288,7 +290,9 @@ async function computeAssessmentState(
       next_question_id: null,
       report_status: "not_started",
       report_url: null,
+      report_stale: false,
       last_activity_at: new Date().toISOString(),
+      last_answer_at: null,
       updated_at: new Date().toISOString(),
       profile_data: profile,
       profile_answers: {},
@@ -479,7 +483,9 @@ async function computeAssessmentState(
     next_question_id: nextQuestionId,
     report_status: (assessmentData?.report_status as ReportStatus) || "not_started",
     report_url: assessmentData?.report_url || null,
+    report_stale: assessmentData?.report_stale || false,
     last_activity_at: assessmentData?.updated_at || new Date().toISOString(),
+    last_answer_at: assessmentData?.last_answer_at || null,
     updated_at: new Date().toISOString(),
     profile_data: profile,
     profile_answers: profileAnswers,
@@ -560,6 +566,7 @@ serve(async (req) => {
         report_status: "ready",
         report_data: report_data,
         report_generated_at: new Date().toISOString(),
+        report_stale: false, // Reset stale flag when new report is saved
       })
       .eq("id", assessmentDbId);
 
@@ -787,6 +794,21 @@ serve(async (req) => {
     if (profileError) {
       return jsonResponse({ error: "Failed to save profile" }, 500);
     }
+
+    // Check if report exists and mark as stale (profile change may affect applicable questions)
+    const { data: currentAssessment } = await readiness
+      .from("assessments")
+      .select("report_status")
+      .eq("id", assessmentResult.id)
+      .maybeSingle();
+
+    if (currentAssessment?.report_status === "ready") {
+      console.log(`[agent] Marking report as stale after profile update`);
+      await readiness
+        .from("assessments")
+        .update({ report_stale: true })
+        .eq("id", assessmentResult.id);
+    }
   }
 
   if (payload.answers && payload.answers.length > 0) {
@@ -811,6 +833,32 @@ serve(async (req) => {
 
     if (answersError) {
       return jsonResponse({ error: "Failed to save answers" }, 500);
+    }
+
+    // Check if report exists and mark as stale
+    const { data: currentAssessment } = await readiness
+      .from("assessments")
+      .select("report_status")
+      .eq("id", assessmentResult.id)
+      .maybeSingle();
+
+    if (currentAssessment?.report_status === "ready") {
+      console.log(`[agent] Marking report as stale after answer update`);
+      await readiness
+        .from("assessments")
+        .update({
+          report_stale: true,
+          last_answer_at: new Date().toISOString(),
+        })
+        .eq("id", assessmentResult.id);
+    } else {
+      // Still update last_answer_at even if no report exists
+      await readiness
+        .from("assessments")
+        .update({
+          last_answer_at: new Date().toISOString(),
+        })
+        .eq("id", assessmentResult.id);
     }
   }
 
