@@ -2,8 +2,6 @@ import { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./AppSidebar";
-import { Button } from "@/components/ui/button";
-import { LogIn, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface DesktopLayoutProps {
@@ -39,17 +37,7 @@ const DesktopLayout = ({ children }: DesktopLayoutProps) => {
                 {currentTitle}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => navigate("/login")}
-                className="font-body text-sm gap-2"
-              >
-                <LogIn className="h-4 w-4" />
-                Sign In
-              </Button>
-            </div>
+            {/* Intentionally empty - auth actions handled by sidebar */}
           </header>
 
           {/* Main Content */}
