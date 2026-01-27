@@ -191,7 +191,6 @@ const Profile = () => {
           apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          action: "get_state",
           subject_id: subjectId,
           assessment_id: ASSESSMENT_ID,
           profile: {
