@@ -32,6 +32,10 @@ export interface AssessmentState {
   profile_progress: number;        // 0-100
   profile_complete: boolean;
   
+  // Profile Data
+  profile_answers: Record<string, "yes" | "no">;
+  profile_data: Record<string, unknown>;
+  
   // Section-level State
   sections: SectionState[];
   
