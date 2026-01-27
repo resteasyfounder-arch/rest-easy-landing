@@ -31,6 +31,7 @@ const Results = () => {
   const navigate = useNavigate();
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +46,35 @@ const Results = () => {
       }
 
       try {
+        // First check if report is being generated
+        console.log("[Results] Checking report status...");
+        const stateResponse = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            action: "get_state",
+            subject_id: subjectId,
+            assessment_id: "readiness_v1",
+          }),
+        });
+
+        const stateData = await stateResponse.json();
+        const reportStatus = stateData?.assessment_state?.report_status;
+        
+        if (reportStatus === "generating") {
+          console.log("[Results] Report is being generated, showing progress UI");
+          setIsGenerating(true);
+          setLoading(false);
+          // Poll for report completion
+          pollForReport(subjectId);
+          return;
+        }
+
+        // Report exists or not generating - fetch it directly
         console.log("[Results] Fetching report from server...");
         const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
           method: "POST",
@@ -75,6 +105,55 @@ const Results = () => {
       }
     };
 
+    const pollForReport = async (subjectId: string) => {
+      const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+      let attempts = 0;
+
+      const poll = async () => {
+        attempts++;
+        try {
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              apikey: SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              action: "get_report",
+              subject_id: subjectId,
+              assessment_id: "readiness_v1",
+            }),
+          });
+
+          const data = await response.json();
+          
+          if (response.ok && data.report) {
+            console.log("[Results] Report ready after polling");
+            setReport(data.report as ReadinessReport);
+            setIsGenerating(false);
+            return;
+          }
+
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 2000);
+          } else {
+            console.log("[Results] Polling timed out");
+            setIsGenerating(false);
+          }
+        } catch (err) {
+          console.error("[Results] Polling error:", err);
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 2000);
+          } else {
+            setIsGenerating(false);
+          }
+        }
+      };
+
+      poll();
+    };
+
     fetchReport();
   }, []);
 
@@ -102,10 +181,22 @@ const Results = () => {
     }
   };
 
-  if (loading) {
+  // Show generating UI when report is being generated
+  if (isGenerating) {
     return (
       <AppLayout hideNav>
         <div className="min-h-screen bg-white"><ReportLoading /></div>
+      </AppLayout>
+    );
+  }
+
+  // Show minimal loading for quick fetches (just a brief spinner, won't flash)
+  if (loading) {
+    return (
+      <AppLayout hideNav>
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
       </AppLayout>
     );
   }
