@@ -1,25 +1,26 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
 import { useImprovementItems } from "@/hooks/useImprovementItems";
-import { LogOut, RotateCcw, Target, Heart, UserCircle, Sparkles, Trophy, Map } from "lucide-react";
+import { LogOut, RotateCcw, Heart, Trophy, Map } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import {
-  ProgressCircle,
-  SectionProgressCard,
   ReportStatusBadge,
   AssessmentCTA,
   WelcomeHeader,
   ReportSummaryCard,
-  LockedPreviewCard,
   ReadinessScoreCard,
   VaultPreviewCard,
   RoadmapCard,
+  QuickStatsStrip,
+  UnlockTeaserCard,
+  ProfileNudge,
+  ProgressHero,
+  JourneyTimeline,
 } from "@/components/dashboard";
 import {
   AlertDialog,
@@ -105,11 +106,8 @@ const Dashboard = () => {
               <Skeleton className="h-4 w-48" />
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <Skeleton className="h-72 rounded-xl lg:col-span-3" />
-            <Skeleton className="h-72 rounded-xl lg:col-span-2" />
-          </div>
-          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
         </div>
       </AppLayout>
     );
@@ -118,15 +116,37 @@ const Dashboard = () => {
   const applicableSections = assessmentState.sections.filter((s) => s.is_applicable);
   const completedSectionsCount = applicableSections.filter((s) => s.progress === 100).length;
   const totalSections = applicableSections.length;
+  const sectionsRemaining = totalSections - completedSectionsCount;
 
   // Find the next section to continue
   const nextSection = applicableSections.find(
     (s) => s.status === "in_progress" || s.status === "available"
   );
 
+  // Calculate totals for quick stats
+  const totalQuestionsAnswered = applicableSections.reduce((acc, s) => acc + s.questions_answered, 0);
+  const totalQuestions = applicableSections.reduce((acc, s) => acc + s.questions_total, 0);
+
+  // Estimate remaining time (assume ~30 seconds per question)
+  const remainingQuestions = totalQuestions - totalQuestionsAnswered;
+  const estimatedMinutes = Math.max(1, Math.ceil(remainingQuestions * 0.5));
+
   // Calculate action metrics from schema-driven roadmap
   const actionsTotal = improvementItems.length + completedItems.length;
   const actionsRemaining = improvementItems.length;
+
+  // Check for locked sections (for profile nudge)
+  const lockedSectionsCount = assessmentState.sections.filter(
+    (s) => s.status === "locked"
+  ).length;
+
+  const handleSectionClick = (sectionId: string) => {
+    navigate(`/readiness?section=${sectionId}`);
+  };
+
+  const handleContinue = (sectionId: string) => {
+    navigate(`/readiness?section=${sectionId}`);
+  };
 
   return (
     <AppLayout>
@@ -196,112 +216,55 @@ const Dashboard = () => {
             )}
           </div>
         ) : hasStarted ? (
-          /* ==================== IN-PROGRESS ASSESSMENT VIEW ==================== */
-          <div className="space-y-6">
-            {/* Progress Hero Card */}
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden shadow-sm">
-              <CardContent className="p-8 sm:p-10">
-                <div className="flex flex-col items-center text-center space-y-6">
-                  <div className="animate-fade-in">
-                    <ProgressCircle
-                      progress={assessmentState.overall_progress}
-                      size="lg"
-                      animated={true}
-                    />
-                  </div>
+          /* ==================== IN-PROGRESS ASSESSMENT VIEW (Journey Design) ==================== */
+          <div className="space-y-8">
+            {/* Progress Hero - Narrative focused */}
+            <ProgressHero
+              overallProgress={assessmentState.overall_progress}
+              sectionsRemaining={sectionsRemaining}
+              currentSectionLabel={nextSection?.label}
+              estimatedMinutes={estimatedMinutes}
+              onContinue={() => nextSection && handleContinue(nextSection.id)}
+            />
 
-                  <div className="space-y-4 max-w-sm">
-                    <h2 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
-                      You're Making Progress!
-                    </h2>
+            {/* Quick Stats Strip */}
+            <QuickStatsStrip
+              estimatedMinutes={estimatedMinutes}
+              questionsAnswered={totalQuestionsAnswered}
+              questionsTotal={totalQuestions}
+              sectionsCompleted={completedSectionsCount}
+              sectionsTotal={totalSections}
+            />
 
-                    {/* Milestone chip */}
-                    <div className="flex items-center justify-center">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                        <Target className="h-3.5 w-3.5" />
-                        {completedSectionsCount} of {totalSections} sections completed
-                      </span>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="space-y-2">
-                      <Progress value={assessmentState.overall_progress} className="h-2" />
-                    </div>
-
-                    {/* Score reveal message */}
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-left">
-                      <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-muted-foreground">
-                        Your personalized{" "}
-                        <span className="font-medium text-foreground">Readiness Score</span> will
-                        appear once you complete all sections.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-                  <AssessmentCTA assessmentState={assessmentState} className="mt-2" />
-
-                  <p className="text-xs text-muted-foreground/70">
-                    Most people complete this in 10-15 minutes
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Profile Completion Card */}
-            {!assessmentState.profile_complete && (
-              <Card className="border-amber-200/50 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/20 dark:to-amber-900/10 dark:border-amber-800/30">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
-                      <UserCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-display font-medium text-foreground">
-                        Complete Your Profile
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Help us personalize your assessment experience
-                      </p>
-                      <div className="mt-3 space-y-1">
-                        <Progress value={assessmentState.profile_progress} className="h-1.5" />
-                        <p className="text-xs text-muted-foreground">
-                          {assessmentState.profile_progress}% complete
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Profile Nudge - Only when relevant */}
+            {!assessmentState.profile_complete && lockedSectionsCount > 0 && (
+              <ProfileNudge
+                lockedSectionsCount={lockedSectionsCount}
+                onComplete={() => navigate("/profile")}
+              />
             )}
 
-            {/* Section Journey */}
+            {/* Journey Timeline */}
             {applicableSections.length > 0 && (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="h-px flex-1 bg-border" />
                   <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    Your Assessment Journey
+                    Your Journey
                   </h2>
                   <div className="h-px flex-1 bg-border" />
                 </div>
 
-                <div className="space-y-3">
-                  {applicableSections.map((section) => (
-                    <SectionProgressCard
-                      key={section.id}
-                      section={section}
-                      isNext={nextSection?.id === section.id}
-                      onClick={() => navigate(`/readiness?section=${section.id}`)}
-                    />
-                  ))}
-                </div>
+                <JourneyTimeline
+                  sections={applicableSections}
+                  onSectionClick={handleSectionClick}
+                  onContinue={handleContinue}
+                />
               </div>
             )}
 
-            {/* Locked Preview Cards */}
-            <div className="space-y-4 pt-4">
+            {/* Unlock Teaser Cards */}
+            <div className="space-y-4 pt-2">
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-border" />
                 <h2 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wider">
@@ -311,16 +274,21 @@ const Dashboard = () => {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <LockedPreviewCard
+                <UnlockTeaserCard
                   title="Your Readiness Score"
-                  description="Complete the assessment to see your personalized readiness score"
+                  description="See how prepared you are across all areas"
                   icon={Trophy}
-                  previewContent={<div className="text-6xl font-bold text-primary">??</div>}
+                  showScorePreview={true}
                 />
-                <LockedPreviewCard
+                <UnlockTeaserCard
                   title="Your Action Roadmap"
-                  description="Unlock your step-by-step guide to getting prepared"
+                  description="Personalized steps to improve your readiness"
                   icon={Map}
+                  previewItems={[
+                    "Prioritized action items",
+                    "Quick wins to start today",
+                    "Expert guidance tailored to you",
+                  ]}
                 />
               </div>
             </div>
@@ -362,7 +330,7 @@ const Dashboard = () => {
           </div>
         ) : (
           /* ==================== NOT STARTED (EMPTY STATE) ==================== */
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-sm">
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-soft">
             <CardContent className="p-10 text-center">
               <div className="max-w-md mx-auto space-y-6">
                 {/* Warm illustration */}
