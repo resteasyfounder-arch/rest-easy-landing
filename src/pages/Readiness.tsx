@@ -1301,8 +1301,13 @@ const Readiness = () => {
     );
   }
 
+  // Check for navigation params - if present, skip "complete" phase rendering
+  // This prevents a race condition where the complete phase renders before URL params are processed
+  const hasNavigationParams = searchParams.has("section") || searchParams.has("question");
+
   // Complete Phase - Auto-generate report, show loading/error states
-  if (flowPhase === "complete") {
+  // Skip if we have navigation params that need processing first
+  if (flowPhase === "complete" && !hasNavigationParams) {
     // Report generation error - show retry option
     if (reportError) {
       return (
