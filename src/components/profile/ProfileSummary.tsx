@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useEffect, useState, useRef } from "react";
 
 interface ProfileSummaryProps {
   yesItems: string[];
@@ -7,6 +8,10 @@ interface ProfileSummaryProps {
 }
 
 export function ProfileSummary({ yesItems, totalItems, className }: ProfileSummaryProps) {
+  const [displayedSummary, setDisplayedSummary] = useState("");
+  const [isAnimating, setIsAnimating] = useState(false);
+  const prevSummaryRef = useRef("");
+
   // Build a natural language summary based on selections
   const buildSummary = (): string => {
     if (yesItems.length === 0) {
@@ -50,16 +55,39 @@ export function ProfileSummary({ yesItems, totalItems, className }: ProfileSumma
     return `Your life includes ${parts.join(", ")}, and ${lastPart}.`;
   };
 
-  const summary = buildSummary();
-  const allAnswered = yesItems.length > 0 || totalItems === 0;
+  const currentSummary = buildSummary();
+
+  useEffect(() => {
+    if (prevSummaryRef.current !== currentSummary) {
+      setIsAnimating(true);
+      const timeout = setTimeout(() => {
+        setDisplayedSummary(currentSummary);
+        setIsAnimating(false);
+        prevSummaryRef.current = currentSummary;
+      }, 150);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentSummary]);
+
+  // Initialize on first render
+  useEffect(() => {
+    if (!displayedSummary) {
+      setDisplayedSummary(currentSummary);
+      prevSummaryRef.current = currentSummary;
+    }
+  }, []);
 
   return (
     <div className={cn(
       "text-center px-4 py-3 rounded-xl bg-secondary/30 backdrop-blur-sm border border-border/30",
       className
     )}>
-      <p className="text-sm font-body text-foreground/80 leading-relaxed">
-        {summary}
+      <p className={cn(
+        "text-sm font-body text-foreground/80 leading-relaxed transition-all duration-300",
+        isAnimating && "opacity-0 translate-y-1",
+        !isAnimating && "opacity-100 translate-y-0"
+      )}>
+        {displayedSummary || currentSummary}
       </p>
     </div>
   );

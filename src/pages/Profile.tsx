@@ -219,7 +219,7 @@ const Profile = () => {
   return (
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-b from-background via-primary/5 to-background">
-        <div className="max-w-md mx-auto px-4 py-8 pb-32">
+        <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
           
           {/* Empty State - Not started */}
           {!hasStarted && (
@@ -238,7 +238,7 @@ const Profile = () => {
                 </p>
               </div>
 
-              <Card className="p-6 text-center bg-card/60 backdrop-blur-sm border-border/40">
+              <Card className="p-6 text-center bg-card/60 backdrop-blur-sm border-border/40 max-w-md mx-auto">
                 <div className="space-y-4">
                   <p className="text-foreground/80 font-body text-sm leading-relaxed">
                     A few quick questions help us personalize your assessment.
@@ -260,20 +260,24 @@ const Profile = () => {
           {hasStarted && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
-              {/* Compact Header */}
-              <ProfileHeader 
-                completedCount={completedCount}
-                totalCount={totalCount}
-              />
+              {/* Header + Summary Row */}
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex-shrink-0">
+                  <ProfileHeader 
+                    completedCount={completedCount}
+                    totalCount={totalCount}
+                  />
+                </div>
+                <div className="flex-1">
+                  <ProfileSummary 
+                    yesItems={yesItems}
+                    totalItems={totalCount}
+                  />
+                </div>
+              </div>
 
-              {/* Dynamic Summary */}
-              <ProfileSummary 
-                yesItems={yesItems}
-                totalItems={totalCount}
-              />
-
-              {/* Compact Life Cards - No sections */}
-              <div className="space-y-2">
+              {/* Horizontal Grid of Life Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {PROFILE_ITEMS.map((item) => (
                   <CompactLifeCard
                     key={item.id}
@@ -290,7 +294,7 @@ const Profile = () => {
               </div>
 
               {/* Assessment CTA */}
-              <Card className="p-3 bg-card/60 backdrop-blur-sm border-border/40">
+              <Card className="p-3 bg-card/60 backdrop-blur-sm border-border/40 max-w-md mx-auto">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-body text-muted-foreground">Life Readiness</p>
