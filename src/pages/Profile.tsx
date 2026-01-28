@@ -4,7 +4,8 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
-import { ProfileEditModal, QUESTION_PROMPTS } from "@/components/profile/ProfileEditModal";
+import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { LifeAreaCategory } from "@/components/profile/LifeAreaCategory";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserCircle,
@@ -18,11 +19,7 @@ import {
   PiggyBank,
   ArrowRight,
   Loader2,
-  Check,
-  X,
-  Circle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 
 const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
@@ -42,23 +39,70 @@ interface ProfileItem {
   fieldPath: string;
 }
 
-const PROFILE_ITEMS: ProfileItem[] = [
-  { id: "profile.household.has_dependents", label: "Family", icon: Users, fieldPath: "household.has_dependents" },
-  { id: "profile.pets.has_pets", label: "Pets", icon: Heart, fieldPath: "pets.has_pets" },
-  { id: "profile.family.supports_aging_parent", label: "Caregiving", icon: HandHeart, fieldPath: "family.supports_aging_parent" },
-  { id: "profile.home.owns_real_property", label: "Home", icon: Home, fieldPath: "home.owns_real_property" },
-  { id: "profile.home.has_significant_personal_property", label: "Belongings", icon: Briefcase, fieldPath: "home.has_significant_personal_property" },
-  { id: "profile.financial.has_beneficiary_accounts", label: "Finances", icon: PiggyBank, fieldPath: "financial.has_beneficiary_accounts" },
-  { id: "profile.digital.owns_crypto", label: "Digital", icon: Laptop, fieldPath: "digital.owns_crypto" },
-  { id: "profile.emotional.has_spiritual_practices", label: "Faith", icon: Flower2, fieldPath: "emotional.has_spiritual_practices" },
+// Grouped profile items by category
+const PROFILE_CATEGORIES = {
+  people: {
+    title: "People in Your Life",
+    items: [
+      { id: "profile.household.has_dependents", label: "Family", icon: Users, fieldPath: "household.has_dependents" },
+      { id: "profile.pets.has_pets", label: "Pets", icon: Heart, fieldPath: "pets.has_pets" },
+      { id: "profile.family.supports_aging_parent", label: "Caregiving", icon: HandHeart, fieldPath: "family.supports_aging_parent" },
+    ],
+  },
+  assets: {
+    title: "Your Assets",
+    items: [
+      { id: "profile.home.owns_real_property", label: "Home", icon: Home, fieldPath: "home.owns_real_property" },
+      { id: "profile.home.has_significant_personal_property", label: "Belongings", icon: Briefcase, fieldPath: "home.has_significant_personal_property" },
+      { id: "profile.financial.has_beneficiary_accounts", label: "Finances", icon: PiggyBank, fieldPath: "financial.has_beneficiary_accounts" },
+    ],
+  },
+  personal: {
+    title: "Personal & Digital",
+    items: [
+      { id: "profile.digital.owns_crypto", label: "Digital Assets", icon: Laptop, fieldPath: "digital.owns_crypto" },
+      { id: "profile.emotional.has_spiritual_practices", label: "Faith & Spirituality", icon: Flower2, fieldPath: "emotional.has_spiritual_practices" },
+    ],
+  },
+};
+
+// Flat list for iteration
+const ALL_PROFILE_ITEMS: ProfileItem[] = [
+  ...PROFILE_CATEGORIES.people.items,
+  ...PROFILE_CATEGORIES.assets.items,
+  ...PROFILE_CATEGORIES.personal.items,
 ];
+
+// Question prompts for each profile item
+const QUESTION_PROMPTS: Record<string, string> = {
+  "profile.household.has_dependents": "Do other people depend on you for care or financial support?",
+  "profile.pets.has_pets": "Do you have pets that are part of your family?",
+  "profile.family.supports_aging_parent": "Are you caring for or supporting an aging parent?",
+  "profile.home.owns_real_property": "Do you own a home or other real estate?",
+  "profile.home.has_significant_personal_property": "Do you have valuable belongings or collections?",
+  "profile.financial.has_beneficiary_accounts": "Do you have retirement accounts, life insurance, or investment accounts?",
+  "profile.digital.owns_crypto": "Do you own cryptocurrency or significant digital assets?",
+  "profile.emotional.has_spiritual_practices": "Do you have spiritual or religious traditions important to you?",
+};
+
+// Unlock hints explaining what each answer unlocks
+const UNLOCK_HINTS: Record<string, string> = {
+  "profile.household.has_dependents": "Guardian designation, dependent care instructions, inheritance planning",
+  "profile.pets.has_pets": "Pet guardian selection, care instructions, veterinary preferences",
+  "profile.family.supports_aging_parent": "Caregiver coordination, medical decision support",
+  "profile.home.owns_real_property": "Property distribution, deed information, mortgage details",
+  "profile.home.has_significant_personal_property": "Heirloom distribution, collection handling, special items",
+  "profile.financial.has_beneficiary_accounts": "Beneficiary review, account consolidation, transfer planning",
+  "profile.digital.owns_crypto": "Wallet access, recovery phrases, digital asset transfer",
+  "profile.emotional.has_spiritual_practices": "Ceremony preferences, religious rites, memorial wishes",
+};
 
 // Helper to build profile_json from profile_answers
 function buildProfileJson(profileAnswers: Record<string, "yes" | "no">): Record<string, Record<string, boolean>> {
   const result: Record<string, Record<string, boolean>> = {};
   
   for (const [questionId, answer] of Object.entries(profileAnswers)) {
-    const item = PROFILE_ITEMS.find(i => i.id === questionId);
+    const item = ALL_PROFILE_ITEMS.find(i => i.id === questionId);
     if (!item) continue;
     
     const [category, field] = item.fieldPath.split(".");
@@ -71,88 +115,19 @@ function buildProfileJson(profileAnswers: Record<string, "yes" | "no">): Record<
   return result;
 }
 
-// Profile item card component
-interface ProfileItemCardProps {
-  item: ProfileItem;
-  currentValue: "yes" | "no" | null;
-  onClick: () => void;
-}
-
-const ProfileItemCard = ({ item, currentValue, onClick }: ProfileItemCardProps) => {
-  const Icon = item.icon;
-  const hasAnswer = currentValue !== null;
-  const isYes = currentValue === "yes";
-  
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center gap-2 p-4 rounded-xl transition-all duration-200",
-        "hover:scale-105 active:scale-95 cursor-pointer",
-        "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2",
-        hasAnswer && isYes && "bg-primary/10 border-2 border-primary/30",
-        hasAnswer && !isYes && "bg-muted/30 border-2 border-border/30",
-        !hasAnswer && "bg-muted/10 border-2 border-dashed border-border/20"
-      )}
-    >
-      <div
-        className={cn(
-          "w-14 h-14 rounded-xl flex items-center justify-center transition-all",
-          hasAnswer && isYes && "bg-primary/20",
-          hasAnswer && !isYes && "bg-muted/40",
-          !hasAnswer && "bg-muted/20"
-        )}
-      >
-        <Icon
-          className={cn(
-            "w-6 h-6 transition-colors",
-            hasAnswer && isYes && "text-primary",
-            hasAnswer && !isYes && "text-muted-foreground",
-            !hasAnswer && "text-muted-foreground/40"
-          )}
-        />
-      </div>
-      <span
-        className={cn(
-          "text-sm font-body font-medium transition-colors",
-          hasAnswer && isYes && "text-foreground",
-          hasAnswer && !isYes && "text-muted-foreground",
-          !hasAnswer && "text-muted-foreground/50"
-        )}
-      >
-        {item.label}
-      </span>
-      <div className="flex items-center gap-1">
-        {hasAnswer ? (
-          isYes ? (
-            <span className="flex items-center gap-1 text-xs text-primary font-medium">
-              <Check className="w-3 h-3" /> Yes
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <X className="w-3 h-3" /> No
-            </span>
-          )
-        ) : (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground/50">
-            <Circle className="w-3 h-3" /> Not set
-          </span>
-        )}
-      </div>
-    </button>
-  );
-};
-
 const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { assessmentState, isLoading, refresh } = useAssessmentState();
   
-  const [editingItem, setEditingItem] = useState<ProfileItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const { profile_complete, profile_progress, profile_answers, status, overall_progress, report_stale } = assessmentState;
   const hasStarted = status !== "not_started";
+
+  // Calculate completed count
+  const completedCount = ALL_PROFILE_ITEMS.filter(item => profile_answers[item.id] !== undefined).length;
+  const totalCount = ALL_PROFILE_ITEMS.length;
 
   const handleStartReadiness = () => {
     navigate("/readiness");
@@ -254,12 +229,15 @@ const Profile = () => {
       });
     } finally {
       setIsSaving(false);
-      setEditingItem(null);
     }
   }, [profile_answers, overall_progress, status, report_stale, refresh, navigate, toast]);
 
-  const getAnswerValue = (questionId: string): "yes" | "no" | null => {
-    return profile_answers[questionId] ?? null;
+  const getAnswersMap = (): Record<string, "yes" | "no" | null> => {
+    const result: Record<string, "yes" | "no" | null> = {};
+    ALL_PROFILE_ITEMS.forEach(item => {
+      result[item.id] = profile_answers[item.id] ?? null;
+    });
+    return result;
   };
 
   if (isLoading) {
@@ -276,58 +254,69 @@ const Profile = () => {
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-b from-background via-primary/5 to-background">
         <div className="max-w-xl mx-auto px-6 py-10 pb-32">
-          {/* Header */}
-          <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="text-2xl font-display font-bold text-foreground mb-2">
-              Your Life, At a Glance
-            </h1>
-            <p className="text-muted-foreground font-body text-sm leading-relaxed max-w-xs mx-auto">
-              Tap any area to update your profile
-            </p>
-          </div>
-
+          
           {/* Empty State - Not started */}
           {!hasStarted && (
-            <Card className="p-8 text-center bg-card/60 backdrop-blur-sm border-border/40 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-              <div className="space-y-5">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mx-auto">
-                  <UserCircle className="w-10 h-10 text-primary" />
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Simplified header for empty state */}
+              <div className="text-center mb-8">
+                <div className="relative inline-flex items-center justify-center mb-6">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                    <UserCircle className="w-12 h-12 text-primary" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <h2 className="text-lg font-display font-semibold text-foreground">
-                    Welcome! Let's create your snapshot
-                  </h2>
-                  <p className="text-foreground/80 font-body text-base leading-relaxed max-w-sm mx-auto">
-                    A few quick questions help us understand what matters most in your life — 
-                    no right or wrong answers.
-                  </p>
-                  <p className="text-sm text-muted-foreground font-body">
-                    About 1 minute · You can always update later
-                  </p>
-                </div>
-                <Button
-                  onClick={handleStartReadiness}
-                  size="lg"
-                  className="mt-2 gap-2 font-body"
-                >
-                  Let's Begin
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
+                <h1 className="text-2xl font-display font-bold text-foreground mb-2">
+                  Your Life Story
+                </h1>
+                <p className="text-muted-foreground font-body text-base leading-relaxed max-w-xs mx-auto">
+                  Let's create a snapshot of what matters most in your life
+                </p>
               </div>
-            </Card>
+
+              <Card className="p-8 text-center bg-card/60 backdrop-blur-sm border-border/40">
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-display font-semibold text-foreground">
+                      Welcome! Let's get started
+                    </h2>
+                    <p className="text-foreground/80 font-body text-base leading-relaxed max-w-sm mx-auto">
+                      A few quick questions help us understand your unique situation — 
+                      no right or wrong answers.
+                    </p>
+                    <p className="text-sm text-muted-foreground font-body">
+                      About 1 minute · You can always update later
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleStartReadiness}
+                    size="lg"
+                    className="mt-2 gap-2 font-body"
+                  >
+                    Let's Begin
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
 
           {/* Profile Content - Has started */}
           {hasStarted && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
+              {/* Personalized Header with Avatar + Progress Ring */}
+              <ProfileHeader 
+                completedCount={completedCount}
+                totalCount={totalCount}
+              />
+
               {/* Assessment Status Card */}
               <Card className="p-4 bg-card/60 backdrop-blur-sm border-border/40">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-body text-muted-foreground">Assessment Status</p>
+                    <p className="text-sm font-body text-muted-foreground">Life Readiness</p>
                     <p className="font-display font-semibold text-foreground">
-                      {status === "completed" ? "Complete" : `${Math.round(overall_progress)}% Complete`}
+                      {status === "completed" ? "Assessment Complete" : `${Math.round(overall_progress)}% Complete`}
                     </p>
                   </div>
                   <Button
@@ -342,53 +331,50 @@ const Profile = () => {
                 </div>
               </Card>
 
-              {/* Interactive Profile Grid */}
-              <Card className="p-6 bg-card/60 backdrop-blur-sm border-border/40">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <UserCircle className="w-8 h-8 text-primary" />
-                  </div>
-                  <p className="text-sm text-muted-foreground font-body">
-                    {profile_complete 
-                      ? "Your profile is complete" 
-                      : `Profile ${Math.round(profile_progress)}% complete`
-                    }
-                  </p>
-                </div>
+              {/* Categorized Life Areas */}
+              <div className="space-y-2">
+                <LifeAreaCategory
+                  title={PROFILE_CATEGORIES.people.title}
+                  items={PROFILE_CATEGORIES.people.items}
+                  answers={getAnswersMap()}
+                  questionPrompts={QUESTION_PROMPTS}
+                  unlockHints={UNLOCK_HINTS}
+                  onAnswer={handleProfileUpdate}
+                  disabled={isSaving}
+                  defaultOpen={true}
+                />
 
-                <div className="grid grid-cols-4 gap-3">
-                  {PROFILE_ITEMS.map((item) => (
-                    <ProfileItemCard
-                      key={item.id}
-                      item={item}
-                      currentValue={getAnswerValue(item.id)}
-                      onClick={() => setEditingItem(item)}
-                    />
-                  ))}
-                </div>
-              </Card>
+                <LifeAreaCategory
+                  title={PROFILE_CATEGORIES.assets.title}
+                  items={PROFILE_CATEGORIES.assets.items}
+                  answers={getAnswersMap()}
+                  questionPrompts={QUESTION_PROMPTS}
+                  unlockHints={UNLOCK_HINTS}
+                  onAnswer={handleProfileUpdate}
+                  disabled={isSaving}
+                  defaultOpen={true}
+                />
+
+                <LifeAreaCategory
+                  title={PROFILE_CATEGORIES.personal.title}
+                  items={PROFILE_CATEGORIES.personal.items}
+                  answers={getAnswersMap()}
+                  questionPrompts={QUESTION_PROMPTS}
+                  unlockHints={UNLOCK_HINTS}
+                  onAnswer={handleProfileUpdate}
+                  disabled={isSaving}
+                  defaultOpen={true}
+                />
+              </div>
 
               {/* Help text */}
-              <p className="text-center text-sm text-muted-foreground font-body">
-                Changes here may unlock or hide assessment questions based on your situation.
+              <p className="text-center text-sm text-muted-foreground font-body pt-2">
+                Changes here personalize your assessment and unlock relevant questions.
               </p>
             </div>
           )}
         </div>
       </div>
-
-      {/* Edit Modal */}
-      {editingItem && (
-        <ProfileEditModal
-          open={!!editingItem}
-          onOpenChange={(open) => !open && setEditingItem(null)}
-          icon={editingItem.icon}
-          label={editingItem.label}
-          questionPrompt={QUESTION_PROMPTS[editingItem.id] || `Update your ${editingItem.label.toLowerCase()} status`}
-          currentValue={getAnswerValue(editingItem.id)}
-          onAnswer={(value) => handleProfileUpdate(editingItem.id, value)}
-        />
-      )}
 
       {/* Saving overlay */}
       {isSaving && (
