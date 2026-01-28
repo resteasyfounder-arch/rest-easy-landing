@@ -44,24 +44,21 @@ const Assessment = () => {
 
   const advanceToNext = useCallback(() => {
     setShowReflection(false);
-    
+
     if (currentQuestionIndex < totalQuestions - 1) {
-      // Check if we need a pause screen
       if (currentQuestion.pauseAfter && step === "questions") {
         setPauseMessageIndex((prev) => (prev + 1) % pauseMessages.length);
         setStep("pause");
         return;
       }
-      
-      // Check if section is ending
+
       if (currentQuestion.sectionEnd && step === "questions") {
         setStep("section-transition");
         return;
       }
-      
+
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // All done - save and show results
       const score = calculateScore(answers);
       localStorage.setItem(
         "findabilityResults",
@@ -74,18 +71,15 @@ const Assessment = () => {
   const handleAnswer = (answer: AnswerValue) => {
     const newAnswers = { ...answers, [currentQuestion.id]: answer };
     setAnswers(newAnswers);
-    
-    // Show autosave indicator
     setLastSaved(true);
     setTimeout(() => setLastSaved(false), 100);
 
-    // Check if there's a reflection for this answer
     const reflection = currentQuestion.reflectionText?.[answer];
     if (reflection) {
       setShowReflection(true);
       setTimeout(() => advanceToNext(), 2000);
     } else {
-      setTimeout(() => advanceToNext(), 400);
+      setTimeout(() => advanceToNext(), 250); // Faster transition since animations are cleaner
     }
   };
 
@@ -94,7 +88,6 @@ const Assessment = () => {
   };
 
   const handlePauseContinue = () => {
-    // Check if section also ends here
     if (currentQuestion.sectionEnd) {
       setStep("section-transition");
     } else {
@@ -126,56 +119,32 @@ const Assessment = () => {
     navigate(-1);
   };
 
-  const handleRetake = () => {
-    setAnswers({});
-    setCurrentQuestionIndex(0);
-    setStep("intro");
-    setShowReflection(false);
-  };
-
-  // Get section icon based on category
   const getSectionIcon = (category: string) => {
     switch (category) {
-      case "documents":
-        return FileText;
-      case "healthcare":
-        return Heart;
-      case "financial":
-        return Wallet;
-      default:
-        return FileText;
+      case "documents": return FileText;
+      case "healthcare": return Heart;
+      case "financial": return Wallet;
+      default: return FileText;
     }
   };
 
-  // Intro screen
   if (step === "intro") {
     return (
-      <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-top safe-area-bottom">
-        <header className="flex items-center justify-end px-4 h-14">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="touch-target press-effect"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </header>
-        <div className="flex-1 overflow-y-auto">
-          <GentleIntro
-            headline="Take your time. There's no rush here."
-            description="This will help us understand what matters most to you. You can pause anytime and pick up where you left off."
-            subtext="About 2 minutes · Your answers are saved automatically"
-            ctaLabel="Let's Begin"
-            onStart={handleStart}
-          />
-        </div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 animate-fade-in">
+        <GentleIntro
+          headline="Take your time."
+          description="There is no rush here. This assessment is designed to be gentle, helping you understand where you stand at your own pace."
+          subtext="Takes about 2-3 minutes per section"
+          ctaLabel="Begin Assessment"
+          onStart={handleStart}
+        />
+        <Button variant="ghost" className="mt-8" onClick={handleClose}>
+          Exit
+        </Button>
       </div>
     );
   }
 
-  // Pause screen
   if (step === "pause") {
     return (
       <PauseScreen
@@ -186,92 +155,94 @@ const Assessment = () => {
     );
   }
 
-  // Section transition
   if (step === "section-transition") {
     const section = sectionInfo[currentQuestion.category];
     const Icon = getSectionIcon(currentQuestion.category);
-    
     return (
       <SectionTransition
         icon={Icon}
-        closingMessage={section?.closingMessage || "That's helpful context."}
+        closingMessage={section?.closingMessage || "Section complete."}
         nextSectionHint={section?.nextHint}
         onContinue={handleSectionContinue}
       />
     );
   }
 
-  // Results screen
   if (step === "results") {
     const score = calculateScore(answers);
-
     return (
       <CompletionScreen
-        headline="Thank you for taking the time."
-        message="Everything you've shared helps bring peace of mind — for you and the people who matter most."
+        headline="Results Ready"
+        message="We've analyzed your responses and created your personalized roadmap."
         primaryAction={{
-          label: "View Your Results",
+          label: "View Report",
           onClick: () => navigate("/results", { state: { score, answers } }),
         }}
         secondaryAction={{
-          label: "Return to Dashboard",
+          label: "Back Home",
           onClick: () => navigate("/"),
         }}
       />
     );
   }
 
-  // Questions screen
   const selectedAnswer = answers[currentQuestion.id];
   const reflectionText = selectedAnswer && currentQuestion.reflectionText?.[selectedAnswer];
 
   return (
-    <div className="fixed inset-0 bg-gradient-hero z-50 flex flex-col safe-area-top safe-area-bottom">
-      {/* Minimal header */}
-      <header className="flex items-center justify-between px-4 h-14">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleBack}
-          className="touch-target press-effect"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleClose}
-          className="touch-target press-effect"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </Button>
-      </header>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Calm Header */}
+      <header className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-6 md:px-12 bg-background/80 backdrop-blur-sm z-50">
+        <div className="w-24">
+          {currentQuestionIndex > 0 && (
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              className="text-muted-foreground hover:text-foreground pl-0 gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
+          )}
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="max-w-md mx-auto space-y-8 question-enter">
-          {/* Soft progress */}
+        {/* Progress Indicator */}
+        <div className="flex-1 max-w-xs md:max-w-md mx-auto">
           <SoftProgress
             current={currentQuestionIndex + 1}
             total={totalQuestions}
             sectionName={currentQuestion.categoryLabel}
           />
+        </div>
 
-          {/* Question card */}
+        <div className="w-24 flex justify-end">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content - Centered & Focused */}
+      <main className="flex-1 flex flex-col justify-center items-center p-6 pt-24 pb-12 max-w-2xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+        <div className="w-full space-y-10">
           <QuestionCard question={currentQuestion.question}>
-            <WhyThisMatters content={currentQuestion.whyWeAsk} className="mt-4 text-center" />
+            <WhyThisMatters content={currentQuestion.whyWeAsk} className="mt-6 text-center text-muted-foreground/80" />
           </QuestionCard>
 
-          {/* Reflection moment (shows after answering) */}
-          {reflectionText && (
-            <ReflectionMoment message={reflectionText} show={showReflection} />
+          {/* Reflection Moment */}
+          {reflectionText && showReflection && (
+            <div className="animate-fade-up">
+              <ReflectionMoment message={reflectionText} show={showReflection} />
+            </div>
           )}
 
-          {/* Answer buttons */}
-          <div className="space-y-3">
+          {/* Options Grid */}
+          <div className="grid gap-3 pt-4">
             {(["yes", "somewhat", "no"] as AnswerValue[]).map((value) => (
               <AnswerButton
                 key={value}
@@ -282,12 +253,14 @@ const Assessment = () => {
             ))}
           </div>
 
-          {/* Skip and autosave row */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex justify-center pt-8">
             <SkipButton onClick={handleSkip} />
-            <AutosaveIndicator show={lastSaved} />
           </div>
         </div>
+      </main>
+
+      <div className="fixed bottom-6 right-6">
+        <AutosaveIndicator show={lastSaved} />
       </div>
     </div>
   );

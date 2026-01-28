@@ -29,15 +29,14 @@ const DesktopLayout = ({ children }: DesktopLayoutProps) => {
         <AppSidebar />
         <SidebarInset className="flex-1">
           {/* Contextual Header */}
-          <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-border/50 bg-background/80 backdrop-blur-md px-6">
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-border/40 bg-background/80 backdrop-blur-md px-8 transition-all">
             <div className="flex items-center gap-4">
-              <SidebarTrigger className="h-8 w-8" />
-              <div className="h-4 w-px bg-border" />
-              <h1 className="font-body text-sm font-medium text-muted-foreground">
+              <SidebarTrigger className="h-9 w-9 text-muted-foreground hover:text-primary transition-colors" />
+              <div className="h-6 w-px bg-border/60" />
+              <h1 className="font-display text-lg font-medium text-foreground/80 tracking-tight">
                 {currentTitle}
               </h1>
             </div>
-            {/* Intentionally empty - auth actions handled by sidebar */}
           </header>
 
           {/* Main Content */}

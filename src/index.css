@@ -4,41 +4,47 @@
 
 @layer base {
   :root {
-    /* Rest Easy Brand Colors - Sage Green Theme */
-    --background: 140 20% 98%;
-    --foreground: 150 25% 15%;
+    /* Rest Easy Brand Colors v2 - Calm & Trust-Forward */
+    /* Background: Moving from stark white to warm off-white/cream */
+    --background: 40 30% 98%; /* #FDFBF8 - Warm Cream */
+    --foreground: 155 30% 15%; /* Deep Forest Green/Charcoal */
 
+    /* Cards: Clean white or very subtle tint */
     --card: 0 0% 100%;
-    --card-foreground: 150 25% 15%;
+    --card-foreground: 155 30% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 150 25% 15%;
+    --popover-foreground: 155 30% 15%;
 
-    /* Primary - Sage Green from logo */
-    --primary: 155 30% 50%;
+    /* Primary: Sophisticated Sage Green */
+    --primary: 155 30% 50%; /* Original Sage */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Light sage */
-    --secondary: 150 25% 92%;
-    --secondary-foreground: 155 30% 35%;
+    /* Secondary: Warm Sand for secondary actions (instead of just grey) */
+    --secondary: 40 20% 94%; 
+    --secondary-foreground: 155 30% 25%;
 
-    --muted: 140 15% 94%;
-    --muted-foreground: 150 15% 45%;
+    /* Muted: Soft slate-green for inactive text */
+    --muted: 155 10% 94%;
+    --muted-foreground: 155 10% 45%;
 
-    /* Accent - Mint green */
+    /* Accent: Mint for highlights */
     --accent: 160 35% 85%;
-    --accent-foreground: 155 30% 25%;
+    --accent-foreground: 155 30% 20%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive: Soft Rose, not traffic light red */
+    --destructive: 0 60% 75%;
+    --destructive-foreground: 0 60% 20%;
 
-    --border: 150 20% 88%;
-    --input: 150 20% 88%;
+    /* Border: Very subtle, almost invisible */
+    --border: 155 10% 90%;
+    --input: 155 10% 90%;
     --ring: 155 30% 50%;
 
-    --radius: 0.75rem;
+    /* Radius: Softer, larger corners */
+    --radius: 1rem; /* 16px */
 
-    /* Custom tokens */
+    /* Custom tokens retained for compatibility */
     --sage-50: 150 30% 97%;
     --sage-100: 150 28% 92%;
     --sage-200: 152 26% 84%;
@@ -51,66 +57,66 @@
     --sage-900: 155 38% 18%;
 
     --mint: 160 40% 75%;
-    --cream: 40 30% 96%;
+    --cream: 40 30% 98%;
 
-    /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(150 30% 97%) 0%, hsl(160 35% 92%) 50%, hsl(150 25% 95%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(150 20% 98%) 100%);
-    --gradient-sage: linear-gradient(135deg, hsl(155 30% 50%) 0%, hsl(160 35% 58%) 100%);
+    /* Gradients - Reduced usage, softer transitions */
+    --gradient-hero: linear-gradient(135deg, hsl(40 30% 98%) 0%, hsl(150 20% 96%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(40 30% 99%) 100%);
+    --gradient-sage: linear-gradient(135deg, hsl(155 30% 50%) 0%, hsl(160 30% 55%) 100%);
 
-    /* Shadows */
-    --shadow-soft: 0 4px 20px -4px hsl(155 30% 50% / 0.12);
-    --shadow-card: 0 8px 30px -8px hsl(155 30% 50% / 0.15);
-    --shadow-elevated: 0 20px 50px -12px hsl(155 30% 50% / 0.2);
+    /* Shadows - softer "elevation" rather than hard shadow */
+    --shadow-soft: 0 4px 20px -8px rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 2px 10px -4px rgba(0, 0, 0, 0.05);
+    --shadow-elevated: 0 20px 40px -12px rgba(0, 0, 0, 0.1);
 
-    /* Sidebar - Matches Rest Easy brand */
-    --sidebar-background: 140 20% 98%;
-    --sidebar-foreground: 150 25% 15%;
+    /* Sidebar */
+    --sidebar-background: 40 30% 97%;
+    --sidebar-foreground: 155 30% 20%;
     --sidebar-primary: 155 30% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 150 25% 92%;
+    --sidebar-accent: 40 20% 92%;
     --sidebar-accent-foreground: 155 30% 25%;
-    --sidebar-border: 150 20% 88%;
+    --sidebar-border: 155 10% 88%;
     --sidebar-ring: 155 30% 50%;
   }
 
   .dark {
     --background: 155 25% 8%;
-    --foreground: 150 20% 95%;
+    --foreground: 40 20% 95%;
 
-    --card: 155 20% 12%;
-    --card-foreground: 150 20% 95%;
+    --card: 155 20% 10%;
+    --card-foreground: 40 20% 95%;
 
-    --popover: 155 20% 12%;
-    --popover-foreground: 150 20% 95%;
+    --popover: 155 20% 10%;
+    --popover-foreground: 40 20% 95%;
 
     --primary: 155 35% 55%;
     --primary-foreground: 155 38% 10%;
 
     --secondary: 155 20% 18%;
-    --secondary-foreground: 150 20% 90%;
+    --secondary-foreground: 40 20% 90%;
 
-    --muted: 155 15% 20%;
-    --muted-foreground: 150 15% 60%;
+    --muted: 155 15% 15%;
+    --muted-foreground: 155 15% 60%;
 
-    --accent: 160 30% 25%;
+    --accent: 160 30% 20%;
     --accent-foreground: 155 35% 85%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 155 15% 22%;
-    --input: 155 15% 22%;
+    --border: 155 15% 20%;
+    --input: 155 15% 20%;
     --ring: 155 35% 55%;
     
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 155 25% 6%;
+    --sidebar-foreground: 40 20% 90%;
+    --sidebar-primary: 155 35% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 155 20% 14%;
+    --sidebar-accent-foreground: 40 20% 95%;
+    --sidebar-border: 155 15% 18%;
+    --sidebar-ring: 155 35% 55%;
   }
 }
 

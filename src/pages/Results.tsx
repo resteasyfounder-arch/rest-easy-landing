@@ -38,7 +38,7 @@ const Results = () => {
   useEffect(() => {
     const fetchReport = async () => {
       const subjectId = localStorage.getItem(SUBJECT_ID_KEY);
-      
+
       if (!subjectId) {
         console.log("[Results] No subject_id found, cannot fetch report");
         setLoading(false);
@@ -65,7 +65,7 @@ const Results = () => {
         const stateData = await stateResponse.json();
         const reportStatus = stateData?.assessment_state?.report_status;
         const reportStale = stateData?.assessment_state?.report_stale;
-        
+
         // If generating OR stale, show loading and poll
         if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
           console.log("[Results] Report is generating or stale, showing progress UI");
@@ -93,7 +93,7 @@ const Results = () => {
         });
 
         const data = await response.json();
-        
+
         if (response.ok && data.report) {
           console.log("[Results] Report loaded from server");
           setReport(data.report as ReadinessReport);
@@ -146,10 +146,10 @@ const Results = () => {
 
           const reportData = await reportResponse.json();
           const stateData = await stateResponse.json();
-          
+
           const reportStale = stateData?.assessment_state?.report_stale;
           const reportStatus = stateData?.assessment_state?.report_status;
-          
+
           // Only show report if it exists AND is not stale AND status is ready
           if (reportResponse.ok && reportData.report && !reportStale && reportStatus === "ready") {
             console.log("[Results] Report ready after polling (not stale)");
@@ -182,11 +182,11 @@ const Results = () => {
 
   const handleDownloadPDF = async () => {
     if (!reportRef.current || !report) return;
-    
+
     setDownloading(true);
     try {
       const html2pdf = (await import("html2pdf.js")).default;
-      
+
       const opt = {
         margin: [0.75, 0.75, 0.75, 0.75],
         filename: `Rest-Easy-Readiness-Report-${new Date().toISOString().split('T')[0]}.pdf`,
@@ -266,26 +266,28 @@ const Results = () => {
       </header>
 
       {/* Document-Style Report */}
-      <div ref={reportRef} className="pt-16 pb-24 bg-white min-h-screen print:pt-0 print:pb-0">
-        <div className="max-w-3xl mx-auto px-8 print:px-12 print:max-w-none">
-          
+      <div ref={reportRef} className="pt-16 pb-24 bg-background min-h-screen print:pt-0 print:pb-0">
+        <div className="max-w-3xl mx-auto px-8 print:px-12 print:max-w-none space-y-12 md:space-y-16">
+
           {/* Cover Page */}
-          <CoverPage 
-            score={report.overallScore} 
-            tier={report.tier} 
-            userName={report.userName} 
-            generatedAt={report.generatedAt} 
-            metrics={metrics} 
+          <CoverPage
+            score={report.overallScore}
+            tier={report.tier}
+            userName={report.userName}
+            generatedAt={report.generatedAt}
+            metrics={metrics}
           />
 
           {/* Table of Contents */}
           <TableOfContents />
 
-          {/* Executive Summary */}
-          <ExecutiveSummary summary={report.executive_summary} />
+          <div className="space-y-12">
+            {/* Executive Summary */}
+            <ExecutiveSummary summary={report.executive_summary} />
 
-          {/* Immediate Actions */}
-          <ImmediateActions actions={report.immediate_actions} />
+            {/* Immediate Actions */}
+            <ImmediateActions actions={report.immediate_actions} />
+          </div>
 
           {/* Category Scores with Detailed Analysis */}
           <CategoryScores categories={report.category_analyses} />
@@ -319,19 +321,19 @@ const Results = () => {
           <ClosingMessage message={report.closing_message} />
 
           {/* Footer */}
-          <footer className="border-t-2 border-gray-200 pt-8 mt-12 text-center print:break-inside-avoid">
-            <img src={restEasyLogo} alt="Rest Easy" className="h-10 mx-auto mb-4 opacity-60" />
-            <p className="text-xs text-gray-400 font-body mb-2">
+          <footer className="border-t border-border/40 pt-12 mt-24 text-center print:break-inside-avoid">
+            <img src={restEasyLogo} alt="Rest Easy" className="h-8 mx-auto mb-6 opacity-40 grayscale" />
+            <p className="text-sm text-muted-foreground font-body mb-2">
               End-of-Life Planning Services
             </p>
-            <p className="text-xs text-gray-400 font-body mb-4 max-w-lg mx-auto">
-              This report was generated based on your assessment responses and is intended to provide guidance for your planning journey. 
+            <p className="text-xs text-muted-foreground/60 font-body mb-4 max-w-lg mx-auto leading-relaxed">
+              This report was generated based on your assessment responses and is intended to provide guidance for your planning journey.
               The information contained herein is educational in nature and should not be considered legal, financial, or medical advice.
             </p>
-            <p className="text-xs text-gray-500 font-body">
+            <p className="text-xs text-muted-foreground/60 font-body">
               Generated: {new Date(report.generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-muted-foreground/40 mt-2">
               © {new Date().getFullYear()} Rest Easy. All rights reserved.
             </p>
           </footer>
@@ -339,10 +341,10 @@ const Results = () => {
       </div>
 
       {/* Bottom Actions */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 print:hidden">
+      <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border/40 p-4 print:hidden z-40">
         <div className="max-w-3xl mx-auto flex gap-3">
           <ShareReportDialog report={report} />
-          <Button onClick={handleDownloadPDF} disabled={downloading} className="flex-1 gap-2">
+          <Button onClick={handleDownloadPDF} disabled={downloading} className="flex-1 gap-2 shadow-soft">
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Download PDF
           </Button>
