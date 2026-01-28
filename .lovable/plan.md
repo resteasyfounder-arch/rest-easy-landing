@@ -1,186 +1,211 @@
 
 
-# Dashboard UX Overhaul: A Journey-Centric Redesign
-
-## Executive Summary
-
-The current "in-progress" dashboard suffers from a utility-first design that feels like a checklist rather than a personal journey. This redesign transforms the experience into an emotionally engaging, narrative-driven dashboard that motivates completion while providing actionable clarity.
-
----
+# Profile Page Redesign: "Your Life Story" - A Visual Identity Experience
 
 ## Current State Problems
 
 ### What's Not Working:
+1. **Grid of Boxes** - All 8 items appear as identical small tiles, making it feel like a mechanical checklist
+2. **No Visual Hierarchy** - "Family" has the same visual weight as "Digital Assets" despite different emotional significance
+3. **Static & Flat** - No animation, no depth, no personality
+4. **Modal-Heavy Flow** - Every tap opens a modal, creating a disconnected, jarring experience
+5. **Missing Personal Touch** - Doesn't feel like "YOUR" profile - it's just a data entry form
+6. **No Storytelling** - Users don't understand how their selections connect to their life
 
-1. **Overwhelming Progress Hero** - A massive circular progress indicator dominates the view, making 30% feel discouraging rather than encouraging
-2. **Monotonous Section List** - All sections appear as identical "bubbles" with no visual hierarchy or emotional differentiation
-3. **No Sense of Journey** - The current layout reads like a form checklist, not a personal journey of discovery
-4. **Buried Motivation** - The "What You'll Unlock" section is pushed to the bottom, when it should inspire action
-5. **Missing Context** - Users don't understand WHY each section matters or what they'll gain
+## Design Philosophy
 
----
-
-## Proposed Design: "Your Journey Home"
-
-### Design Philosophy
-
-Transform the dashboard from a **task tracker** into a **story of progress** - where users feel they're on a meaningful path toward peace of mind, not checking boxes.
+Transform the profile from a **data entry form** into a **visual life canvas** - where users see their life represented beautifully, with each selection creating a more complete picture of who they are.
 
 ---
 
-## Section 1: The Welcoming Hero
-
-### Current: 
-Large circular progress ring with percentage
-
-### Proposed: 
-A warm, narrative-focused welcome that adapts to progress state
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│  🌿 Good evening, Sarah                                         │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                                                          │   │
-│  │   "You're 3 sections away from                           │   │
-│  │    your personalized report"                             │   │
-│  │                                                          │   │
-│  │   ████████░░░░░░░░░░░  42%                               │   │
-│  │                                                          │   │
-│  │   ┌─────────────────────────────────────────────────┐    │   │
-│  │   │  ▶  Continue with Healthcare Wishes             │    │   │
-│  │   └─────────────────────────────────────────────────┘    │   │
-│  │                                                          │   │
-│  │   ~5 minutes remaining                                   │   │
-│  │                                                          │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Key Changes:
-- Replace circular progress with a **slim horizontal bar** - less intimidating
-- Add **narrative text** that emphasizes proximity to goal, not deficit
-- Single, prominent **"Continue" CTA** that names the next section
-- Add **time estimate** to reduce anxiety
-
----
-
-## Section 2: Journey Timeline (Replaces Section Bubbles)
+## Section 1: The Identity Canvas (Replaces Grid)
 
 ### Current:
-Vertical list of identical section cards with progress bars
+8 identical square tiles in a 4x2 grid
 
 ### Proposed:
-A **visual timeline/path** showing the journey with distinct states
+A radial/orbital layout where profile items orbit around a central "you" avatar, creating a visual representation of life's important areas
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│   YOUR JOURNEY                                                  │
+│                         YOUR LIFE STORY                         │
 │                                                                 │
-│   ✓ Getting to Know You          ← Profile complete             │
-│   │                                                             │
-│   ✓ Financial Affairs            ← 100% · Score: 72            │
-│   │                              "Your finances are organized"  │
-│   │                                                             │
-│   ◉ Healthcare Wishes    ← IN PROGRESS · 2 of 5 questions      │
-│   │  ┌─────────────────────────────────────────────────────┐    │
-│   │  │ Continue where you left off                         │    │
-│   │  └─────────────────────────────────────────────────────┘    │
-│   │                                                             │
-│   ○ Legal Documents              ← Ready to start               │
-│   │                                                             │
-│   ○ Family Communication         ← Ready to start               │
-│   │                                                             │
-│   🔒 Digital Legacy              ← Completes after profile      │
+│                    🏠                    👨‍👩‍👧‍👦                      │
+│                 Home                    Family                  │
+│                                                                 │
+│           💼                   ┌──────┐                🐾        │
+│       Belongings              │  👤  │               Pets       │
+│                               │ YOU  │                          │
+│                               └──────┘                          │
+│           💰                                           🙏        │
+│        Finances                                      Faith      │
+│                                                                 │
+│                    💻                    🫂                       │
+│                 Digital               Caregiving                │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Changes:
-- **Vertical timeline** with connected path (connectors between nodes)
-- **State-specific visuals**: ✓ completed, ◉ current (pulsing), ○ available, 🔒 locked
-- **Micro-wins**: Show brief positive feedback for completed sections
-- **Embedded CTA** on current section - not a separate button below
-- **Collapsible** completed sections to reduce visual weight
+### Key Features:
+- **Central Avatar** with initials or gentle placeholder icon
+- **Orbital Items** float gently around the center (subtle floating animation)
+- **Visual States**: 
+  - Active (Yes) = Filled, glowing, connected with subtle line to center
+  - Inactive (No) = Outlined, dimmed, but still present
+  - Unanswered = Dotted outline, pulsing gently
+- **Connection Lines** drawn from active items to center, showing what's part of "your story"
 
 ---
 
-## Section 3: Motivation Panel (Elevated Position)
+## Section 2: Inline Toggle Cards (Replaces Modal)
 
 ### Current:
-"What You'll Unlock" cards at bottom with generic locked icons
+Tap tile → Modal opens → Select Yes/No → Modal closes
 
 ### Proposed:
-**Side-by-side teaser cards** positioned prominently, with animated preview
-
-```text
-┌───────────────────────────────────┬───────────────────────────────────┐
-│                                   │                                   │
-│  🎯 YOUR READINESS SCORE          │  🗺️ YOUR ACTION ROADMAP          │
-│                                   │                                   │
-│    ╭───────────────────╮          │    ┌─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐        │
-│    │                   │          │     ☐ Prioritized tasks           │
-│    │       ??          │          │     ☐ Quick wins                  │
-│    │                   │          │     ☐ Expert guidance             │
-│    ╰───────────────────╯          │    └─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘        │
-│                                   │                                   │
-│  Reveal when complete ──────────▶ │  Personalized just for you        │
-│                                   │                                   │
-└───────────────────────────────────┴───────────────────────────────────┘
-```
-
-### Key Changes:
-- **Move up** in the visual hierarchy (above section list or alongside progress)
-- Add **subtle animation** (gentle pulse on the "??" or shimmer effect)
-- **Hint at value** with blurred/teased content, not just locked icons
-- Show **what type of guidance** they'll receive
-
----
-
-## Section 4: Quick Stats Strip
-
-### New Addition:
-A compact strip showing key metrics at a glance
+**Expandable inline cards** using shadcn Collapsible - tap to expand in-place, no modal needed
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│   🕐 ~5 min left    📋 12/28 questions    ✓ 3/7 sections       │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 👨‍👩‍👧‍👦  Family                                     ✓ Yes  │    │
+│  │                                                         │    │
+│  │  People depend on you for care or support               │    │
+│  │                                                         │    │
+│  │  ┌────────────────┐  ┌────────────────┐                 │    │
+│  │  │      Yes       │  │      No        │                 │    │
+│  │  └────────────────┘  └────────────────┘                 │    │
+│  │                                                         │    │
+│  │  Unlocks: Healthcare proxy questions, inheritance       │    │
+│  │  planning, family communication section                 │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 🐾  Pets                                        · No    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 🏠  Home                                        ○ ···   │    │
+│  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Purpose:
-- Reduces cognitive load by providing context without dominating
-- Feels informative, not overwhelming
-- Updates in real-time as progress is made
+### Key Changes:
+- Use **shadcn Collapsible** for expand/collapse
+- **Inline buttons** for Yes/No selection (use shadcn Toggle or Button)
+- Show **"What this unlocks"** hint when expanded
+- **Subtle animation** on expand/collapse
+- **Progress indicator** appears on collapsed cards (✓ Yes, · No, ○ Not set)
 
 ---
 
-## Section 5: Profile Nudge (Contextual)
+## Section 3: Personalized Header with Avatar
 
 ### Current:
-Always-visible card with progress bar
+Generic "Your Life, At a Glance" with plain UserCircle icon
 
 ### Proposed:
-**Inline contextual prompt** only when profile affects sections
+A **warm, personalized header** with avatar and completion ring
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  💡 Quick tip: Complete your profile to unlock                  │
-│     Digital Legacy and 3 more personalized questions            │
 │                                                                 │
-│     [Complete Profile →]                                        │
+│           ╭──────────────────────────────────────────╮          │
+│           │          ╭─────────────────╮             │          │
+│           │          │                 │             │          │
+│           │          │   ┌───────┐     │             │          │
+│           │          │   │  👤   │     │  ← Progress │          │
+│           │          │   │ S.J.  │     │     Ring    │          │
+│           │          │   └───────┘     │             │          │
+│           │          │                 │             │          │
+│           │          ╰─────────────────╯             │          │
+│           ╰──────────────────────────────────────────╯          │
+│                                                                 │
+│                     Good evening, Friend                        │
+│                                                                 │
+│          "Your life snapshot is 75% complete"                   │
+│                                                                 │
+│    ┌─────────────────────────────────────────────────┐          │
+│    │       5 of 8 areas reflect your life           │          │
+│    └─────────────────────────────────────────────────┘          │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Changes:
-- Show **only when relevant** (sections are locked due to profile)
-- Explain **what they'll unlock** specifically
-- Compact, non-intrusive design
+### Features:
+- **Circular progress ring** around avatar (using SVG or shadcn Progress in circular mode)
+- **Time-based greeting** ("Good morning", "Good evening")
+- **Narrative progress** ("5 of 8 areas reflect your life")
+- Use shadcn **Avatar** component with fallback initials
+
+---
+
+## Section 4: Category Grouping with Accordions
+
+### Current:
+All 8 items displayed equally in a flat grid
+
+### Proposed:
+Group items into **meaningful categories** using shadcn Accordion
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  PEOPLE IN YOUR LIFE                                    2/3 ✓   │
+│  ────────────────────────────────────────────────────────────   │
+│  │ 👨‍👩‍👧‍👦 Family    │ 🐾 Pets    │ 🫂 Caregiving                │
+│                                                                 │
+│  YOUR ASSETS                                            1/3 ✓   │
+│  ────────────────────────────────────────────────────────────   │
+│  │ 🏠 Home    │ 💼 Belongings    │ 💰 Finances                  │
+│                                                                 │
+│  PERSONAL & DIGITAL                                     0/2     │
+│  ────────────────────────────────────────────────────────────   │
+│  │ 💻 Digital    │ 🙏 Faith                                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Benefits:
+- Creates **logical groupings** users can understand
+- Shows **category-level progress** (2/3 complete)
+- Reduces visual overwhelm by chunking
+- Uses **shadcn Accordion** for expand/collapse
+
+---
+
+## Section 5: Micro-Interactions & Animations
+
+### New Animations to Add:
+1. **Float Animation** - Profile items gently bob up and down
+2. **Connection Draw** - When item is set to "Yes", a line animates drawing to center
+3. **Glow Pulse** - Active items have a subtle glow pulse
+4. **Expand Ripple** - When tapping a card, ripple effect from tap point
+5. **Confetti Burst** - When profile reaches 100%, subtle celebration
+
+### CSS Additions:
+```css
+/* Floating animation for orbital items */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Connection line draw */
+@keyframes draw-connection {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Glow pulse for active items */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3); }
+  50% { box-shadow: 0 0 20px 4px hsl(var(--primary) / 0.2); }
+}
+```
 
 ---
 
@@ -188,107 +213,87 @@ Always-visible card with progress bar
 
 ### New Components to Create:
 
-| Component | Purpose |
-|-----------|---------|
-| `JourneyTimeline.tsx` | Vertical timeline with connected nodes |
-| `JourneyNode.tsx` | Individual section node with state |
-| `ProgressHero.tsx` | Narrative-focused welcome hero |
-| `QuickStatsStrip.tsx` | Compact metrics bar |
-| `UnlockTeaserCard.tsx` | Animated "coming soon" preview |
+| Component | Purpose | shadcn Used |
+|-----------|---------|-------------|
+| `ProfileHeader.tsx` | Personalized avatar with progress ring | Avatar, Progress |
+| `ProfileCanvas.tsx` | Radial/orbital layout of life areas | Custom + CSS |
+| `LifeAreaCard.tsx` | Collapsible inline toggle card | Collapsible, Button |
+| `ConnectionLine.tsx` | SVG connection lines to center | Custom SVG |
 
 ### Components to Modify:
 
 | Component | Changes |
 |-----------|---------|
-| `Dashboard.tsx` | New layout structure for in-progress view |
-| `SectionProgressCard.tsx` | Refactor into `JourneyNode` |
-| `LockedPreviewCard.tsx` | Add shimmer animation, richer preview |
+| `Profile.tsx` | Complete restructure with new layout |
+| `ProfileEditModal.tsx` | Keep as fallback for accessibility, but prefer inline |
 
 ### Files to Create:
-- `src/components/dashboard/journey/JourneyTimeline.tsx`
-- `src/components/dashboard/journey/JourneyNode.tsx`
-- `src/components/dashboard/journey/index.ts`
-- `src/components/dashboard/ProgressHero.tsx`
-- `src/components/dashboard/QuickStatsStrip.tsx`
-- `src/components/dashboard/UnlockTeaserCard.tsx`
+- `src/components/profile/ProfileHeader.tsx`
+- `src/components/profile/ProfileCanvas.tsx`
+- `src/components/profile/LifeAreaCard.tsx`
 
 ### Files to Modify:
-- `src/pages/Dashboard.tsx` - New in-progress layout
-- `src/components/dashboard/index.ts` - Export new components
-- `src/index.css` - Add shimmer animation keyframes
+- `src/pages/Profile.tsx` - New layout structure
+- `src/index.css` - Add new animations
 
 ---
 
-## Animation Enhancements
+## Implementation Approach
 
-### New CSS Animations:
+Given the scope, I recommend a **hybrid approach** that balances innovation with implementation time:
 
-```css
-/* Shimmer effect for teaser cards */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
+### Option A: Full Orbital Canvas (High Impact, More Complex)
+- Radial layout with SVG connections
+- Stunning visual impact
+- More CSS/SVG work required
 
-/* Gentle pulse for current section node */
-@keyframes journey-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
-  50% { box-shadow: 0 0 0 12px hsl(var(--primary) / 0); }
-}
+### Option B: Enhanced Card List (Moderate Impact, Faster)
+- Inline collapsible cards with shadcn Collapsible
+- Category grouping with shadcn Accordion
+- Personalized header with Avatar + progress ring
+- Faster to implement, still significant UX improvement
 
-/* Path connector grow animation */
-@keyframes path-grow {
-  from { height: 0; }
-  to { height: 100%; }
-}
-```
-
----
-
-## Responsive Considerations
-
-### Mobile Layout:
-- Journey timeline becomes a **compact vertical list**
-- Unlock teasers stack vertically
-- Progress hero simplifies to just the bar and CTA
-- Quick stats become a **scrollable chip row**
-
-### Tablet/Desktop:
-- Journey timeline can have **more horizontal space** for context
-- Unlock teasers side-by-side
-- Full progress hero with narrative
-
----
-
-## Micro-Interactions
-
-1. **Section Complete Animation**: When a section reaches 100%, the node transforms from ◉ to ✓ with a satisfying pop animation
-2. **Progress Bar Fill**: Smooth animation when percentage increases
-3. **CTA Hover**: Subtle lift and shadow on the continue button
-4. **Teaser Shimmer**: Gentle shimmer on locked content to draw curiosity
-
----
-
-## Benefits of This Approach
-
-| Benefit | How It's Achieved |
-|---------|-------------------|
-| **Less Overwhelming** | Replace large circular progress with slim bar |
-| **Clearer Next Step** | Single prominent CTA naming the specific section |
-| **Sense of Journey** | Vertical timeline shows path traveled and path ahead |
-| **Motivation to Complete** | Elevated unlock teasers with animated hints |
-| **Celebrates Progress** | Micro-wins shown for completed sections |
-| **Contextual Guidance** | Profile nudge only when relevant |
-| **Brand Warmth** | Sage green theme, gentle animations, caring copy |
+### Recommendation: Start with Option B foundations, with Option A's visual polish:
+1. Personalized header with Avatar and circular progress
+2. Grouped categories using Accordion
+3. Inline collapsible cards (no modal) using Collapsible
+4. Add float animations and visual states
+5. Show "what this unlocks" context
 
 ---
 
 ## Implementation Order
 
-1. **Phase 1**: Create `ProgressHero` component with narrative text and slim progress bar
-2. **Phase 2**: Build `JourneyTimeline` and `JourneyNode` components
-3. **Phase 3**: Enhance `LockedPreviewCard` with shimmer and rename to `UnlockTeaserCard`
-4. **Phase 4**: Create `QuickStatsStrip` component
-5. **Phase 5**: Integrate all components in `Dashboard.tsx` in-progress view
-6. **Phase 6**: Add animations and polish
+1. **Phase 1**: Create `ProfileHeader.tsx` with Avatar + progress ring and time-based greeting
+2. **Phase 2**: Create `LifeAreaCard.tsx` with Collapsible + inline Yes/No buttons
+3. **Phase 3**: Restructure `Profile.tsx` to use new components with category grouping
+4. **Phase 4**: Add animations (float, glow, expand)
+5. **Phase 5**: Add "What this unlocks" context hints
+6. **Phase 6**: Polish and responsive adjustments
+
+---
+
+## Visual Summary
+
+| Before | After |
+|--------|-------|
+| Generic title | Time-based personalized greeting |
+| Plain icon | Avatar with progress ring |
+| 4x2 grid of boxes | Categorized collapsible cards |
+| Modal for every edit | Inline expand/collapse |
+| Static, flat | Animated, layered, glowing |
+| No context | Shows "what this unlocks" |
+
+---
+
+## Benefits
+
+| Benefit | How Achieved |
+|---------|--------------|
+| **Feels Personal** | Avatar, greeting by time of day, "Your life story" framing |
+| **Less Overwhelming** | Category grouping, collapsible sections |
+| **More Engaging** | Animations, inline interactions, visual feedback |
+| **Clearer Purpose** | "What this unlocks" shows value of each selection |
+| **Brand Aligned** | Sage green theme, warm shadows, gentle animations |
+| **Accessible** | Modal retained as fallback, keyboard navigable |
 
