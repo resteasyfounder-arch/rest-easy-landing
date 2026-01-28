@@ -1,6 +1,6 @@
 // Shared assessment components
 export { default as GentleIntro } from './GentleIntro';
-export { default as QuestionCard } from './QuestionCard';
+export { QuestionCard } from './QuestionCard';
 export { default as SoftProgress } from './SoftProgress';
 export { default as AnswerButton } from './AnswerButton';
 export { default as WhyThisMatters } from './WhyThisMatters';
