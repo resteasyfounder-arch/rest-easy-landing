@@ -5,7 +5,7 @@
 @layer base {
   :root {
     /* Rest Easy Brand Colors - Sage Green Theme */
-    --background: 140 20% 98%;
+    --background: 0 0% 100%;
     --foreground: 150 25% 15%;
 
     --card: 0 0% 100%;
@@ -64,7 +64,7 @@
     --shadow-elevated: 0 20px 50px -12px hsl(155 30% 50% / 0.2);
 
     /* Sidebar - Matches Rest Easy brand */
-    --sidebar-background: 140 20% 98%;
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 150 25% 15%;
     --sidebar-primary: 155 30% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
