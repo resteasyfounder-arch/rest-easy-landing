@@ -1,11 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
-import { LifeAreaCategory } from "@/components/profile/LifeAreaCategory";
+import { ProfileSummary } from "@/components/profile/ProfileSummary";
+import { CompactLifeCard } from "@/components/profile/CompactLifeCard";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserCircle,
@@ -39,62 +40,39 @@ interface ProfileItem {
   fieldPath: string;
 }
 
-// Grouped profile items by category
-const PROFILE_CATEGORIES = {
-  people: {
-    title: "People in Your Life",
-    items: [
-      { id: "profile.household.has_dependents", label: "Family", icon: Users, fieldPath: "household.has_dependents" },
-      { id: "profile.pets.has_pets", label: "Pets", icon: Heart, fieldPath: "pets.has_pets" },
-      { id: "profile.family.supports_aging_parent", label: "Caregiving", icon: HandHeart, fieldPath: "family.supports_aging_parent" },
-    ],
-  },
-  assets: {
-    title: "Your Assets",
-    items: [
-      { id: "profile.home.owns_real_property", label: "Home", icon: Home, fieldPath: "home.owns_real_property" },
-      { id: "profile.home.has_significant_personal_property", label: "Belongings", icon: Briefcase, fieldPath: "home.has_significant_personal_property" },
-      { id: "profile.financial.has_beneficiary_accounts", label: "Finances", icon: PiggyBank, fieldPath: "financial.has_beneficiary_accounts" },
-    ],
-  },
-  personal: {
-    title: "Personal & Digital",
-    items: [
-      { id: "profile.digital.owns_crypto", label: "Digital Assets", icon: Laptop, fieldPath: "digital.owns_crypto" },
-      { id: "profile.emotional.has_spiritual_practices", label: "Faith & Spirituality", icon: Flower2, fieldPath: "emotional.has_spiritual_practices" },
-    ],
-  },
-};
-
-// Flat list for iteration
-const ALL_PROFILE_ITEMS: ProfileItem[] = [
-  ...PROFILE_CATEGORIES.people.items,
-  ...PROFILE_CATEGORIES.assets.items,
-  ...PROFILE_CATEGORIES.personal.items,
+const PROFILE_ITEMS: ProfileItem[] = [
+  { id: "profile.household.has_dependents", label: "Family", icon: Users, fieldPath: "household.has_dependents" },
+  { id: "profile.pets.has_pets", label: "Pets", icon: Heart, fieldPath: "pets.has_pets" },
+  { id: "profile.family.supports_aging_parent", label: "Caregiving", icon: HandHeart, fieldPath: "family.supports_aging_parent" },
+  { id: "profile.home.owns_real_property", label: "Home", icon: Home, fieldPath: "home.owns_real_property" },
+  { id: "profile.home.has_significant_personal_property", label: "Belongings", icon: Briefcase, fieldPath: "home.has_significant_personal_property" },
+  { id: "profile.financial.has_beneficiary_accounts", label: "Finances", icon: PiggyBank, fieldPath: "financial.has_beneficiary_accounts" },
+  { id: "profile.digital.owns_crypto", label: "Digital Assets", icon: Laptop, fieldPath: "digital.owns_crypto" },
+  { id: "profile.emotional.has_spiritual_practices", label: "Faith & Spirituality", icon: Flower2, fieldPath: "emotional.has_spiritual_practices" },
 ];
 
-// Question prompts for each profile item
+// Question prompts
 const QUESTION_PROMPTS: Record<string, string> = {
   "profile.household.has_dependents": "Do other people depend on you for care or financial support?",
   "profile.pets.has_pets": "Do you have pets that are part of your family?",
   "profile.family.supports_aging_parent": "Are you caring for or supporting an aging parent?",
   "profile.home.owns_real_property": "Do you own a home or other real estate?",
   "profile.home.has_significant_personal_property": "Do you have valuable belongings or collections?",
-  "profile.financial.has_beneficiary_accounts": "Do you have retirement accounts, life insurance, or investment accounts?",
+  "profile.financial.has_beneficiary_accounts": "Do you have retirement accounts, life insurance, or investments?",
   "profile.digital.owns_crypto": "Do you own cryptocurrency or significant digital assets?",
   "profile.emotional.has_spiritual_practices": "Do you have spiritual or religious traditions important to you?",
 };
 
-// Unlock hints explaining what each answer unlocks
+// Unlock hints
 const UNLOCK_HINTS: Record<string, string> = {
-  "profile.household.has_dependents": "Guardian designation, dependent care instructions, inheritance planning",
-  "profile.pets.has_pets": "Pet guardian selection, care instructions, veterinary preferences",
-  "profile.family.supports_aging_parent": "Caregiver coordination, medical decision support",
-  "profile.home.owns_real_property": "Property distribution, deed information, mortgage details",
-  "profile.home.has_significant_personal_property": "Heirloom distribution, collection handling, special items",
-  "profile.financial.has_beneficiary_accounts": "Beneficiary review, account consolidation, transfer planning",
-  "profile.digital.owns_crypto": "Wallet access, recovery phrases, digital asset transfer",
-  "profile.emotional.has_spiritual_practices": "Ceremony preferences, religious rites, memorial wishes",
+  "profile.household.has_dependents": "Guardian designation, dependent care",
+  "profile.pets.has_pets": "Pet guardian, care instructions",
+  "profile.family.supports_aging_parent": "Caregiver coordination",
+  "profile.home.owns_real_property": "Property distribution planning",
+  "profile.home.has_significant_personal_property": "Heirloom & collection handling",
+  "profile.financial.has_beneficiary_accounts": "Beneficiary review, transfers",
+  "profile.digital.owns_crypto": "Wallet access, recovery phrases",
+  "profile.emotional.has_spiritual_practices": "Ceremony & memorial wishes",
 };
 
 // Helper to build profile_json from profile_answers
@@ -102,7 +80,7 @@ function buildProfileJson(profileAnswers: Record<string, "yes" | "no">): Record<
   const result: Record<string, Record<string, boolean>> = {};
   
   for (const [questionId, answer] of Object.entries(profileAnswers)) {
-    const item = ALL_PROFILE_ITEMS.find(i => i.id === questionId);
+    const item = PROFILE_ITEMS.find(i => i.id === questionId);
     if (!item) continue;
     
     const [category, field] = item.fieldPath.split(".");
@@ -122,12 +100,19 @@ const Profile = () => {
   
   const [isSaving, setIsSaving] = useState(false);
 
-  const { profile_complete, profile_progress, profile_answers, status, overall_progress, report_stale } = assessmentState;
+  const { profile_answers, status, overall_progress, report_stale } = assessmentState;
   const hasStarted = status !== "not_started";
 
-  // Calculate completed count
-  const completedCount = ALL_PROFILE_ITEMS.filter(item => profile_answers[item.id] !== undefined).length;
-  const totalCount = ALL_PROFILE_ITEMS.length;
+  // Calculate stats
+  const completedCount = PROFILE_ITEMS.filter(item => profile_answers[item.id] !== undefined).length;
+  const totalCount = PROFILE_ITEMS.length;
+
+  // Get "yes" items for summary
+  const yesItems = useMemo(() => {
+    return PROFILE_ITEMS
+      .filter(item => profile_answers[item.id] === "yes")
+      .map(item => item.label);
+  }, [profile_answers]);
 
   const handleStartReadiness = () => {
     navigate("/readiness");
@@ -151,12 +136,8 @@ const Profile = () => {
     setIsSaving(true);
 
     try {
-      // Build updated profile answers
       const updatedAnswers = { ...profile_answers, [questionId]: value };
       const profileJson = buildProfileJson(updatedAnswers);
-
-      console.log("[Profile] Saving update:", questionId, "=", value);
-      console.log("[Profile] Profile JSON to send:", profileJson);
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
         method: "POST",
@@ -179,19 +160,12 @@ const Profile = () => {
         throw new Error("Failed to save profile update");
       }
 
-      // Consume the response to get updated state
-      const responseData = await response.json();
-      console.log("[Profile] Server response profile_answers:", responseData.assessment_state?.profile_answers);
-
-      // Refresh state to ensure hook is synced
       const newState = await refresh();
-      console.log("[Profile] After refresh, profile_answers:", newState?.profile_answers);
 
       if (!newState) {
         throw new Error("Failed to refresh state");
       }
 
-      // Detect if new questions were unlocked
       if (
         newState.overall_progress < previousProgress ||
         (previousStatus === "completed" && newState.status === "in_progress")
@@ -216,8 +190,8 @@ const Profile = () => {
         });
       } else {
         toast({
-          title: "Profile Updated",
-          description: "Your change has been saved.",
+          title: "Saved",
+          description: "Your profile has been updated.",
         });
       }
     } catch (error) {
@@ -232,14 +206,6 @@ const Profile = () => {
     }
   }, [profile_answers, overall_progress, status, report_stale, refresh, navigate, toast]);
 
-  const getAnswersMap = (): Record<string, "yes" | "no" | null> => {
-    const result: Record<string, "yes" | "no" | null> = {};
-    ALL_PROFILE_ITEMS.forEach(item => {
-      result[item.id] = profile_answers[item.id] ?? null;
-    });
-    return result;
-  };
-
   if (isLoading) {
     return (
       <AppLayout>
@@ -253,44 +219,34 @@ const Profile = () => {
   return (
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-b from-background via-primary/5 to-background">
-        <div className="max-w-xl mx-auto px-6 py-10 pb-32">
+        <div className="max-w-md mx-auto px-4 py-8 pb-32">
           
           {/* Empty State - Not started */}
           {!hasStarted && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Simplified header for empty state */}
-              <div className="text-center mb-8">
-                <div className="relative inline-flex items-center justify-center mb-6">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                    <UserCircle className="w-12 h-12 text-primary" />
+              <div className="text-center mb-6">
+                <div className="relative inline-flex items-center justify-center mb-4">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                    <UserCircle className="w-10 h-10 text-primary" />
                   </div>
                 </div>
-                <h1 className="text-2xl font-display font-bold text-foreground mb-2">
+                <h1 className="text-xl font-display font-bold text-foreground mb-1">
                   Your Life Story
                 </h1>
-                <p className="text-muted-foreground font-body text-base leading-relaxed max-w-xs mx-auto">
-                  Let's create a snapshot of what matters most in your life
+                <p className="text-muted-foreground font-body text-sm max-w-xs mx-auto">
+                  Let's create a snapshot of what matters most
                 </p>
               </div>
 
-              <Card className="p-8 text-center bg-card/60 backdrop-blur-sm border-border/40">
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <h2 className="text-lg font-display font-semibold text-foreground">
-                      Welcome! Let's get started
-                    </h2>
-                    <p className="text-foreground/80 font-body text-base leading-relaxed max-w-sm mx-auto">
-                      A few quick questions help us understand your unique situation — 
-                      no right or wrong answers.
-                    </p>
-                    <p className="text-sm text-muted-foreground font-body">
-                      About 1 minute · You can always update later
-                    </p>
-                  </div>
+              <Card className="p-6 text-center bg-card/60 backdrop-blur-sm border-border/40">
+                <div className="space-y-4">
+                  <p className="text-foreground/80 font-body text-sm leading-relaxed">
+                    A few quick questions help us personalize your assessment.
+                  </p>
                   <Button
                     onClick={handleStartReadiness}
                     size="lg"
-                    className="mt-2 gap-2 font-body"
+                    className="gap-2 font-body"
                   >
                     Let's Begin
                     <ArrowRight className="w-4 h-4" />
@@ -302,75 +258,57 @@ const Profile = () => {
 
           {/* Profile Content - Has started */}
           {hasStarted && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
-              {/* Personalized Header with Avatar + Progress Ring */}
+              {/* Compact Header */}
               <ProfileHeader 
                 completedCount={completedCount}
                 totalCount={totalCount}
               />
 
-              {/* Assessment Status Card */}
-              <Card className="p-4 bg-card/60 backdrop-blur-sm border-border/40">
+              {/* Dynamic Summary */}
+              <ProfileSummary 
+                yesItems={yesItems}
+                totalItems={totalCount}
+              />
+
+              {/* Compact Life Cards - No sections */}
+              <div className="space-y-2">
+                {PROFILE_ITEMS.map((item) => (
+                  <CompactLifeCard
+                    key={item.id}
+                    id={item.id}
+                    label={item.label}
+                    icon={item.icon}
+                    questionPrompt={QUESTION_PROMPTS[item.id]}
+                    currentValue={profile_answers[item.id] ?? null}
+                    unlockHint={UNLOCK_HINTS[item.id]}
+                    onAnswer={(value) => handleProfileUpdate(item.id, value)}
+                    disabled={isSaving}
+                  />
+                ))}
+              </div>
+
+              {/* Assessment CTA */}
+              <Card className="p-3 bg-card/60 backdrop-blur-sm border-border/40">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-body text-muted-foreground">Life Readiness</p>
-                    <p className="font-display font-semibold text-foreground">
-                      {status === "completed" ? "Assessment Complete" : `${Math.round(overall_progress)}% Complete`}
+                    <p className="text-xs font-body text-muted-foreground">Life Readiness</p>
+                    <p className="text-sm font-display font-semibold text-foreground">
+                      {status === "completed" ? "Complete" : `${Math.round(overall_progress)}%`}
                     </p>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleStartReadiness}
-                    className="font-body"
+                    className="font-body text-xs h-8"
                   >
                     {status === "completed" ? "Review" : "Continue"}
-                    <ArrowRight className="w-4 h-4 ml-1" />
+                    <ArrowRight className="w-3.5 h-3.5 ml-1" />
                   </Button>
                 </div>
               </Card>
-
-              {/* Categorized Life Areas */}
-              <div className="space-y-2">
-                <LifeAreaCategory
-                  title={PROFILE_CATEGORIES.people.title}
-                  items={PROFILE_CATEGORIES.people.items}
-                  answers={getAnswersMap()}
-                  questionPrompts={QUESTION_PROMPTS}
-                  unlockHints={UNLOCK_HINTS}
-                  onAnswer={handleProfileUpdate}
-                  disabled={isSaving}
-                  defaultOpen={true}
-                />
-
-                <LifeAreaCategory
-                  title={PROFILE_CATEGORIES.assets.title}
-                  items={PROFILE_CATEGORIES.assets.items}
-                  answers={getAnswersMap()}
-                  questionPrompts={QUESTION_PROMPTS}
-                  unlockHints={UNLOCK_HINTS}
-                  onAnswer={handleProfileUpdate}
-                  disabled={isSaving}
-                  defaultOpen={true}
-                />
-
-                <LifeAreaCategory
-                  title={PROFILE_CATEGORIES.personal.title}
-                  items={PROFILE_CATEGORIES.personal.items}
-                  answers={getAnswersMap()}
-                  questionPrompts={QUESTION_PROMPTS}
-                  unlockHints={UNLOCK_HINTS}
-                  onAnswer={handleProfileUpdate}
-                  disabled={isSaving}
-                  defaultOpen={true}
-                />
-              </div>
-
-              {/* Help text */}
-              <p className="text-center text-sm text-muted-foreground font-body pt-2">
-                Changes here personalize your assessment and unlock relevant questions.
-              </p>
             </div>
           )}
         </div>
