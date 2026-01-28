@@ -1709,7 +1709,6 @@ const Readiness = () => {
                     key={option.value}
                     label={option.label}
                     selected={profileAnswers[currentProfileQuestion.id] === option.value}
-                    showConfirmation={recentlySelected === `profile:${currentProfileQuestion.id}:${option.value}`}
                     onClick={() => {
                       setRecentlySelected(`profile:${currentProfileQuestion.id}:${option.value}`);
                       setTimeout(() => setRecentlySelected(null), 500);
@@ -1862,7 +1861,6 @@ const Readiness = () => {
                         key={`${option.value}-${index}`}
                         label={option.label}
                         selected={answers[currentQuestion.id]?.answer_value === option.value}
-                        showConfirmation={recentlySelected === `question:${currentQuestion.id}:${option.value}`}
                         onClick={() => {
                           setRecentlySelected(`question:${currentQuestion.id}:${option.value}`);
                           setTimeout(() => setRecentlySelected(null), 500);

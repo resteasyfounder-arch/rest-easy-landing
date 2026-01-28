@@ -46,7 +46,7 @@ const itemVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 50,
       damping: 20
     }
@@ -205,8 +205,8 @@ const Dashboard = () => {
               {applicableSections.map((section) => (
                 <motion.div key={section.id} variants={itemVariants}>
                   <RoadmapRow
-                    title={section.title}
-                    description={section.description || "Review your readiness in this area."}
+                    title={section.label}
+                    description="Review your readiness in this area."
                     status={
                       section.progress === 100 ? "completed" :
                         section.status === "available" || section.status === "in_progress" ? "in_progress" : "locked"
