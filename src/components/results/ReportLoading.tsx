@@ -31,13 +31,16 @@ const ReportLoading = () => {
   }, []);
 
   useEffect(() => {
-    // Smooth progress bar animation
+    // Smooth progress bar animation - capped at 95% until report actually loads
     const interval = setInterval(() => {
       setProgress((prev) => {
-        // Progress based on current step, but never fully complete (leaves room for actual load)
-        const targetProgress = Math.min(((currentStep + 1) / PROGRESS_STEPS.length) * 85, 90);
+        // Cap at 95% to leave room for final completion
+        if (prev >= 95) return 95;
+        
+        // Progress based on current step
+        const targetProgress = Math.min(((currentStep + 1) / PROGRESS_STEPS.length) * 90, 95);
         const increment = (targetProgress - prev) * 0.1;
-        return prev + Math.max(increment, 0.5);
+        return Math.min(prev + Math.max(increment, 0.3), 95);
       });
     }, 100);
 
