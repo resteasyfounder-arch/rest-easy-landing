@@ -1,351 +1,294 @@
 
-# Strict Report Generation Rules: Background Regeneration on Answer Update
 
-## Current State Analysis
+# Dashboard UX Overhaul: A Journey-Centric Redesign
 
-### How Report Synchronization Works Today:
-1. **Answer Updates Set `report_stale: true`** (Lines 1027-1042 in `agent/index.ts`)
-   - When answers are saved, the agent checks if `report_status === "ready"`
-   - If so, it marks `report_stale: true` and updates `last_answer_at`
+## Executive Summary
 
-2. **Report Generation Trigger** (Lines 1125-1134 in `Readiness.tsx`)
-   - Report auto-generates ONLY when `flowPhase === "complete"`
-   - The `hasTriggeredAutoReport` flag prevents double-triggering
-   - Generation happens synchronously before navigating to Results
-
-3. **Results Page Handling** (Lines 38-106 in `Results.tsx`)
-   - Checks `report_status` via `get_state` action
-   - If `generating`, shows loading UI and polls for completion
-   - If `ready`, fetches and displays the report
-
-### Current Gap:
-When a user updates an answer from the Dashboard roadmap:
-- Answer is saved → `report_stale` is set to `true`
-- User returns to Dashboard → Dashboard shows updated scores
-- User navigates to Results → **Stale report is displayed** (no regeneration triggered)
+The current "in-progress" dashboard suffers from a utility-first design that feels like a checklist rather than a personal journey. This redesign transforms the experience into an emotionally engaging, narrative-driven dashboard that motivates completion while providing actionable clarity.
 
 ---
 
-## Proposed Solution: Strict, Explicit Regeneration Rules
+## Current State Problems
 
-### Rule Set (No Automatic/Fuzzy Logic):
+### What's Not Working:
 
-| Trigger Event | Action |
-|--------------|--------|
-| **Assessment completes for the first time** | Generate report (existing behavior) |
-| **Any answer is updated** | Trigger background regeneration immediately |
-| **Profile is updated** | Trigger background regeneration immediately |
-| **User visits Results page while `report_status === "generating"`** | Show ReportLoading screen, poll until ready |
-| **User visits Results page while `report_stale === true`** | Show ReportLoading screen, trigger regeneration |
+1. **Overwhelming Progress Hero** - A massive circular progress indicator dominates the view, making 30% feel discouraging rather than encouraging
+2. **Monotonous Section List** - All sections appear as identical "bubbles" with no visual hierarchy or emotional differentiation
+3. **No Sense of Journey** - The current layout reads like a form checklist, not a personal journey of discovery
+4. **Buried Motivation** - The "What You'll Unlock" section is pushed to the bottom, when it should inspire action
+5. **Missing Context** - Users don't understand WHY each section matters or what they'll gain
 
-### Implementation: Two-Part Approach
+---
 
-#### Part 1: Background Regeneration After Answer Update
+## Proposed Design: "Your Journey Home"
 
-Modify the agent to trigger report regeneration as a **background task** whenever an answer is saved and a report already exists.
+### Design Philosophy
+
+Transform the dashboard from a **task tracker** into a **story of progress** - where users feel they're on a meaningful path toward peace of mind, not checking boxes.
+
+---
+
+## Section 1: The Welcoming Hero
+
+### Current: 
+Large circular progress ring with percentage
+
+### Proposed: 
+A warm, narrative-focused welcome that adapts to progress state
 
 ```text
-Answer Saved → Agent marks report_stale
-            → Agent sets report_status = "generating"
-            → Agent triggers generate-report via EdgeRuntime.waitUntil()
-            → User continues immediately (non-blocking)
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  🌿 Good evening, Sarah                                         │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                                                          │   │
+│  │   "You're 3 sections away from                           │   │
+│  │    your personalized report"                             │   │
+│  │                                                          │   │
+│  │   ████████░░░░░░░░░░░  42%                               │   │
+│  │                                                          │   │
+│  │   ┌─────────────────────────────────────────────────┐    │   │
+│  │   │  ▶  Continue with Healthcare Wishes             │    │   │
+│  │   └─────────────────────────────────────────────────┘    │   │
+│  │                                                          │   │
+│  │   ~5 minutes remaining                                   │   │
+│  │                                                          │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-#### Part 2: Results Page Handles All Stale/Generating States
+### Key Changes:
+- Replace circular progress with a **slim horizontal bar** - less intimidating
+- Add **narrative text** that emphasizes proximity to goal, not deficit
+- Single, prominent **"Continue" CTA** that names the next section
+- Add **time estimate** to reduce anxiety
 
-The Results page already handles `report_status === "generating"`. Add handling for `report_stale === true`:
+---
+
+## Section 2: Journey Timeline (Replaces Section Bubbles)
+
+### Current:
+Vertical list of identical section cards with progress bars
+
+### Proposed:
+A **visual timeline/path** showing the journey with distinct states
 
 ```text
-User visits /results
-  → Fetch assessment state
-  → If report_status === "generating" OR report_stale === true:
-      → Show ReportLoading
-      → Poll until report_status === "ready" AND report_stale === false
-  → Else:
-      → Display report
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   YOUR JOURNEY                                                  │
+│                                                                 │
+│   ✓ Getting to Know You          ← Profile complete             │
+│   │                                                             │
+│   ✓ Financial Affairs            ← 100% · Score: 72            │
+│   │                              "Your finances are organized"  │
+│   │                                                             │
+│   ◉ Healthcare Wishes    ← IN PROGRESS · 2 of 5 questions      │
+│   │  ┌─────────────────────────────────────────────────────┐    │
+│   │  │ Continue where you left off                         │    │
+│   │  └─────────────────────────────────────────────────────┘    │
+│   │                                                             │
+│   ○ Legal Documents              ← Ready to start               │
+│   │                                                             │
+│   ○ Family Communication         ← Ready to start               │
+│   │                                                             │
+│   🔒 Digital Legacy              ← Completes after profile      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+### Key Changes:
+- **Vertical timeline** with connected path (connectors between nodes)
+- **State-specific visuals**: ✓ completed, ◉ current (pulsing), ○ available, 🔒 locked
+- **Micro-wins**: Show brief positive feedback for completed sections
+- **Embedded CTA** on current section - not a separate button below
+- **Collapsible** completed sections to reduce visual weight
+
+---
+
+## Section 3: Motivation Panel (Elevated Position)
+
+### Current:
+"What You'll Unlock" cards at bottom with generic locked icons
+
+### Proposed:
+**Side-by-side teaser cards** positioned prominently, with animated preview
+
+```text
+┌───────────────────────────────────┬───────────────────────────────────┐
+│                                   │                                   │
+│  🎯 YOUR READINESS SCORE          │  🗺️ YOUR ACTION ROADMAP          │
+│                                   │                                   │
+│    ╭───────────────────╮          │    ┌─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐        │
+│    │                   │          │     ☐ Prioritized tasks           │
+│    │       ??          │          │     ☐ Quick wins                  │
+│    │                   │          │     ☐ Expert guidance             │
+│    ╰───────────────────╯          │    └─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘        │
+│                                   │                                   │
+│  Reveal when complete ──────────▶ │  Personalized just for you        │
+│                                   │                                   │
+└───────────────────────────────────┴───────────────────────────────────┘
+```
+
+### Key Changes:
+- **Move up** in the visual hierarchy (above section list or alongside progress)
+- Add **subtle animation** (gentle pulse on the "??" or shimmer effect)
+- **Hint at value** with blurred/teased content, not just locked icons
+- Show **what type of guidance** they'll receive
+
+---
+
+## Section 4: Quick Stats Strip
+
+### New Addition:
+A compact strip showing key metrics at a glance
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   🕐 ~5 min left    📋 12/28 questions    ✓ 3/7 sections       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Purpose:
+- Reduces cognitive load by providing context without dominating
+- Feels informative, not overwhelming
+- Updates in real-time as progress is made
+
+---
+
+## Section 5: Profile Nudge (Contextual)
+
+### Current:
+Always-visible card with progress bar
+
+### Proposed:
+**Inline contextual prompt** only when profile affects sections
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  💡 Quick tip: Complete your profile to unlock                  │
+│     Digital Legacy and 3 more personalized questions            │
+│                                                                 │
+│     [Complete Profile →]                                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Changes:
+- Show **only when relevant** (sections are locked due to profile)
+- Explain **what they'll unlock** specifically
+- Compact, non-intrusive design
 
 ---
 
 ## Technical Implementation
 
-### File: `supabase/functions/agent/index.ts`
+### New Components to Create:
 
-#### Change 1: Add Background Report Generation Helper
+| Component | Purpose |
+|-----------|---------|
+| `JourneyTimeline.tsx` | Vertical timeline with connected nodes |
+| `JourneyNode.tsx` | Individual section node with state |
+| `ProgressHero.tsx` | Narrative-focused welcome hero |
+| `QuickStatsStrip.tsx` | Compact metrics bar |
+| `UnlockTeaserCard.tsx` | Animated "coming soon" preview |
 
-```typescript
-async function triggerReportRegeneration(
-  readiness: ReturnType<...>,
-  assessmentDbId: string,
-  subjectId: string,
-  assessmentKey: string
-) {
-  console.log(`[agent] Triggering background report regeneration for ${assessmentDbId}`);
-  
-  // Set status to generating BEFORE starting background task
-  await readiness
-    .from("assessments")
-    .update({
-      report_status: "generating",
-      report_stale: true,
-    })
-    .eq("id", assessmentDbId);
-    
-  // Build report payload from current state
-  const assessmentState = await computeAssessmentState(
-    readiness, subjectId, assessmentDbId, assessmentKey
-  );
-  
-  // Load schema for section labels/weights
-  const { data: schemaData } = await readiness
-    .from("assessment_schemas")
-    .select("schema_json")
-    .eq("assessment_id", assessmentKey)
-    .eq("version", "v1")
-    .single();
-  
-  const schema = schemaData?.schema_json;
-  
-  // Build section scores with labels
-  const sectionScores: Record<string, { score: number; label: string; weight: number }> = {};
-  for (const section of assessmentState.sections) {
-    sectionScores[section.id] = {
-      score: section.score,
-      label: section.label,
-      weight: schema?.sections?.find(s => s.id === section.id)?.weight || 1,
-    };
-  }
-  
-  // Build answers array
-  const answersForReport = Object.values(assessmentState.answers).map(answer => ({
-    question_id: answer.question_id,
-    section_id: answer.section_id,
-    question_text: answer.question_text || "",
-    answer_value: answer.answer_value,
-    answer_label: answer.answer_label || answer.answer_value,
-    score_fraction: answer.score_fraction ?? null,
-  }));
-  
-  // Call generate-report
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-    },
-    body: JSON.stringify({
-      userName: "Friend",
-      profile: assessmentState.profile_data,
-      overallScore: assessmentState.overall_score,
-      tier: assessmentState.tier,
-      sectionScores,
-      answers: answersForReport,
-      schema: {
-        answer_scoring: schema?.answer_scoring || {},
-        score_bands: schema?.score_bands || [],
-        sections: schema?.sections || [],
-      },
-    }),
-  });
-  
-  const data = await response.json();
-  
-  if (response.ok && data.report) {
-    // Save report and clear stale flag
-    await readiness
-      .from("assessments")
-      .update({
-        report_status: "ready",
-        report_data: data.report,
-        report_generated_at: new Date().toISOString(),
-        report_stale: false,
-      })
-      .eq("id", assessmentDbId);
-    console.log(`[agent] Background report regeneration complete`);
-  } else {
-    // Mark as failed
-    await readiness
-      .from("assessments")
-      .update({
-        report_status: "failed",
-      })
-      .eq("id", assessmentDbId);
-    console.error(`[agent] Background report regeneration failed:`, data.error);
-  }
+### Components to Modify:
+
+| Component | Changes |
+|-----------|---------|
+| `Dashboard.tsx` | New layout structure for in-progress view |
+| `SectionProgressCard.tsx` | Refactor into `JourneyNode` |
+| `LockedPreviewCard.tsx` | Add shimmer animation, richer preview |
+
+### Files to Create:
+- `src/components/dashboard/journey/JourneyTimeline.tsx`
+- `src/components/dashboard/journey/JourneyNode.tsx`
+- `src/components/dashboard/journey/index.ts`
+- `src/components/dashboard/ProgressHero.tsx`
+- `src/components/dashboard/QuickStatsStrip.tsx`
+- `src/components/dashboard/UnlockTeaserCard.tsx`
+
+### Files to Modify:
+- `src/pages/Dashboard.tsx` - New in-progress layout
+- `src/components/dashboard/index.ts` - Export new components
+- `src/index.css` - Add shimmer animation keyframes
+
+---
+
+## Animation Enhancements
+
+### New CSS Animations:
+
+```css
+/* Shimmer effect for teaser cards */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Gentle pulse for current section node */
+@keyframes journey-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+  50% { box-shadow: 0 0 0 12px hsl(var(--primary) / 0); }
+}
+
+/* Path connector grow animation */
+@keyframes path-grow {
+  from { height: 0; }
+  to { height: 100%; }
 }
 ```
 
-#### Change 2: Modify Answer Save Logic to Trigger Background Regeneration
+---
 
-Replace the current stale-marking logic (lines 1027-1050) with:
+## Responsive Considerations
 
-```typescript
-if (payload.answers && payload.answers.length > 0) {
-  // ... existing answer save logic ...
-  
-  // Check if report exists and needs regeneration
-  const { data: currentAssessment } = await readiness
-    .from("assessments")
-    .select("report_status, report_data")
-    .eq("id", assessmentResult.id)
-    .maybeSingle();
+### Mobile Layout:
+- Journey timeline becomes a **compact vertical list**
+- Unlock teasers stack vertically
+- Progress hero simplifies to just the bar and CTA
+- Quick stats become a **scrollable chip row**
 
-  // Only trigger regeneration if a report has been generated before
-  if (currentAssessment?.report_data && currentAssessment?.report_status === "ready") {
-    console.log(`[agent] Answer updated, triggering background report regeneration`);
-    
-    // Use EdgeRuntime.waitUntil for background execution
-    EdgeRuntime.waitUntil(
-      triggerReportRegeneration(
-        readiness,
-        assessmentResult.id,
-        subjectResult.id,
-        assessmentKey
-      )
-    );
-  } else {
-    // Just update last_answer_at if no report exists yet
-    await readiness
-      .from("assessments")
-      .update({
-        last_answer_at: new Date().toISOString(),
-      })
-      .eq("id", assessmentResult.id);
-  }
-}
-```
-
-#### Change 3: Same Logic for Profile Updates
-
-When profile is saved (around line 986-1000), add similar logic to trigger regeneration if report exists.
+### Tablet/Desktop:
+- Journey timeline can have **more horizontal space** for context
+- Unlock teasers side-by-side
+- Full progress hero with narrative
 
 ---
 
-### File: `src/pages/Results.tsx`
+## Micro-Interactions
 
-#### Change: Handle `report_stale` Same as `generating`
-
-Update the fetchReport logic (lines 48-75):
-
-```typescript
-const stateData = await stateResponse.json();
-const reportStatus = stateData?.assessment_state?.report_status;
-const reportStale = stateData?.assessment_state?.report_stale;
-
-// If generating OR stale, show loading and poll
-if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
-  console.log("[Results] Report is generating or stale, showing progress UI");
-  setIsGenerating(true);
-  setLoading(false);
-  pollForReport(subjectId);
-  return;
-}
-```
-
-#### Change: Update Polling to Check Stale Flag
-
-```typescript
-const pollForReport = async (subjectId: string) => {
-  const poll = async () => {
-    // Fetch BOTH report and state to check stale flag
-    const [reportResponse, stateResponse] = await Promise.all([
-      fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: { ... },
-        body: JSON.stringify({
-          action: "get_report",
-          subject_id: subjectId,
-          assessment_id: "readiness_v1",
-        }),
-      }),
-      fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: { ... },
-        body: JSON.stringify({
-          action: "get_state",
-          subject_id: subjectId,
-          assessment_id: "readiness_v1",
-        }),
-      }),
-    ]);
-    
-    const reportData = await reportResponse.json();
-    const stateData = await stateResponse.json();
-    
-    const reportStale = stateData?.assessment_state?.report_stale;
-    
-    // Only show report if it exists AND is not stale
-    if (reportResponse.ok && reportData.report && !reportStale) {
-      setReport(reportData.report);
-      setIsGenerating(false);
-      return;
-    }
-    
-    // Continue polling
-    if (attempts < maxAttempts) {
-      setTimeout(poll, 2000);
-    }
-  };
-  
-  poll();
-};
-```
+1. **Section Complete Animation**: When a section reaches 100%, the node transforms from ◉ to ✓ with a satisfying pop animation
+2. **Progress Bar Fill**: Smooth animation when percentage increases
+3. **CTA Hover**: Subtle lift and shadow on the continue button
+4. **Teaser Shimmer**: Gentle shimmer on locked content to draw curiosity
 
 ---
 
-### File: `src/pages/Readiness.tsx`
+## Benefits of This Approach
 
-#### Change: Remove Manual Generation from Complete Phase (Optional Cleanup)
-
-Since regeneration now happens in the background on every answer update, the complete phase no longer needs to trigger generation. However, we should KEEP the first-time generation logic for new assessments that have never had a report.
-
-The current auto-trigger logic (lines 1125-1134) can remain as a fallback for first-time report generation.
-
----
-
-## Strict Rule Summary
-
-| Rule | Implementation |
-|------|---------------|
-| Report generates on first completion | Existing logic in Readiness.tsx complete phase |
-| Report regenerates on answer update | Agent triggers `EdgeRuntime.waitUntil()` background task |
-| Report regenerates on profile update | Agent triggers `EdgeRuntime.waitUntil()` background task |
-| Results shows loading if generating | Check `report_status === "generating"` |
-| Results shows loading if stale | Check `report_stale === true` |
-| No manual regenerate button | Already removed per previous requirements |
+| Benefit | How It's Achieved |
+|---------|-------------------|
+| **Less Overwhelming** | Replace large circular progress with slim bar |
+| **Clearer Next Step** | Single prominent CTA naming the specific section |
+| **Sense of Journey** | Vertical timeline shows path traveled and path ahead |
+| **Motivation to Complete** | Elevated unlock teasers with animated hints |
+| **Celebrates Progress** | Micro-wins shown for completed sections |
+| **Contextual Guidance** | Profile nudge only when relevant |
+| **Brand Warmth** | Sage green theme, gentle animations, caring copy |
 
 ---
 
-## Files to Modify
+## Implementation Order
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/agent/index.ts` | Add `triggerReportRegeneration()` helper, modify answer/profile save to call it via `EdgeRuntime.waitUntil()` |
-| `src/pages/Results.tsx` | Handle `report_stale === true` same as `generating`, update polling to check stale flag |
+1. **Phase 1**: Create `ProgressHero` component with narrative text and slim progress bar
+2. **Phase 2**: Build `JourneyTimeline` and `JourneyNode` components
+3. **Phase 3**: Enhance `LockedPreviewCard` with shimmer and rename to `UnlockTeaserCard`
+4. **Phase 4**: Create `QuickStatsStrip` component
+5. **Phase 5**: Integrate all components in `Dashboard.tsx` in-progress view
+6. **Phase 6**: Add animations and polish
 
----
-
-## Edge Cases Handled
-
-1. **User updates answer → immediately goes to Results**
-   - `report_status` is already `"generating"` (set synchronously before background task starts)
-   - Results page shows loading screen
-   - Polling picks up the new report when ready
-
-2. **User updates multiple answers quickly**
-   - Each update triggers a new background regeneration
-   - Latest regeneration will "win" (overwrites previous)
-   - `report_stale` stays `true` until final regeneration completes
-
-3. **Report generation fails**
-   - `report_status` is set to `"failed"`
-   - Results page can show error state (already handled)
-   - User can retry from Results page
-
-4. **New user completing assessment for first time**
-   - No `report_data` exists yet
-   - Readiness.tsx complete phase triggers first generation
-   - No background regeneration happens (no existing report to regenerate)
