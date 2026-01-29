@@ -51,7 +51,7 @@ const journeySteps = [
 
 const JourneySection = () => {
   return (
-    <section className="py-16 lg:py-24 bg-background">
+    <section className="py-16 lg:py-24 bg-background relative">
       {/* Section Header */}
       <div className="container mx-auto px-4 lg:px-8 mb-12 lg:mb-16 text-center">
         <AnimatedItem animation="fade-up" delay={0}>
@@ -66,14 +66,17 @@ const JourneySection = () => {
         </AnimatedItem>
       </div>
 
-      {/* Journey Steps */}
-      {journeySteps.map((step, index) => (
-        <JourneyStep
-          key={step.step}
-          {...step}
-          reversed={index % 2 === 0}
-        />
-      ))}
+      {/* Journey Steps with connectors */}
+      <div className="relative">
+        {journeySteps.map((step, index) => (
+          <JourneyStep
+            key={step.step}
+            {...step}
+            reversed={index % 2 === 0}
+            isLast={index === journeySteps.length - 1}
+          />
+        ))}
+      </div>
     </section>
   );
 };
