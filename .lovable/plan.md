@@ -1,86 +1,100 @@
 
 
-## Meet Remy Section - AI Virtual Assistant Introduction
+## Remy Section Redesign - Bento Style with Interactive Demo
 
-This plan adds a dedicated section to the landing page introducing Remy, the Rest Easy AI assistant. The section will be warm, professional, and positioned between the "Your Path to Life Readiness" journey section and the "Two Paths Forward" solution section.
+This plan redesigns the Remy section to use a bento-style layout with an interactive demo showing a simulated conversation with Remy, replacing the current pulse/shimmer animations with a cleaner, more engaging design.
 
 ---
 
 ### Visual Design Concept
 
-The section will feature a centered, soft card panel with:
-- A custom animated Remy avatar/icon placeholder (calm, minimal)
-- Warm headline: "Meet Remy - Your Personal Rest Easy Manager"
-- Three capability highlights with subtle icons
-- A primary CTA button: "Talk with Remy"
-- A unique "breathing glow" animation that creates a calming presence
+The new section will feature:
+- A two-column bento-style layout (stacked on mobile)
+- Left card: Remy introduction with the new avatar image and capability highlights
+- Right card: Interactive demo showing a simulated "Ask Remy" conversation flow
+- Clean animations focused on the demo interaction, not background effects
 
 ---
 
-### Custom Animation: "Remy Presence"
+### Interactive Demo: "Ask Remy a Question"
 
-A signature animation for Remy's introduction featuring:
-- **Soft Pulse Ring**: Concentric circles that gently expand from Remy's avatar, creating a calm, "alive" presence
-- **Gradient Shimmer**: A subtle light sweep across the card that emphasizes warmth and intelligence
-- **Icon Float**: The Remy avatar gently floats to convey approachability
+The demo will cycle through example conversations:
 
-```text
-Animation Keyframes:
-1. remy-pulse - Expanding rings from avatar (opacity fade out)
-2. remy-shimmer - Horizontal light sweep across card
-3. remy-float - Gentle vertical bob for avatar
-```
+**Example Interactions:**
+1. User: "What should I focus on first?" → Remy: "Based on your assessment, I'd prioritize updating your healthcare directive..."
+2. User: "Why is my legal score low?" → Remy: "Your legal readiness score is 45% because you haven't completed a will yet..."
+3. User: "What's next after I finish the will?" → Remy: "Great progress! Next, let's look at your digital accounts..."
+
+**Animation Flow:**
+- Typing indicator appears (3 dots pulsing)
+- User question fades in
+- Brief pause, then Remy's response types in character by character
+- Transition to next question after delay
 
 ---
 
 ### Implementation Steps
 
-**1. Create RemySection Component**
+**1. Copy Remy Avatar to Project**
 
-New file: `src/components/landing/RemySection.tsx`
+Copy the uploaded image to `src/assets/remy-avatar.png` for use in the component.
 
-Structure:
-- Full-width section with subtle background differentiation
-- Centered container with max-width constraint
-- Soft card/panel with rounded corners and shadow
-- Remy avatar placeholder with animated pulse rings
-- Headline, supporting copy, capability list, and CTA
+**2. Create RemyChatDemo Component**
 
-**2. Add Custom CSS Animations**
+New file: `src/components/landing/demos/RemyChatDemo.tsx`
 
-Update `src/index.css` with:
-- `@keyframes remy-pulse` - Expanding ring animation
-- `@keyframes remy-shimmer` - Light sweep effect
-- `@keyframes remy-float` - Gentle bobbing motion
-- Utility classes: `.animate-remy-pulse`, `.animate-remy-shimmer`, `.animate-remy-float`
+- Cycles through 3 example Q&A conversations
+- Shows a simplified chat interface with:
+  - Remy avatar on responses
+  - Typing indicator animation
+  - Smooth text reveal for responses
+- Uses existing animation patterns from QuestionFlowDemo
 
-**3. Update Index Page**
+**3. Redesign RemySection Component**
 
-Modify `src/pages/Index.tsx` to:
-- Import RemySection component
-- Place it between JourneySection and Solution
+Update `src/components/landing/RemySection.tsx`:
 
-**4. Export from Landing Index**
+Layout structure:
+```text
++------------------------------------------+
+|          Meet Remy — Your Personal       |
+|           Rest Easy Manager              |
+|        (centered headline + subtext)     |
++------------------------------------------+
+|                                          |
+|  +----------------+  +----------------+  |
+|  | Remy Avatar    |  | "Ask Remy"     |  |
+|  | Intro card     |  |  Demo          |  |
+|  | with 3 caps    |  |  (chat flow)   |  |
+|  +----------------+  +----------------+  |
+|                                          |
+|           [Talk with Remy] CTA           |
++------------------------------------------+
+```
 
-Update `src/components/landing/index.ts` to export the new component
+- Remove all pulse ring animations and shimmer overlay
+- Use BentoCard-style styling for consistency
+- Include the new Remy avatar image
+- Keep the 3 capability highlights in a more compact format
+
+**4. Update CSS Animations**
+
+Clean up `src/index.css`:
+- Remove `animate-remy-pulse` and `animate-remy-shimmer` (no longer needed)
+- Keep `animate-remy-float` for subtle avatar movement
+- Add new animations for the chat demo:
+  - `@keyframes typing-dot` - Pulsing dots for typing indicator
+  - `@keyframes message-appear` - Fade in for chat messages
 
 ---
 
-### Content Structure
+### Content Preservation
 
-**Headline:**
-"Meet Remy - Your Personal Rest Easy Manager"
-
-**Subheadline:**
-"A calm, trustworthy companion who helps you understand your Life Readiness journey and guides you toward peace of mind."
-
-**Capability Highlights (3 items):**
-1. **Understands Your Journey** - "Remy knows your profile, tracks your progress, and remembers where you left off."
-2. **Explains in Plain Language** - "Get clear answers about your scores, what they mean, and what to focus on next."
-3. **Adapts as Life Changes** - "As your circumstances evolve, Remy adjusts recommendations to keep you on track."
-
-**CTA Button:**
-"Talk with Remy" (disabled/placeholder - links to #)
+All existing content will be preserved:
+- **Headline**: "Meet Remy — Your Personal Rest Easy Manager"
+- **Subheadline**: "A calm, trustworthy companion who helps you understand your Life Readiness journey and guides you toward peace of mind."
+- **Capabilities**: Understands Your Journey, Explains in Plain Language, Adapts as Life Changes
+- **CTA**: "Talk with Remy" (disabled with "Coming soon")
 
 ---
 
@@ -88,18 +102,17 @@ Update `src/components/landing/index.ts` to export the new component
 
 | File | Action |
 |------|--------|
-| `src/components/landing/RemySection.tsx` | Create new component |
-| `src/index.css` | Add Remy-specific animations |
-| `src/pages/Index.tsx` | Import and place RemySection |
-| `src/components/landing/index.ts` | Add export |
+| `src/assets/remy-avatar.png` | Copy from user upload |
+| `src/components/landing/demos/RemyChatDemo.tsx` | Create new demo component |
+| `src/components/landing/RemySection.tsx` | Redesign with bento layout |
+| `src/index.css` | Update animations (remove old, add new) |
 
 ---
 
 ### Accessibility Considerations
 
-- All animations respect `prefers-reduced-motion`
-- Remy avatar has appropriate alt text
-- CTA button is properly labeled
-- Content maintains proper heading hierarchy (h2)
-- Animations are decorative and don't convey essential information
+- Chat demo respects `prefers-reduced-motion`
+- Remy avatar has proper alt text
+- Demo is purely decorative (aria-hidden)
+- All content remains accessible without animations
 
