@@ -30,18 +30,48 @@ const JourneyStep = ({
 }: JourneyStepProps) => {
   return (
     <div className="relative">
-      {/* Connector line to next step */}
+      {/* Curved SVG connector to next step */}
       {!isLast && (
-        <div 
-          className={cn(
-            "hidden lg:block absolute left-1/2 -translate-x-1/2 top-full w-px h-16",
-            "border-l-2 border-dashed border-primary/30"
-          )}
-        >
-          {/* Animated dot traveling down the line */}
-          <div className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary/60 animate-pulse" 
-               style={{ top: '50%' }} 
-          />
+        <div className="hidden lg:block absolute left-0 right-0 top-full h-24 overflow-visible pointer-events-none z-10">
+          <svg
+            className="absolute w-full h-full"
+            viewBox="0 0 1200 96"
+            fill="none"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Curved path - alternates direction based on reversed */}
+            <path
+              d={reversed 
+                ? "M 300 0 Q 300 48, 600 48 Q 900 48, 900 96"
+                : "M 900 0 Q 900 48, 600 48 Q 300 48, 300 96"
+              }
+              stroke="url(#journeyGradient)"
+              strokeWidth="2"
+              strokeDasharray="8 6"
+              strokeLinecap="round"
+              className="animate-[dash_20s_linear_infinite]"
+            />
+            {/* Gradient definition */}
+            <defs>
+              <linearGradient id="journeyGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+                <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+              </linearGradient>
+            </defs>
+            {/* Animated dot along the path */}
+            <circle r="4" fill="hsl(var(--primary))" className="opacity-80">
+              <animateMotion
+                dur="4s"
+                repeatCount="indefinite"
+                path={reversed 
+                  ? "M 300 0 Q 300 48, 600 48 Q 900 48, 900 96"
+                  : "M 900 0 Q 900 48, 600 48 Q 300 48, 300 96"
+                }
+              />
+            </circle>
+          </svg>
         </div>
       )}
 
@@ -55,17 +85,8 @@ const JourneyStep = ({
         <AnimatedItem
           animation="fade-up"
           delay={100}
-          className={cn("relative", reversed && "lg:order-2")}
+          className={cn(reversed && "lg:order-2")}
         >
-          {/* Step number badge on card */}
-          <div className={cn(
-            "absolute -top-3 z-10",
-            reversed ? "lg:right-4 left-4 lg:left-auto" : "left-4"
-          )}>
-            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shadow-lg">
-              {step}
-            </div>
-          </div>
           <BentoCard icon={icon} title={cardTitle} subtitle={cardSubtitle}>
             {demo}
           </BentoCard>
