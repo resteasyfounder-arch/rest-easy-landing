@@ -258,6 +258,7 @@ const Readiness = () => {
   const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
   const [viewingCompletedSection, setViewingCompletedSection] = useState(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const [hasPendingNavigation, setHasPendingNavigation] = useState(false);
 
   // Flow phase is now server-driven, no localStorage persistence needed
 
@@ -424,6 +425,9 @@ const Readiness = () => {
     const returnToParam = searchParams.get("returnTo");
     
     if (!sectionParam && !questionParam) return;
+
+    // Prevent complete-phase UI/effects from taking over while we process URL-based navigation.
+    setHasPendingNavigation(true);
     
     console.log("[Readiness] URL params - section:", sectionParam, "question:", questionParam, "returnTo:", returnToParam);
     
@@ -431,9 +435,8 @@ const Readiness = () => {
     if (returnToParam) {
       setReturnTo(returnToParam);
     }
-    
-    // Clear the URL params so we don't re-trigger on subsequent renders
-    setSearchParams({}, { replace: true });
+
+    const clearUrlParams = () => setSearchParams({}, { replace: true });
     
     // If we have a specific question, find it and navigate directly to it
     if (questionParam) {
@@ -444,6 +447,8 @@ const Readiness = () => {
         setFocusedSectionId(targetQuestion.section_id);
         setFlowPhase(allQuestionsAnswered ? "review" : "assessment");
         setCurrentStepId(`question:${questionParam}`);
+        clearUrlParams();
+        setHasPendingNavigation(false);
         return;
       } else {
         console.log("[Readiness] Question not found or not applicable:", questionParam);
@@ -456,6 +461,8 @@ const Readiness = () => {
       const section = applicableSections.find(s => s.id === sectionParam);
       if (!section) {
         console.log("[Readiness] Section not found or not applicable:", sectionParam);
+        // Keep URL params intact for debugging/retry.
+        setHasPendingNavigation(false);
         return;
       }
       
@@ -472,6 +479,8 @@ const Readiness = () => {
         console.log("[Readiness] Section complete, showing summary");
         setFocusedSectionId(sectionParam);
         setFlowPhase("section-summary");
+        clearUrlParams();
+        setHasPendingNavigation(false);
         return;
       }
       
@@ -483,14 +492,20 @@ const Readiness = () => {
         // Use "review" phase for completed assessments, "assessment" for incomplete
         setFlowPhase(allQuestionsAnswered ? "review" : "assessment");
         setCurrentStepId(`question:${firstUnanswered.id}`);
+        clearUrlParams();
+        setHasPendingNavigation(false);
       } else if (sectionQuestions.length > 0) {
         // All questions in section answered - show first question in review mode
         console.log("[Readiness] Section fully answered, showing in review mode");
         setFocusedSectionId(sectionParam);
         setFlowPhase(allQuestionsAnswered ? "review" : "assessment");
         setCurrentStepId(`question:${sectionQuestions[0].id}`);
+        clearUrlParams();
+        setHasPendingNavigation(false);
       }
     }
+
+    setHasPendingNavigation(false);
   }, [loading, schema, searchParams, applicableSections, applicableQuestions, answers, setSearchParams]);
 
   const completedQuestionCount = useMemo(() => {
@@ -1124,6 +1139,11 @@ const Readiness = () => {
 
   // Auto-trigger report generation when assessment is complete
   useEffect(() => {
+    // If we're navigating to a specific section/question via URL params,
+    // do NOT auto-trigger report generation (it can hijack the navigation).
+    const hasNavParams = searchParams.has("section") || searchParams.has("question") || hasPendingNavigation;
+    if (hasNavParams) return;
+
     if (flowPhase !== "complete" || !results || reportGenerating || hasTriggeredAutoReport) return;
     
     // Auto-generate if no report exists or report is stale
@@ -1131,7 +1151,7 @@ const Readiness = () => {
     console.log("[Readiness] Auto-triggering report generation");
     setHasTriggeredAutoReport(true);
     handleGenerateReport();
-  }, [flowPhase, results, reportGenerating, hasTriggeredAutoReport]);
+  }, [flowPhase, results, reportGenerating, hasTriggeredAutoReport, hasPendingNavigation, searchParams]);
 
   // Report generation - auto-triggered, handles both first generation and updates
   const handleGenerateReport = useCallback(async () => {
@@ -1305,9 +1325,27 @@ const Readiness = () => {
   // This prevents a race condition where the complete phase renders before URL params are processed
   const hasNavigationParams = searchParams.has("section") || searchParams.has("question");
 
+  // While URL params are being processed, never show the report-prep screen.
+  if (flowPhase === "complete" && (hasNavigationParams || hasPendingNavigation)) {
+    return (
+      <AppLayout hideNav>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
+          <div className="text-center space-y-4 max-w-sm animate-fade-up">
+            <div className="relative mx-auto w-16 h-16">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="font-body text-sm text-muted-foreground">Opening your section…</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   // Complete Phase - Auto-generate report, show loading/error states
   // Skip if we have navigation params that need processing first
-  if (flowPhase === "complete" && !hasNavigationParams) {
+  if (flowPhase === "complete" && !hasNavigationParams && !hasPendingNavigation) {
     // Report generation error - show retry option
     if (reportError) {
       return (
