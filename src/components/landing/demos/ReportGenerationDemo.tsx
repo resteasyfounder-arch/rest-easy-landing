@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ClipboardList, Brain, Sparkles, FileText, Check, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,78 +22,84 @@ const ReportGenerationDemo = () => {
   const [progress, setProgress] = useState(0);
   const [score, setScore] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
+  
+  const intervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearAllTimers = useCallback(() => {
+    intervalsRef.current.forEach(clearInterval);
+    timeoutsRef.current.forEach(clearTimeout);
+    intervalsRef.current = [];
+    timeoutsRef.current = [];
+  }, []);
+
+  const runCycle = useCallback(() => {
+    clearAllTimers();
+    
+    // Reset state
+    setPhase("generating");
+    setCurrentStep(0);
+    setProgress(0);
+    setScore(0);
+    setScrollOffset(0);
+
+    const GENERATING_DURATION = 5000;
+
+    // Progress bar animation
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => Math.min(prev + 2, 100));
+    }, GENERATING_DURATION / 50);
+    intervalsRef.current.push(progressInterval);
+
+    // Step cycling
+    const stepInterval = setInterval(() => {
+      setCurrentStep((prev) => Math.min(prev + 1, generatingSteps.length - 1));
+    }, GENERATING_DURATION / generatingSteps.length);
+    intervalsRef.current.push(stepInterval);
+
+    // Transition to preview phase
+    const previewTimeout = setTimeout(() => {
+      setPhase("preview");
+      setProgress(100);
+      setCurrentStep(generatingSteps.length - 1);
+
+      // Score animation
+      let currentScore = 0;
+      const scoreInterval = setInterval(() => {
+        currentScore += 3;
+        if (currentScore >= 78) {
+          setScore(78);
+          clearInterval(scoreInterval);
+        } else {
+          setScore(currentScore);
+        }
+      }, 25);
+      intervalsRef.current.push(scoreInterval);
+
+      // Scroll animation after a short delay
+      const scrollTimeout = setTimeout(() => {
+        const scrollInterval = setInterval(() => {
+          setScrollOffset((prev) => {
+            const next = prev + 0.8;
+            return next >= 100 ? 100 : next;
+          });
+        }, 40);
+        intervalsRef.current.push(scrollInterval);
+      }, 1000);
+      timeoutsRef.current.push(scrollTimeout);
+    }, GENERATING_DURATION);
+    timeoutsRef.current.push(previewTimeout);
+  }, [clearAllTimers]);
 
   useEffect(() => {
-    const TOTAL_CYCLE = 15000; // 15 seconds total
-    const GENERATING_DURATION = 6000;
-    const PREVIEW_DURATION = 9000;
-
-    let stepInterval: ReturnType<typeof setInterval>;
-    let progressInterval: ReturnType<typeof setInterval>;
-    let scoreInterval: ReturnType<typeof setInterval>;
-    let scrollInterval: ReturnType<typeof setInterval>;
-
-    const runCycle = () => {
-      // Phase 1: Generating
-      setPhase("generating");
-      setCurrentStep(0);
-      setProgress(0);
-      setScore(0);
-      setScrollOffset(0);
-
-      // Progress bar animation
-      progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 2, 100));
-      }, GENERATING_DURATION / 50);
-
-      // Step cycling
-      stepInterval = setInterval(() => {
-        setCurrentStep((prev) => Math.min(prev + 1, generatingSteps.length - 1));
-      }, GENERATING_DURATION / generatingSteps.length);
-
-      // Transition to preview phase
-      setTimeout(() => {
-        clearInterval(stepInterval);
-        clearInterval(progressInterval);
-        setPhase("preview");
-        setProgress(100);
-        setCurrentStep(generatingSteps.length - 1);
-
-        // Score animation
-        let currentScore = 0;
-        scoreInterval = setInterval(() => {
-          currentScore += 2;
-          if (currentScore >= 78) {
-            setScore(78);
-            clearInterval(scoreInterval);
-          } else {
-            setScore(currentScore);
-          }
-        }, 30);
-
-        // Scroll animation
-        setTimeout(() => {
-          scrollInterval = setInterval(() => {
-            setScrollOffset((prev) => {
-              if (prev >= 120) return 0;
-              return prev + 1;
-            });
-          }, 50);
-        }, 1500);
-      }, GENERATING_DURATION);
-    };
-
     runCycle();
-    const cycleInterval = setInterval(runCycle, TOTAL_CYCLE);
+    const cycleInterval = setInterval(runCycle, 12000);
 
     return () => {
       clearInterval(cycleInterval);
-      clearInterval(stepInterval);
-      clearInterval(progressInterval);
-      clearInterval(scoreInterval);
-      clearInterval(scrollInterval);
+      clearAllTimers();
     };
-  }, []);
+  }, [runCycle, clearAllTimers]);
 
   return (
     <div 
