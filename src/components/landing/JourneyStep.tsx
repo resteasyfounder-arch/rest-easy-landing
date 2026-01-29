@@ -81,22 +81,28 @@ const JourneyStep = ({
           "grid lg:grid-cols-2 gap-8 lg:gap-16 items-center"
         )}
       >
-        {/* Demo Card */}
+        {/* Demo Card - on mobile: appears second (below text) */}
         <AnimatedItem
           animation="fade-up"
           delay={100}
-          className={cn(reversed && "lg:order-2")}
+          className={cn(
+            "order-2", // Mobile: always second
+            reversed ? "lg:order-2" : "lg:order-1" // Desktop: follows alternating pattern
+          )}
         >
           <BentoCard icon={icon} title={cardTitle} subtitle={cardSubtitle}>
             {demo}
           </BentoCard>
         </AnimatedItem>
 
-        {/* Content */}
+        {/* Content - on mobile: appears first (above demo) */}
         <AnimatedItem
           animation="fade-up"
           delay={200}
-          className={cn("space-y-4", reversed && "lg:order-1")}
+          className={cn(
+            "space-y-4 order-1", // Mobile: always first
+            reversed ? "lg:order-1" : "lg:order-2" // Desktop: follows alternating pattern
+          )}
         >
           <Badge variant="secondary" className="font-body">
             Step {step}
