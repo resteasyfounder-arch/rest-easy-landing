@@ -12,6 +12,7 @@ export { LockedPreviewCard } from "./LockedPreviewCard";
 export { ReadinessScoreCard } from "./ReadinessScoreCard";
 export { VaultPreviewCard } from "./VaultPreviewCard";
 export { RoadmapCard } from "./RoadmapCard";
+export { QuestionEditModal } from "./QuestionEditModal";
 
 // Journey components
 export { default as QuickStatsStrip } from "./QuickStatsStrip";
