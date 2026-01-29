@@ -1,112 +1,118 @@
 
-# Life Readiness Assessment Flow Issues
+# Fix: Always Show Section Summary After Completing a Section
 
-## Issues Identified
+## Problem Identified
 
-### Issue 1: Checkbox Movement Animation Bug
-**Symptom**: After clicking an answer, the checkbox appears to "move" within the answer box.
+The section summary page only appears when completing a section that was explicitly navigated to via the sidebar or dashboard (i.e., when `focusedSectionId` is set). During a natural linear flow through the assessment, the code skips directly to the next section's first question without showing any completion celebration or summary.
 
-**Root Cause**: The `AnswerButton` component in `src/components/assessment/shared/AnswerButton.tsx` applies an `animate-selection-confirm` class when selected. This animation (defined in `src/index.css` lines 436-450) pulses the background color. However, the issue is that the checkbox itself has a conditional `animate-check-pop` animation that only triggers when `showConfirmation` is true.
+## Root Cause
 
-The visual "movement" happens because:
-1. When an answer is clicked, `recentlySelected` is set, which triggers `showConfirmation={true}` 
-2. The `animate-check-pop` animation runs (scales up then down)
-3. The button also has a `hover:-translate-y-0.5` class causing the whole button to shift
-4. Combined with the `active:scale-[0.98] active:translate-y-0` on click, this creates a jittery feel
+In the `handleAnswer` function (around line 863), when a section is completed but no `focusedSectionId` is set, the code finds the next global step and navigates there immediately:
 
-**Solution**: 
-- Remove the conflicting transform animations that cause visual jitter
-- Make the checkbox position stable by ensuring animations don't affect layout
-
-### Issue 2: Dynamic Question Count Increasing
-**Symptom**: Started with "0 of 10" and increased to "9 of 17" as questions were answered.
-
-**Root Cause**: This is actually **intentional behavior** based on the assessment schema design. The `applicableQuestions` list is calculated dynamically based on both profile answers AND assessment answers:
-
-```typescript
-const applicableQuestions = useMemo(() => {
-  if (!schema) return [];
-  return schema.questions.filter((question) =>
-    evaluateCondition(question.applies_if, profile, answerValues)
-  );
-}, [schema, profile, answerValues]);
+```
+if (nextInSection) {
+  // Stay in the same section
+  setCurrentStepId(`question:${nextInSection.id}`);
+} else if (focusedSectionId) {
+  // ✅ Focused section complete - shows SectionComplete view
+  setViewingCompletedSection(true);
+} else {
+  // ❌ No focus - SKIPS summary and jumps to next section
+  const nextStep = getNextStepId(...);
+  setCurrentStepId(nextStep);
+}
 ```
 
-The schema uses `applies_if` conditions like:
-- `"applies_if": "answers['1.1.A.1'] in ['yes','partial']"` - shows follow-up questions only if the user answered "yes" or "partial" to a previous question
-- `"applies_if": "answers['1.1.B.1'] in ['yes','partial'] or answers['1.1.B.3'] in ['yes','partial']"` - branching logic
+## Solution
 
-This means when you answer "yes" to "Do you have a will?", follow-up questions like "Is your will up to date?" become applicable and add to the total.
+Modify the section completion logic to **always** show the section summary when the last question of a section is answered, regardless of whether `focusedSectionId` was set.
 
-**UX Problem**: While technically correct, showing the total count changing (e.g., "0 of 10" → "9 of 17") is confusing and anxiety-inducing for users. They feel like the assessment is "growing" rather than making progress.
+## Technical Changes
 
-**Solution**: Change the progress display from showing total applicable questions to showing **section-based** progress only. Users will see "3 of 8 in this section" instead of "9 of 17 total", which remains stable within each section.
+### File: `src/pages/Readiness.tsx`
+
+**Change 1: Detect section completion in the "non-focused" branch**
+
+After line 863, instead of immediately jumping to the next step, detect if we just completed the current section and show the summary:
+
+```typescript
+} else {
+  // Not focused on a section - check if we just completed the current section
+  const justCompletedSectionId = currentQuestion.section_id;
+  const justCompletedSectionQuestions = nextApplicable.filter(
+    q => q.section_id === justCompletedSectionId
+  );
+  const sectionNowComplete = justCompletedSectionQuestions.every(
+    q => nextAnswers[q.id]
+  );
+  
+  if (sectionNowComplete) {
+    // Show section summary before moving on
+    setStepHistory((prev) => [...prev, currentStepId]);
+    setFocusedSectionId(justCompletedSectionId);
+    setFlowPhase("section-summary");
+  } else {
+    // Find next global step (existing logic)
+    setStepHistory((prev) => [...prev, currentStepId]);
+    const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
+    
+    if (nextStep) {
+      setCurrentStepId(nextStep);
+    } else {
+      setFlowPhase("complete");
+      setCurrentStepId(null);
+    }
+  }
+}
+```
+
+**Change 2: Update `handleContinueFromCompletedSection` to work with section-summary**
+
+The current `handleContinueFromCompletedSection` handler resets `viewingCompletedSection` and finds the next step. We need the "Continue" button in `SectionSummary` to do similar navigation:
+
+The `SectionSummary` component's `onContinue` callback should:
+1. Clear `focusedSectionId`
+2. Find the next unanswered question in the next section
+3. Navigate there OR go to "complete" phase if all done
+
+This already works via the existing `handleContinueFromCompletedSection` function which is passed as `onContinue` to `SectionSummary`.
+
+**Change 3: Ensure proper flow from SectionSummary**
+
+The section summary phase (line 1449) already handles the "Continue Assessment" button via `onContinue={handleContinueFromCompletedSection}`. We just need to make sure this function correctly finds the next section's first question.
+
+Review `handleContinueFromCompletedSection` (lines 926-941):
+- It clears `viewingCompletedSection` and `focusedSectionId`
+- Finds the next step using `getNextStepId`
+- Sets flow to "assessment" or "complete"
+
+This logic is correct but may need a small tweak to ensure `currentStepId` is set properly for the next section.
 
 ---
 
-## Technical Implementation Plan
+## Summary of Changes
 
-### Fix 1: Checkbox Animation Stability
-
-**File: `src/components/assessment/shared/AnswerButton.tsx`**
-
-1. Remove the conflicting hover transform that causes visual jitter:
-   - Remove `hover:-translate-y-0.5` from the button className
-   - Keep the `active:scale-[0.98]` but remove `active:translate-y-0`
-
-2. Simplify the selection visual feedback:
-   - The `animate-selection-confirm` background pulse is fine
-   - Keep `animate-check-pop` for the checkmark appearance but ensure it doesn't affect surrounding elements
-
-3. Make the checkbox container use `transform-origin: center` to prevent layout shift during animation
-
-### Fix 2: Stable Progress Display
-
-**File: `src/pages/Readiness.tsx`**
-
-1. **Change header display from total questions to section questions**:
-   - Currently shows: `Question {currentQuestionIndex} of {applicableQuestions.length}`
-   - Change to: `Question {currentSectionQuestionIndex} of {currentSectionQuestionCount}`
-
-2. **Add new computed values** for section-specific progress:
-   ```typescript
-   const currentSectionQuestionIndex = useMemo(() => {
-     if (!currentQuestion || !currentSection) return 0;
-     const sectionQuestions = applicableQuestions.filter(q => q.section_id === currentSection.id);
-     return sectionQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
-   }, [currentQuestion, currentSection, applicableQuestions]);
-
-   const currentSectionQuestionCount = useMemo(() => {
-     if (!currentSection) return 0;
-     return applicableQuestions.filter(q => q.section_id === currentSection.id).length;
-   }, [currentSection, applicableQuestions]);
-   ```
-
-3. **Update the header displays** in both desktop and mobile views to use section-based counts
-
-4. **Keep existing sidebar progress** (which already uses `sectionProgress[section.id]`) - this correctly shows per-section progress
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/assessment/shared/AnswerButton.tsx` | Remove conflicting transform animations, stabilize checkbox positioning |
-| `src/pages/Readiness.tsx` | Add section-specific question counting, update header display to show section progress |
-| `src/index.css` | (Optional) Minor animation timing adjustments if needed |
-
----
+| Location | Change |
+|----------|--------|
+| `handleAnswer()` (lines 863-874) | Add section completion detection in the "non-focused" branch. Set `focusedSectionId` and `flowPhase = "section-summary"` when section is complete. |
+| `handleContinueFromCompletedSection()` | Verify it properly sets `currentStepId` for the next section's first question |
 
 ## Expected Behavior After Fix
 
-### Checkbox Animation
-- Clicking an answer shows smooth selection feedback
-- Checkmark appears with a subtle pop animation
-- No jittery movement or layout shift
+1. User answers the last question of a section (e.g., Legal Planning)
+2. **Section Summary page appears** with:
+   - Section score
+   - AI-generated insight
+   - "Review & Edit Answers" button
+   - "Continue Assessment" button
+3. User clicks "Continue Assessment"
+4. Flow navigates to the first question of the next section (e.g., Healthcare)
+5. Repeat for each section until assessment is complete
 
-### Progress Display  
-- Header shows "Question 3 of 8" (within current section) instead of "Question 9 of 17" (total)
-- Section name is clearly displayed above the count
-- Sidebar continues showing per-section progress bars correctly
-- Total count within a section may still grow slightly (e.g., 8 → 10) if follow-up questions unlock, but this is much less jarring than the global count changing dramatically
+---
+
+## Technical Notes
+
+- The `SectionSummary` component is already built and displays properly when `flowPhase === "section-summary"` (line 1448)
+- The `SectionComplete` component (used when `viewingCompletedSection` is true) is a simpler celebration view; we'll use `SectionSummary` instead for consistency
+- The AI insight generation via `generate-section-summary` edge function will trigger when the summary page loads
