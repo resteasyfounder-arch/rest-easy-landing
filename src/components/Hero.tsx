@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Shield, Heart } from "lucide-react";
 import { AnimatedItem } from "@/hooks/useScrollAnimation";
 import heartLogo from "@/assets/rest-easy-heart.png";
+import FloatingIcons from "@/components/landing/FloatingIcons";
 
 const Hero = () => {
   return (
@@ -15,14 +16,16 @@ const Hero = () => {
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
         <div className="max-w-3xl mx-auto text-center space-y-6 lg:space-y-8">
-          {/* Heart Logo */}
+          {/* Heart Logo with Floating Icons */}
           <AnimatedItem animation="fade-up" delay={0}>
-            <div className="flex justify-center mb-2">
-              <img 
-                src={heartLogo} 
-                alt="Rest Easy" 
-                className="w-16 h-16 lg:w-20 lg:h-20 object-contain"
-              />
+            <div className="flex justify-center mb-4">
+              <FloatingIcons>
+                <img 
+                  src={heartLogo} 
+                  alt="Rest Easy" 
+                  className="w-16 h-16 lg:w-20 lg:h-20 object-contain"
+                />
+              </FloatingIcons>
             </div>
           </AnimatedItem>
 
