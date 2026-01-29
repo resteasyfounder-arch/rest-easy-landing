@@ -1,10 +1,9 @@
-import { Home, ClipboardCheck, BarChart3, UserCircle, Sparkles } from "lucide-react";
+import { Home, BarChart3, UserCircle, Sparkles } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/dashboard" },
-  { icon: ClipboardCheck, label: "Assessment", path: "/assessment" },
   { icon: Sparkles, label: "Readiness", path: "/readiness" },
   { icon: BarChart3, label: "Report", path: "/results" },
   { icon: UserCircle, label: "Profile", path: "/profile" },
