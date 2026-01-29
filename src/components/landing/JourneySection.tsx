@@ -71,7 +71,7 @@ const JourneySection = () => {
         <JourneyStep
           key={step.step}
           {...step}
-          reversed={index % 2 === 1}
+          reversed={index % 2 === 0}
         />
       ))}
     </section>
