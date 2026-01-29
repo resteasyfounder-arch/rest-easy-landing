@@ -861,15 +861,31 @@ const Readiness = () => {
           setStepHistory((prev) => [...prev, currentStepId]);
           setViewingCompletedSection(true);
         } else {
-          // Not focused on a section - find next global step
-          setStepHistory((prev) => [...prev, currentStepId]);
-          const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
+          // Not focused on a section - check if we just completed the current section
+          const justCompletedSectionId = currentQuestion.section_id;
+          const justCompletedSectionQuestions = nextApplicable.filter(
+            q => q.section_id === justCompletedSectionId
+          );
+          const sectionNowComplete = justCompletedSectionQuestions.every(
+            q => nextAnswers[q.id]
+          );
           
-          if (nextStep) {
-            setCurrentStepId(nextStep);
+          if (sectionNowComplete) {
+            // Show section summary before moving on
+            setStepHistory((prev) => [...prev, currentStepId]);
+            setFocusedSectionId(justCompletedSectionId);
+            setFlowPhase("section-summary");
           } else {
-            setFlowPhase("complete");
-            setCurrentStepId(null);
+            // Find next global step
+            setStepHistory((prev) => [...prev, currentStepId]);
+            const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
+            
+            if (nextStep) {
+              setCurrentStepId(nextStep);
+            } else {
+              setFlowPhase("complete");
+              setCurrentStepId(null);
+            }
           }
         }
         return;
