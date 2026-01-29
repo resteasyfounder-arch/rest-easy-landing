@@ -30,47 +30,28 @@ const JourneyStep = ({
 }: JourneyStepProps) => {
   return (
     <div className="relative">
-      {/* Curved SVG connector to next step */}
+      {/* Curved SVG connector to next step - connects bento boxes */}
       {!isLast && (
-        <div className="hidden lg:block absolute left-0 right-0 top-full h-24 overflow-visible pointer-events-none z-10">
+        <div className="hidden lg:block absolute left-0 right-0 top-full h-20 overflow-visible pointer-events-none z-10">
           <svg
             className="absolute w-full h-full"
-            viewBox="0 0 1200 96"
+            viewBox="0 0 1200 80"
             fill="none"
             preserveAspectRatio="none"
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Curved path - alternates direction based on reversed */}
+            {/* Curved path - connects from current bento to next bento */}
             <path
               d={reversed 
-                ? "M 300 0 Q 300 48, 600 48 Q 900 48, 900 96"
-                : "M 900 0 Q 900 48, 600 48 Q 300 48, 300 96"
+                ? "M 900 0 C 900 40, 300 40, 300 80"  // From right bento to left bento
+                : "M 300 0 C 300 40, 900 40, 900 80"  // From left bento to right bento
               }
-              stroke="url(#journeyGradient)"
+              stroke="hsl(var(--primary))"
               strokeWidth="2"
-              strokeDasharray="8 6"
+              strokeDasharray="6 8"
               strokeLinecap="round"
-              className="animate-[dash_20s_linear_infinite]"
+              strokeOpacity="0.4"
             />
-            {/* Gradient definition */}
-            <defs>
-              <linearGradient id="journeyGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
-                <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
-              </linearGradient>
-            </defs>
-            {/* Animated dot along the path */}
-            <circle r="4" fill="hsl(var(--primary))" className="opacity-80">
-              <animateMotion
-                dur="4s"
-                repeatCount="indefinite"
-                path={reversed 
-                  ? "M 300 0 Q 300 48, 600 48 Q 900 48, 900 96"
-                  : "M 900 0 Q 900 48, 600 48 Q 300 48, 300 96"
-                }
-              />
-            </circle>
           </svg>
         </div>
       )}
