@@ -1,118 +1,103 @@
 
-# Fix: Always Show Section Summary After Completing a Section
+Goal
+- Navigating to “Life Readiness” (/readiness) after an assessment is already complete must NOT trigger report generation.
+- A new report should only be generated:
+  1) The first time the assessment becomes complete, or
+  2) After a user updates a question/profile answer (and only because of that update, not because they visited a page).
 
-## Problem Identified
+What’s happening (root cause)
+- The /readiness page contains legacy client-side report generation code:
+  - It watches `flowPhase === "complete"` and then automatically calls the `generate-report` edge function from the browser.
+  - When you navigate to /readiness after completion, the backend hydration sets `flow_phase` to `"complete"` (because the assessment is completed), which satisfies that condition, so the client fires report generation again.
+- This is confirmed by the browser network log showing:
+  - `POST .../functions/v1/generate-report` coming from the web app origin when you merely navigated to /readiness.
 
-The section summary page only appears when completing a section that was explicitly navigated to via the sidebar or dashboard (i.e., when `focusedSectionId` is set). During a natural linear flow through the assessment, the code skips directly to the next section's first question without showing any completion celebration or summary.
+Design decision (to match your requirement)
+- /readiness should never “hijack” the experience with a “Preparing Your Report” screen just because a report is generating.
+- /readiness should be for taking/reviewing the assessment (and section summaries).
+- /results should be the place that shows “Preparing Your Report” while the report is generating.
 
-## Root Cause
+Implementation approach
+A) Move “first-time completion” report triggering fully to the backend (agent edge function)
+Why:
+- Guarantees report generation happens only as a consequence of the completion/write event (answer/profile update), never because a UI route mounted.
+- Removes the current behavior where the browser can regenerate reports just by visiting /readiness.
 
-In the `handleAnswer` function (around line 863), when a section is completed but no `focusedSectionId` is set, the code finds the next global step and navigates there immediately:
+Changes in `supabase/functions/agent/index.ts`
+1) After saving answers/profile (in the default upsert flow), determine whether the assessment is now complete.
+2) If the assessment is complete AND no report exists yet:
+   - Synchronously update `assessments.report_status = "generating"` (and `report_stale = false` for first-time generation).
+   - Kick off `triggerReportRegeneration(...)` via `EdgeRuntime.waitUntil(...)`.
+3) Ensure idempotency so we do NOT re-trigger if:
+   - `report_status` is already `"generating"`, or
+   - `report_data` exists / `report_status` is `"ready"`.
 
-```
-if (nextInSection) {
-  // Stay in the same section
-  setCurrentStepId(`question:${nextInSection.id}`);
-} else if (focusedSectionId) {
-  // ✅ Focused section complete - shows SectionComplete view
-  setViewingCompletedSection(true);
-} else {
-  // ❌ No focus - SKIPS summary and jumps to next section
-  const nextStep = getNextStepId(...);
-  setCurrentStepId(nextStep);
-}
-```
+Acceptance criteria for backend
+- Completing the last applicable question results in:
+  - `report_status` switching to `"generating"` immediately in the same request,
+  - then later `"ready"` once the background report finishes.
+- Merely calling `get_state` / navigating pages never flips `report_status` or starts generation.
 
-## Solution
+B) Remove client-side report generation from /readiness entirely
+Why:
+- It is the direct cause of “Preparing Your Report” appearing on navigation and repeated report generation.
+- It currently calls `generate-report` from the browser, which is exactly what we want to avoid for both correctness and control.
 
-Modify the section completion logic to **always** show the section summary when the last question of a section is answered, regardless of whether `focusedSectionId` was set.
+Changes in `src/pages/Readiness.tsx`
+1) Delete the client report generation machinery:
+   - Remove `reportGenerating`, `reportError`, `hasTriggeredAutoReport` state.
+   - Remove the “Auto-trigger report generation when assessment is complete” `useEffect`.
+   - Remove `handleGenerateReport()` and `handleRetryReport()` and any UI branches that depend on them.
+2) Adjust completion behavior so completed assessments open as “review” in /readiness:
+   - When the backend hydrates `flow_phase: "complete"` (because assessment status is completed), the page should transition into `flowPhase = "review"` for navigation use-cases.
+   - This ensures the user can always review sections and see section summaries, instead of being blocked by report-related UI.
+3) Keep section summaries as the “moment” after finishing a section:
+   - The final section summary already supports “View Full Report” when `isAssessmentComplete` is true.
+   - That becomes the primary path to /results after completion.
+4) Ensure no browser request ever calls:
+   - `/functions/v1/generate-report` from Readiness.
 
-## Technical Changes
+Acceptance criteria for /readiness
+- If the report is already generated and the assessment is complete:
+  - Navigating to /readiness shows the review/assessment UI (journey + sections + section summaries), not “Preparing Your Report.”
+  - No new report generation is started.
+- If a report is generating due to an answer/profile update:
+  - /readiness still remains usable for review (no forced “Preparing Your Report” takeover).
+  - /results continues to be the place that shows generation progress.
 
-### File: `src/pages/Readiness.tsx`
+C) Update dashboard CTA so “Preparing Report…” routes to /results (not /readiness)
+Why:
+- After we remove report generation from /readiness, “Preparing Report…” should send users to the report page, which already knows how to poll and display progress.
 
-**Change 1: Detect section completion in the "non-focused" branch**
+Changes in `src/components/dashboard/AssessmentCTA.tsx`
+- For “Assessment complete but no report yet”:
+  - Change the link target from `/readiness` to `/results`.
+- Optionally, for “report_status === generating”:
+  - Either keep disabled, or link to `/results` so users can watch progress (preferred for transparency while keeping the UI calm).
 
-After line 863, instead of immediately jumping to the next step, detect if we just completed the current section and show the summary:
+Testing plan (end-to-end)
+1) Fresh private window
+   - Start assessment → complete all questions → confirm:
+     - Agent marks report as generating (server-side) on completion.
+     - /readiness shows final section summary and offers “View Full Report”.
+     - /results shows the generating UI and then the report when ready.
+2) After report is ready
+   - Navigate Dashboard → Life Readiness (/readiness):
+     - Verify no “Preparing Your Report” screen appears.
+     - Verify in Network tab: no POST to `/functions/v1/generate-report`.
+3) Update a single answer (e.g., from roadmap or section edit)
+   - Confirm report status transitions to generating due to the update.
+   - Confirm /readiness does not trigger generation; only the update did.
+   - Confirm /results shows generating UI and eventually the updated report.
 
-```typescript
-} else {
-  // Not focused on a section - check if we just completed the current section
-  const justCompletedSectionId = currentQuestion.section_id;
-  const justCompletedSectionQuestions = nextApplicable.filter(
-    q => q.section_id === justCompletedSectionId
-  );
-  const sectionNowComplete = justCompletedSectionQuestions.every(
-    q => nextAnswers[q.id]
-  );
-  
-  if (sectionNowComplete) {
-    // Show section summary before moving on
-    setStepHistory((prev) => [...prev, currentStepId]);
-    setFocusedSectionId(justCompletedSectionId);
-    setFlowPhase("section-summary");
-  } else {
-    // Find next global step (existing logic)
-    setStepHistory((prev) => [...prev, currentStepId]);
-    const nextStep = getNextStepId(nextProfileAnswers, nextAnswers, nextProfile);
-    
-    if (nextStep) {
-      setCurrentStepId(nextStep);
-    } else {
-      setFlowPhase("complete");
-      setCurrentStepId(null);
-    }
-  }
-}
-```
+Files to change
+- Backend:
+  - `supabase/functions/agent/index.ts`
+- Frontend:
+  - `src/pages/Readiness.tsx`
+  - `src/components/dashboard/AssessmentCTA.tsx`
 
-**Change 2: Update `handleContinueFromCompletedSection` to work with section-summary**
-
-The current `handleContinueFromCompletedSection` handler resets `viewingCompletedSection` and finds the next step. We need the "Continue" button in `SectionSummary` to do similar navigation:
-
-The `SectionSummary` component's `onContinue` callback should:
-1. Clear `focusedSectionId`
-2. Find the next unanswered question in the next section
-3. Navigate there OR go to "complete" phase if all done
-
-This already works via the existing `handleContinueFromCompletedSection` function which is passed as `onContinue` to `SectionSummary`.
-
-**Change 3: Ensure proper flow from SectionSummary**
-
-The section summary phase (line 1449) already handles the "Continue Assessment" button via `onContinue={handleContinueFromCompletedSection}`. We just need to make sure this function correctly finds the next section's first question.
-
-Review `handleContinueFromCompletedSection` (lines 926-941):
-- It clears `viewingCompletedSection` and `focusedSectionId`
-- Finds the next step using `getNextStepId`
-- Sets flow to "assessment" or "complete"
-
-This logic is correct but may need a small tweak to ensure `currentStepId` is set properly for the next section.
-
----
-
-## Summary of Changes
-
-| Location | Change |
-|----------|--------|
-| `handleAnswer()` (lines 863-874) | Add section completion detection in the "non-focused" branch. Set `focusedSectionId` and `flowPhase = "section-summary"` when section is complete. |
-| `handleContinueFromCompletedSection()` | Verify it properly sets `currentStepId` for the next section's first question |
-
-## Expected Behavior After Fix
-
-1. User answers the last question of a section (e.g., Legal Planning)
-2. **Section Summary page appears** with:
-   - Section score
-   - AI-generated insight
-   - "Review & Edit Answers" button
-   - "Continue Assessment" button
-3. User clicks "Continue Assessment"
-4. Flow navigates to the first question of the next section (e.g., Healthcare)
-5. Repeat for each section until assessment is complete
-
----
-
-## Technical Notes
-
-- The `SectionSummary` component is already built and displays properly when `flowPhase === "section-summary"` (line 1448)
-- The `SectionComplete` component (used when `viewingCompletedSection` is true) is a simpler celebration view; we'll use `SectionSummary` instead for consistency
-- The AI insight generation via `generate-section-summary` edge function will trigger when the summary page loads
+Risks / edge cases to handle
+- Race timing: ensure the completion-request response sets `report_status = "generating"` before returning so the UI doesn’t sit in a confusing “no report” state.
+- Don’t regress deep-link behavior (`?section=` / `?question=`): keep the existing `hasPendingNavigation` guard behavior intact.
+- Ensure no loop where completed assessments keep flipping phases; completion should settle into review when visiting /readiness from nav.
