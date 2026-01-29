@@ -1,87 +1,112 @@
 
-# Bug Fix: Life Readiness Section Navigation Shows Report Loading Screen
+# Life Readiness Assessment Flow Issues
 
-## Problem Identified
+## Issues Identified
 
-When a user with a completed assessment clicks on "Life Readiness" (or any section) from the Dashboard, they briefly (or permanently) see the "Preparing Your Report" loading screen instead of navigating to the expected section content.
+### Issue 1: Checkbox Movement Animation Bug
+**Symptom**: After clicking an answer, the checkbox appears to "move" within the answer box.
 
-### Root Cause
+**Root Cause**: The `AnswerButton` component in `src/components/assessment/shared/AnswerButton.tsx` applies an `animate-selection-confirm` class when selected. This animation (defined in `src/index.css` lines 436-450) pulses the background color. However, the issue is that the checkbox itself has a conditional `animate-check-pop` animation that only triggers when `showConfirmation` is true.
 
-There is a race condition in the Readiness page:
+The visual "movement" happens because:
+1. When an answer is clicked, `recentlySelected` is set, which triggers `showConfirmation={true}` 
+2. The `animate-check-pop` animation runs (scales up then down)
+3. The button also has a `hover:-translate-y-0.5` class causing the whole button to shift
+4. Combined with the `active:scale-[0.98] active:translate-y-0` on click, this creates a jittery feel
 
-1. **Server hydration**: When the page loads, it fetches state from the server which includes `flow_phase: "complete"` for completed assessments
-2. **Initial render**: The page renders with `flowPhase === "complete"`, which triggers the "Preparing Your Report" UI (lines 1305-1385)
-3. **URL parameter effect runs AFTER**: The effect that handles `?section=...` parameters runs after the initial render, but by then the "complete" phase rendering has already occurred
-4. **Auto-report generation**: While showing the "complete" phase, the auto-trigger effect may also start report generation, making the issue persist
+**Solution**: 
+- Remove the conflicting transform animations that cause visual jitter
+- Make the checkbox position stable by ensuring animations don't affect layout
 
-### Console Log Evidence
+### Issue 2: Dynamic Question Count Increasing
+**Symptom**: Started with "0 of 10" and increased to "9 of 17" as questions were answered.
 
-The logs confirm this sequence:
+**Root Cause**: This is actually **intentional behavior** based on the assessment schema design. The `applicableQuestions` list is calculated dynamically based on both profile answers AND assessment answers:
+
+```typescript
+const applicableQuestions = useMemo(() => {
+  if (!schema) return [];
+  return schema.questions.filter((question) =>
+    evaluateCondition(question.applies_if, profile, answerValues)
+  );
+}, [schema, profile, answerValues]);
 ```
-[Readiness] Hydrated from server: { flowPhase: "complete" }
-[Readiness] Auto-triggering report generation
-```
 
-The URL parameter handling never gets a chance to redirect because the "complete" phase takes over immediately.
+The schema uses `applies_if` conditions like:
+- `"applies_if": "answers['1.1.A.1'] in ['yes','partial']"` - shows follow-up questions only if the user answered "yes" or "partial" to a previous question
+- `"applies_if": "answers['1.1.B.1'] in ['yes','partial'] or answers['1.1.B.3'] in ['yes','partial']"` - branching logic
 
-## Solution
+This means when you answer "yes" to "Do you have a will?", follow-up questions like "Is your will up to date?" become applicable and add to the total.
 
-Add a **pending navigation state** that prevents the "complete" phase from rendering while URL parameters are present and being processed.
+**UX Problem**: While technically correct, showing the total count changing (e.g., "0 of 10" → "9 of 17") is confusing and anxiety-inducing for users. They feel like the assessment is "growing" rather than making progress.
 
-### Technical Changes
+**Solution**: Change the progress display from showing total applicable questions to showing **section-based** progress only. Users will see "3 of 8 in this section" instead of "9 of 17 total", which remains stable within each section.
+
+---
+
+## Technical Implementation Plan
+
+### Fix 1: Checkbox Animation Stability
+
+**File: `src/components/assessment/shared/AnswerButton.tsx`**
+
+1. Remove the conflicting hover transform that causes visual jitter:
+   - Remove `hover:-translate-y-0.5` from the button className
+   - Keep the `active:scale-[0.98]` but remove `active:translate-y-0`
+
+2. Simplify the selection visual feedback:
+   - The `animate-selection-confirm` background pulse is fine
+   - Keep `animate-check-pop` for the checkmark appearance but ensure it doesn't affect surrounding elements
+
+3. Make the checkbox container use `transform-origin: center` to prevent layout shift during animation
+
+### Fix 2: Stable Progress Display
 
 **File: `src/pages/Readiness.tsx`**
 
-1. **Add a new state variable** to track whether we have URL parameters that need processing:
-   - Add `const [hasPendingNavigation, setHasPendingNavigation] = useState(false);`
+1. **Change header display from total questions to section questions**:
+   - Currently shows: `Question {currentQuestionIndex} of {applicableQuestions.length}`
+   - Change to: `Question {currentSectionQuestionIndex} of {currentSectionQuestionCount}`
 
-2. **Check for URL params immediately on mount** (before rendering any phase-specific UI):
-   - In the bootstrap function or a separate early effect, detect if `searchParams` has `section` or `question` params
-   - Set `hasPendingNavigation = true` if params exist
+2. **Add new computed values** for section-specific progress:
+   ```typescript
+   const currentSectionQuestionIndex = useMemo(() => {
+     if (!currentQuestion || !currentSection) return 0;
+     const sectionQuestions = applicableQuestions.filter(q => q.section_id === currentSection.id);
+     return sectionQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
+   }, [currentQuestion, currentSection, applicableQuestions]);
 
-3. **Modify the URL parameter handling effect** to:
-   - Clear `hasPendingNavigation` once navigation is complete
-   - Set it at the start if params are detected
+   const currentSectionQuestionCount = useMemo(() => {
+     if (!currentSection) return 0;
+     return applicableQuestions.filter(q => q.section_id === currentSection.id).length;
+   }, [currentSection, applicableQuestions]);
+   ```
 
-4. **Guard the "complete" phase rendering** to wait for URL param processing:
-   - Change the condition from `if (flowPhase === "complete")` to `if (flowPhase === "complete" && !hasPendingNavigation)`
-   - Show a minimal loading skeleton while `hasPendingNavigation` is true
+3. **Update the header displays** in both desktop and mobile views to use section-based counts
 
-### Alternative Solution (Simpler)
+4. **Keep existing sidebar progress** (which already uses `sectionProgress[section.id]`) - this correctly shows per-section progress
 
-Instead of adding state, we can check for URL parameters directly in the render logic:
+---
 
-**Modify lines ~1305:**
-```tsx
-// Complete Phase - BUT only if not navigating via URL params
-const hasNavigationParams = searchParams.get("section") || searchParams.get("question");
-if (flowPhase === "complete" && !hasNavigationParams) {
-  // ... existing complete phase rendering
-}
-```
+## Files to Modify
 
-This is simpler because:
-- No new state needed
-- Directly checks the condition at render time
-- The URL params effect will change flowPhase, and on next render, the correct phase will show
+| File | Changes |
+|------|---------|
+| `src/components/assessment/shared/AnswerButton.tsx` | Remove conflicting transform animations, stabilize checkbox positioning |
+| `src/pages/Readiness.tsx` | Add section-specific question counting, update header display to show section progress |
+| `src/index.css` | (Optional) Minor animation timing adjustments if needed |
 
-### Implementation Steps
+---
 
-1. At the top of the render section (around line 1260), add a check for navigation params
-2. Modify the "complete" phase condition to skip rendering if navigation params exist
-3. Add a minimal loading state for the brief moment while URL params are being processed
+## Expected Behavior After Fix
 
-### Code Changes Summary
+### Checkbox Animation
+- Clicking an answer shows smooth selection feedback
+- Checkmark appears with a subtle pop animation
+- No jittery movement or layout shift
 
-| Location | Change |
-|----------|--------|
-| Line ~1261 | Add `const hasNavigationParams = searchParams.has("section") \|\| searchParams.has("question");` |
-| Line ~1305 | Change condition to `if (flowPhase === "complete" && !hasNavigationParams)` |
-
-### Expected Behavior After Fix
-
-1. User clicks "Life Readiness" section on Dashboard
-2. Navigate to `/readiness?section=life_readiness`
-3. Page loads with brief loading skeleton (not "Preparing Your Report")
-4. URL parameter effect runs and sets `flowPhase` to "section-summary" or "review"
-5. Correct section content renders
+### Progress Display  
+- Header shows "Question 3 of 8" (within current section) instead of "Question 9 of 17" (total)
+- Section name is clearly displayed above the count
+- Sidebar continues showing per-section progress bars correctly
+- Total count within a section may still grow slightly (e.g., 8 → 10) if follow-up questions unlock, but this is much less jarring than the global count changing dramatically
