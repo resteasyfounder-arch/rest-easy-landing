@@ -654,6 +654,18 @@ const Readiness = () => {
     return applicableQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
   }, [currentQuestion, applicableQuestions]);
 
+  // Section-specific question progress (more stable UX than global count)
+  const currentSectionQuestionIndex = useMemo(() => {
+    if (!currentQuestion || !currentSection) return 0;
+    const sectionQuestions = applicableQuestions.filter(q => q.section_id === currentSection.id);
+    return sectionQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
+  }, [currentQuestion, currentSection, applicableQuestions]);
+
+  const currentSectionQuestionCount = useMemo(() => {
+    if (!currentSection) return 0;
+    return applicableQuestions.filter(q => q.section_id === currentSection.id).length;
+  }, [currentSection, applicableQuestions]);
+
   const currentProfileIndex = useMemo(() => {
     if (!schema || !currentProfileQuestion) return 0;
     return schema.profile_questions.findIndex(q => q.id === currentProfileQuestion.id) + 1;
@@ -1835,7 +1847,7 @@ const Readiness = () => {
                   </p>
                 ) : (
                   <p className="text-sm font-body text-muted-foreground">
-                    Question {currentQuestionIndex} of {applicableQuestions.length}
+                    {currentSection?.label} • Question {currentSectionQuestionIndex} of {currentSectionQuestionCount}
                   </p>
                 )}
               </div>
@@ -1890,7 +1902,7 @@ const Readiness = () => {
                       {currentSection?.label}
                     </p>
                     <p className="text-xs text-muted-foreground md:hidden">
-                      {currentQuestionIndex} of {applicableQuestions.length}
+                      Question {currentSectionQuestionIndex} of {currentSectionQuestionCount}
                     </p>
                   </div>
 
