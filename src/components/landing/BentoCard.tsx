@@ -55,4 +55,5 @@ const BentoCard = ({
   );
 };
 
+export { BentoCard };
 export default BentoCard;

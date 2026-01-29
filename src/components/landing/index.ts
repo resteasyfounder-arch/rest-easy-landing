@@ -1,5 +1,8 @@
-export { default as BentoCard } from "./BentoCard";
+export { BentoCard } from "./BentoCard";
 export { default as BentoGrid } from "./BentoGrid";
+export { default as JourneySection } from "./JourneySection";
+export { default as JourneyStep } from "./JourneyStep";
 export { default as QuestionFlowDemo } from "./demos/QuestionFlowDemo";
 export { default as JourneyProgressDemo } from "./demos/JourneyProgressDemo";
+export { default as ReportGenerationDemo } from "./demos/ReportGenerationDemo";
 export { default as RoadmapDemo } from "./demos/RoadmapDemo";
