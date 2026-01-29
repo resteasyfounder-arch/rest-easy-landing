@@ -91,13 +91,13 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
       );
     }
 
-    // Assessment complete but no report yet - auto-generation pending
-    // Redirect to readiness which will auto-trigger generation
+    // Assessment complete but no report yet - auto-generation is happening server-side
+    // Redirect to /results which will show the generation progress
     return (
       <Button asChild size="lg" className={className}>
-        <Link to="/readiness" className="gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Preparing Report...
+        <Link to="/results" className="gap-2">
+          <FileText className="h-4 w-4" />
+          View Report
         </Link>
       </Button>
     );

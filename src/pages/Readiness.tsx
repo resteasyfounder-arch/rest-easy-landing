@@ -262,10 +262,8 @@ const Readiness = () => {
 
   // Flow phase is now server-driven, no localStorage persistence needed
 
-  // State for report generation (auto-triggered, no manual button)
-  const [reportGenerating, setReportGenerating] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [hasTriggeredAutoReport, setHasTriggeredAutoReport] = useState(false);
+  // Legacy report generation state - kept for minimal refactor, but auto-generation is disabled
+  // Report generation now happens server-side in the agent edge function
 
   const bootstrap = useCallback(async () => {
     setLoading(true);
@@ -303,11 +301,18 @@ const Readiness = () => {
         setProfile(assessmentState.profile_data || {});
         setProfileAnswers(assessmentState.profile_answers || {});
         setAnswers(assessmentState.answers || {});
-        setFlowPhase(assessmentState.flow_phase || "intro");
+        
+        // IMPORTANT: If assessment is complete, default to "review" mode for navigation
+        // This prevents the "Preparing Report" screen from hijacking on page visits
+        // The actual report generation is now handled server-side when completing the last question
+        const hydratedPhase = assessmentState.flow_phase === "complete" ? "review" : (assessmentState.flow_phase || "intro");
+        setFlowPhase(hydratedPhase);
+        
         console.log("[Readiness] Hydrated from server:", {
           profileAnswerCount: Object.keys(assessmentState.profile_answers || {}).length,
           answerCount: Object.keys(assessmentState.answers || {}).length,
-          flowPhase: assessmentState.flow_phase,
+          serverFlowPhase: assessmentState.flow_phase,
+          clientFlowPhase: hydratedPhase,
         });
       }
     } catch (err) {
@@ -1165,122 +1170,10 @@ const Readiness = () => {
     persistScore();
   }, [flowPhase, results, subjectId, scoreSaved]);
 
-  // Auto-trigger report generation when assessment is complete
-  useEffect(() => {
-    // If we're navigating to a specific section/question via URL params,
-    // do NOT auto-trigger report generation (it can hijack the navigation).
-    const hasNavParams = searchParams.has("section") || searchParams.has("question") || hasPendingNavigation;
-    if (hasNavParams) return;
-
-    if (flowPhase !== "complete" || !results || reportGenerating || hasTriggeredAutoReport) return;
-    
-    // Auto-generate if no report exists or report is stale
-    // Note: This runs on first completion AND when returning to complete phase with stale data
-    console.log("[Readiness] Auto-triggering report generation");
-    setHasTriggeredAutoReport(true);
-    handleGenerateReport();
-  }, [flowPhase, results, reportGenerating, hasTriggeredAutoReport, hasPendingNavigation, searchParams]);
-
-  // Report generation - auto-triggered, handles both first generation and updates
-  const handleGenerateReport = useCallback(async () => {
-    if (!results || !schema || reportGenerating) return;
-    
-    setReportGenerating(true);
-    setReportError(null);
-    
-    try {
-      // Build section scores with labels and weights
-      const sectionScoresWithMeta: Record<string, { score: number; label: string; weight: number }> = {};
-      for (const section of schema.sections) {
-        if (results.sectionScores[section.id] !== undefined) {
-          sectionScoresWithMeta[section.id] = {
-            score: results.sectionScores[section.id],
-            label: section.label,
-            weight: section.weight,
-          };
-        }
-      }
-
-      // Build answers array for the report
-      const answersForReport = Object.values(answers).map((answer) => ({
-        question_id: answer.question_id,
-        section_id: answer.section_id,
-        question_text: answer.question_text || "",
-        answer_value: answer.answer_value,
-        answer_label: answer.answer_label || answer.answer_value,
-        score_fraction: answer.score_fraction ?? null,
-      }));
-
-      // Determine tier from score bands
-      const scoreBands = (schema as any).score_bands || [];
-      let tier = "Getting Started";
-      for (const band of scoreBands) {
-        if (results.overallScore >= band.min && results.overallScore <= band.max) {
-          if (band.label === "Highly Prepared") tier = "Rest Easy Ready";
-          else if (band.label === "Moderately Prepared") tier = "Well Prepared";
-          else if (band.label === "Limited Preparedness") tier = "On Your Way";
-          else tier = "Getting Started";
-          break;
-        }
-      }
-
-      const payload = {
-        userName: "Friend", // Default name for guest mode
-        profile,
-        overallScore: results.overallScore,
-        tier,
-        sectionScores: sectionScoresWithMeta,
-        answers: answersForReport,
-        schema: {
-          answer_scoring: schema.answer_scoring,
-          score_bands: scoreBands,
-          sections: schema.sections,
-        },
-      };
-
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok && data.report) {
-        // Save report to server (this also resets report_stale flag)
-        try {
-          await callAgent({
-            action: "save_report",
-            subject_id: subjectId,
-            assessment_id: assessmentId,
-            report_data: data.report,
-          });
-          console.log("[Readiness] Report saved to server");
-        } catch (saveErr) {
-          console.error("[Readiness] Failed to save report to server:", saveErr);
-        }
-        navigate("/results");
-      } else {
-        console.error("Report generation failed:", data.error);
-        setReportError(data.error || "Failed to generate report. Please try again.");
-      }
-    } catch (err) {
-      console.error("Error generating report:", err);
-      setReportError(err instanceof Error ? err.message : "An error occurred. Please try again.");
-    } finally {
-      setReportGenerating(false);
-    }
-  }, [results, schema, answers, profile, navigate, reportGenerating, subjectId, assessmentId]);
-
-  // Retry report generation (only for error cases)
-  const handleRetryReport = () => {
-    setReportError(null);
-    setHasTriggeredAutoReport(false);
-  };
+  // Report generation is now handled server-side in the agent edge function
+  // when the assessment is first completed or when answers are updated.
+  // The /readiness page no longer triggers report generation - it's for taking/reviewing the assessment.
+  // The /results page handles showing report generation progress.
 
   // Handle going back to review sections from complete phase
   const handleReviewSections = () => {
@@ -1371,89 +1264,11 @@ const Readiness = () => {
     );
   }
 
-  // Complete Phase - Auto-generate report, show loading/error states
-  // Skip if we have navigation params that need processing first
-  if (flowPhase === "complete" && !hasNavigationParams && !hasPendingNavigation) {
-    // Report generation error - show retry option
-    if (reportError) {
-      return (
-        <AppLayout hideNav>
-          <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
-            <div className="text-center space-y-6 max-w-sm">
-              <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-                <AlertCircle className="w-8 h-8 text-destructive" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="font-display text-xl font-semibold text-foreground">
-                  Unable to Generate Report
-                </h2>
-                <p className="font-body text-sm text-muted-foreground">
-                  {reportError}
-                </p>
-              </div>
-              <div className="space-y-3 pt-4">
-                <Button onClick={handleRetryReport} size="lg" className="w-full gap-2">
-                  <RefreshCw className="w-4 h-4" />
-                  Try Again
-                </Button>
-                <Button variant="ghost" onClick={handleBackToDashboard} className="w-full text-muted-foreground">
-                  Back to Dashboard
-                </Button>
-              </div>
-            </div>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    // Report is generating (auto-triggered) - show seamless loading
-    if (reportGenerating) {
-      return (
-        <AppLayout hideNav>
-          <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
-            <div className="text-center space-y-6 max-w-sm animate-fade-up">
-              <div className="relative mx-auto w-20 h-20">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h2 className="font-display text-xl font-semibold text-foreground">
-                  Preparing Your Report
-                </h2>
-                <p className="font-body text-sm text-muted-foreground">
-                  Our AI is analyzing your responses to create personalized recommendations...
-                </p>
-              </div>
-            </div>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    // Briefly show completion before auto-redirect (fallback if report already exists)
-    return (
-      <AppLayout hideNav>
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-hero px-6">
-          <div className="text-center space-y-6 max-w-sm animate-fade-up">
-            <div className="relative mx-auto w-20 h-20">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h2 className="font-display text-xl font-semibold text-foreground">
-                Assessment Complete!
-              </h2>
-              <p className="font-body text-sm text-muted-foreground">
-                Preparing your personalized report...
-              </p>
-            </div>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  // Complete Phase is no longer handled here - we now default to "review" mode
+  // when loading a completed assessment. This prevents the "Preparing Report" screen
+  // from appearing when navigating to /readiness after completion.
+  // The /results page handles showing report generation progress.
+  // If somehow we end up in "complete" phase, just show the review UI by falling through.
 
   // Review Phase - Same as assessment but for completed assessments
   if (flowPhase === "review") {
