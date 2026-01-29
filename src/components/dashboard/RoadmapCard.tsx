@@ -21,6 +21,7 @@ interface RoadmapCardProps {
   isLoading?: boolean;
   className?: string;
   onViewAll?: () => void;
+  onEditQuestion?: (item: RoadmapItem) => void;
 }
 
 type PriorityFilter = "all" | "HIGH" | "MEDIUM" | "LOW";
@@ -123,6 +124,7 @@ export function RoadmapCard({
   completedItems,
   isLoading = false,
   onViewAll,
+  onEditQuestion,
   className,
 }: RoadmapCardProps) {
   const navigate = useNavigate();
@@ -212,8 +214,13 @@ export function RoadmapCard({
   };
 
   const handleNavigateToQuestion = (item: RoadmapItem) => {
-    // Navigate to the readiness page with returnTo=dashboard so user comes back after answering
-    navigate(`/readiness?section=${item.section_id}&question=${item.question_id}&returnTo=dashboard`);
+    // If onEditQuestion is provided, open the modal instead of navigating
+    if (onEditQuestion) {
+      onEditQuestion(item);
+    } else {
+      // Fallback: Navigate to the readiness page
+      navigate(`/readiness?section=${item.section_id}&question=${item.question_id}&returnTo=dashboard`);
+    }
   };
 
   const renderPrioritySection = (priority: "HIGH" | "MEDIUM" | "LOW") => {

@@ -16,6 +16,7 @@ import {
   ReadinessScoreCard,
   VaultPreviewCard,
   RoadmapCard,
+  QuestionEditModal,
   QuickStatsStrip,
   UnlockTeaserCard,
   ProfileNudge,
@@ -72,10 +73,26 @@ const Dashboard = () => {
     items: improvementItems,
     completedItems,
     isLoading: isLoadingRoadmap,
+    refresh: refreshRoadmap,
   } = useImprovementItems({
     subjectId,
     enabled: isComplete && isReportReady,
   });
+
+  // Question edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<import("@/types/assessment").RoadmapItem | null>(null);
+
+  const handleEditQuestion = (item: import("@/types/assessment").RoadmapItem) => {
+    setEditingItem(item);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    setEditModalOpen(false);
+    setEditingItem(null);
+    refreshRoadmap();
+  };
 
   const handleLogout = () => {
     logout();
@@ -212,8 +229,18 @@ const Dashboard = () => {
                 completedItems={completedItems}
                 isLoading={isLoadingRoadmap}
                 onViewAll={() => navigate("/results#action-plan")}
+                onEditQuestion={handleEditQuestion}
               />
             )}
+
+            {/* Question Edit Modal */}
+            <QuestionEditModal
+              open={editModalOpen}
+              onOpenChange={setEditModalOpen}
+              item={editingItem}
+              subjectId={subjectId || ""}
+              onSuccess={handleEditSuccess}
+            />
           </div>
         ) : hasStarted ? (
           /* ==================== IN-PROGRESS ASSESSMENT VIEW (Journey Design) ==================== */
