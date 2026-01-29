@@ -1160,15 +1160,34 @@ serve(async (req) => {
       return jsonResponse({ error: "Failed to save answers" }, 500);
     }
 
-    // Check if report exists and needs regeneration
+    // Update last_answer_at
+    await readiness
+      .from("assessments")
+      .update({
+        last_answer_at: new Date().toISOString(),
+      })
+      .eq("id", assessmentResult.id);
+
+    // Check if report exists and needs regeneration OR if assessment just became complete
     const { data: currentAssessmentForAnswer } = await readiness
       .from("assessments")
       .select("report_status, report_data")
       .eq("id", assessmentResult.id)
       .maybeSingle();
 
-    // Trigger background regeneration if a report has been generated before
-    if (currentAssessmentForAnswer?.report_data && currentAssessmentForAnswer?.report_status === "ready") {
+    // Check if this answer completes the assessment (for first-time report generation)
+    const assessmentStateAfterAnswer = await computeAssessmentState(
+      readiness,
+      subjectResult.id,
+      assessmentResult.id,
+      assessmentKey
+    );
+    const isNowComplete = assessmentStateAfterAnswer.status === "completed";
+    const hasExistingReport = !!currentAssessmentForAnswer?.report_data;
+    const isAlreadyGenerating = currentAssessmentForAnswer?.report_status === "generating";
+
+    if (hasExistingReport && currentAssessmentForAnswer?.report_status === "ready") {
+      // Report exists and is ready - trigger background regeneration because answer changed
       console.log(`[agent] Answer updated, triggering background report regeneration`);
       
       // Set status to generating synchronously before background task
@@ -1177,7 +1196,6 @@ serve(async (req) => {
         .update({
           report_status: "generating",
           report_stale: true,
-          last_answer_at: new Date().toISOString(),
         })
         .eq("id", assessmentResult.id);
       
@@ -1190,14 +1208,28 @@ serve(async (req) => {
           assessmentKey
         )
       );
-    } else {
-      // Just update last_answer_at if no report exists yet
+    } else if (isNowComplete && !hasExistingReport && !isAlreadyGenerating) {
+      // Assessment just became complete for the first time - trigger initial report generation
+      console.log(`[agent] Assessment completed for first time, triggering initial report generation`);
+      
+      // Set status to generating synchronously before background task
       await readiness
         .from("assessments")
         .update({
-          last_answer_at: new Date().toISOString(),
+          report_status: "generating",
+          report_stale: false,
         })
         .eq("id", assessmentResult.id);
+      
+      // Use EdgeRuntime.waitUntil for background execution
+      EdgeRuntime.waitUntil(
+        triggerReportRegeneration(
+          readiness,
+          assessmentResult.id,
+          subjectResult.id,
+          assessmentKey
+        )
+      );
     }
   }
 
