@@ -10,7 +10,7 @@ interface AppLayoutProps {
 }
 
 // Routes that should show the navigation (inner app pages)
-const APP_ROUTES = ["/profile", "/assessment", "/readiness", "/results", "/menu", "/dashboard"];
+const APP_ROUTES = ["/profile", "/assessment", "/readiness", "/results", "/menu", "/dashboard", "/vault"];
 
 const AppLayout = ({ children, hideNav = false }: AppLayoutProps) => {
   const isMobile = useIsMobile();

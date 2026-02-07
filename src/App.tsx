@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Readiness from "./pages/Readiness";
 import Profile from "./pages/Profile";
+import EasyVault from "./pages/EasyVault";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/readiness" element={<Readiness />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/vault" element={<EasyVault />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
