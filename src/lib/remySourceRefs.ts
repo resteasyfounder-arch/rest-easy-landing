@@ -10,7 +10,7 @@ export function describeRemySourceRef(sourceRef: string): string {
   }
 
   if (sourceRef.startsWith("assessment:report_status:")) {
-    const status = sourceRef.slice("assessment:report_status:".length).replaceAll("_", " ");
+    const status = sourceRef.slice("assessment:report_status:".length).split("_").join(" ");
     return `Report status (${status})`;
   }
 
@@ -23,8 +23,8 @@ export function describeRemySourceRef(sourceRef: string): string {
   }
 
   if (sourceRef.startsWith("assessment:")) {
-    return `Assessment signal (${sourceRef.slice("assessment:".length).replaceAll("_", " ")})`;
+    return `Assessment signal (${sourceRef.slice("assessment:".length).split("_").join(" ")})`;
   }
 
-  return sourceRef.replaceAll("_", " ");
+  return sourceRef.split("_").join(" ");
 }

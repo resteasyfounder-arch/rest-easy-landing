@@ -1,4 +1,4 @@
-import { Home, BarChart3, Settings, LogIn, Sparkles, UserCircle } from "lucide-react";
+import { Home, BarChart3, Settings, LogIn, Sparkles, UserCircle, Vault } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -24,6 +24,7 @@ const navItems = [
   { title: "My Profile", url: "/profile", icon: UserCircle },
   { title: "Life Readiness", url: "/readiness", icon: Sparkles },
   { title: "Readiness Report", url: "/results", icon: BarChart3 },
+  { title: "EasyVault", url: "/vault", icon: Vault },
 ];
 
 const AppSidebar = () => {
