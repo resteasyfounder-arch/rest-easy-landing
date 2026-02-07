@@ -4,7 +4,9 @@ import { ArrowRight, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/context/AuthContext";
 import { useRemySurface } from "@/hooks/useRemySurface";
+import { RemyGuestChat } from "@/components/remy/RemyGuestChat";
 import { describeRemySourceRef } from "@/lib/remySourceRefs";
 import { getSafeRemyPath } from "@/lib/remyNavigation";
 import { cn } from "@/lib/utils";
@@ -13,45 +15,7 @@ import type { RemySurface } from "@/types/remy";
 const STORAGE_KEYS = {
   subjectId: "rest-easy.readiness.subject_id",
 };
-
-type GuestIntent = "purpose" | "findability" | "login";
-
-const guestIntentContent: Record<
-  GuestIntent,
-  {
-    title: string;
-    body: string;
-    primaryLabel: string;
-    primaryHref: string;
-    secondaryLabel?: string;
-    secondaryHref?: string;
-  }
-> = {
-  purpose: {
-    title: "What Rest Easy does",
-    body: "Rest Easy helps you organize life-readiness decisions, identify gaps, and move forward with clear next steps.",
-    primaryLabel: "Take Findability Assessment",
-    primaryHref: "/assessment",
-    secondaryLabel: "Sign up / Log in",
-    secondaryHref: "/login",
-  },
-  findability: {
-    title: "Start with Findability",
-    body: "The Findability Assessment is a short entry point. It helps you understand where to focus before the full readiness flow.",
-    primaryLabel: "Start Findability",
-    primaryHref: "/assessment",
-    secondaryLabel: "Learn the full process",
-    secondaryHref: "/",
-  },
-  login: {
-    title: "Unlock full personalization",
-    body: "Log in to keep your progress and get personalized Remy guidance across profile, readiness, dashboard, and report results.",
-    primaryLabel: "Sign up / Log in",
-    primaryHref: "/login",
-    secondaryLabel: "Take Findability first",
-    secondaryHref: "/assessment",
-  },
-};
+const REMY_OPEN_LAUNCHER_EVENT = "remy:open-launcher";
 
 function getRouteSurface(pathname: string): RemySurface | null {
   if (pathname.startsWith("/dashboard")) return "dashboard";
@@ -74,16 +38,17 @@ function getRouteLabel(pathname: string): string {
 }
 
 export function RemyGlobalLauncher() {
+  const { isAuthenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [subjectId, setSubjectId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.subjectId));
-  const [guestIntent, setGuestIntent] = useState<GuestIntent>("purpose");
 
   const surface = useMemo(() => getRouteSurface(location.pathname), [location.pathname]);
   const routeLabel = useMemo(() => getRouteLabel(location.pathname), [location.pathname]);
-  const isGuestSurface = location.pathname === "/" || !surface || !subjectId;
+  const personalizedEnabled = Boolean(surface && subjectId && isAuthenticated);
+  const isGuestSurface = !personalizedEnabled;
 
   const {
     payload,
@@ -95,7 +60,7 @@ export function RemyGlobalLauncher() {
   } = useRemySurface({
     subjectId,
     surface: surface || "dashboard",
-    enabled: Boolean(surface && subjectId),
+    enabled: personalizedEnabled,
   });
 
   useEffect(() => {
@@ -103,7 +68,16 @@ export function RemyGlobalLauncher() {
     setSubjectId(localStorage.getItem(STORAGE_KEYS.subjectId));
   }, [location.pathname]);
 
-  const hasActionableNudge = Boolean(payload?.nudge);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOpen = () => setOpen(true);
+    window.addEventListener(REMY_OPEN_LAUNCHER_EVENT, handleOpen);
+    return () => {
+      window.removeEventListener(REMY_OPEN_LAUNCHER_EVENT, handleOpen);
+    };
+  }, []);
+
+  const hasActionableNudge = !isGuestSurface && Boolean(payload?.nudge);
   const isAppRouteOnMobile = isMobile && (
     location.pathname.startsWith("/profile") ||
     location.pathname.startsWith("/assessment") ||
@@ -112,8 +86,6 @@ export function RemyGlobalLauncher() {
     location.pathname.startsWith("/menu") ||
     location.pathname.startsWith("/dashboard")
   );
-
-  const content = guestIntentContent[guestIntent];
 
   return (
     <>
@@ -140,49 +112,7 @@ export function RemyGlobalLauncher() {
           </div>
 
           {isGuestSurface ? (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant={guestIntent === "purpose" ? "default" : "outline"} onClick={() => setGuestIntent("purpose")}>
-                  What is Rest Easy?
-                </Button>
-                <Button size="sm" variant={guestIntent === "findability" ? "default" : "outline"} onClick={() => setGuestIntent("findability")}>
-                  Findability Assessment
-                </Button>
-                <Button size="sm" variant={guestIntent === "login" ? "default" : "outline"} onClick={() => setGuestIntent("login")}>
-                  Sign up / Log in
-                </Button>
-              </div>
-
-              <div className="rounded-xl border border-border/60 bg-card/70 p-3">
-                <p className="text-sm font-medium text-foreground">{content.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{content.body}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => {
-                      setOpen(false);
-                      navigate(content.primaryHref);
-                    }}
-                  >
-                    {content.primaryLabel}
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                  {content.secondaryLabel && content.secondaryHref && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setOpen(false);
-                        navigate(content.secondaryHref);
-                      }}
-                    >
-                      {content.secondaryLabel}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
+            <RemyGuestChat onNavigate={() => setOpen(false)} />
           ) : (
             <div className="space-y-3">
               {isLoading && <p className="text-sm text-muted-foreground">Loading personalized guidance...</p>}
