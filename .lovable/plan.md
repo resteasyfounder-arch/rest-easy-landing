@@ -1,118 +1,134 @@
 
 
-## Remy Section Redesign - Bento Style with Interactive Demo
+## EasyVault - Secure Document Storage Page
 
-This plan redesigns the Remy section to use a bento-style layout with an interactive demo showing a simulated conversation with Remy, replacing the current pulse/shimmer animations with a cleaner, more engaging design.
-
----
-
-### Visual Design Concept
-
-The new section will feature:
-- A two-column bento-style layout (stacked on mobile)
-- Left card: Remy introduction with the new avatar image and capability highlights
-- Right card: Interactive demo showing a simulated "Ask Remy" conversation flow
-- Clean animations focused on the demo interaction, not background effects
+A new full page accessible from the sidebar for paid users to manage important documents, organized by category with progress tracking and a trust network panel. Backend storage integration will come later -- this plan covers the complete UI.
 
 ---
 
-### Interactive Demo: "Ask Remy a Question"
+### What Gets Built
 
-The demo will cycle through example conversations:
-
-**Example Interactions:**
-1. User: "What should I focus on first?" → Remy: "Based on your assessment, I'd prioritize updating your healthcare directive..."
-2. User: "Why is my legal score low?" → Remy: "Your legal readiness score is 45% because you haven't completed a will yet..."
-3. User: "What's next after I finish the will?" → Remy: "Great progress! Next, let's look at your digital accounts..."
-
-**Animation Flow:**
-- Typing indicator appears (3 dots pulsing)
-- User question fades in
-- Brief pause, then Remy's response types in character by character
-- Transition to next question after delay
+A dedicated `/vault` page modeled after the reference screenshot, featuring:
+- **Essential Documents tracker** with overall progress (e.g., 0/27 completed)
+- **Collapsible document categories** (Financial, Legal, Healthcare, Digital, Insurance, Personal) with per-category progress bars
+- **Individual document rows** within each category showing status, priority badges, and upload placeholders
+- **Trust Network sidebar panel** (desktop) for managing trusted contacts
+- **Paid-only gate**: A lock overlay/message for non-paid users
+- **"+ Add Documents" action** at the bottom of each category
 
 ---
 
-### Implementation Steps
+### Design Approach (Matching Reference)
 
-**1. Copy Remy Avatar to Project**
+The layout follows the reference screenshot closely:
 
-Copy the uploaded image to `src/assets/remy-avatar.png` for use in the component.
-
-**2. Create RemyChatDemo Component**
-
-New file: `src/components/landing/demos/RemyChatDemo.tsx`
-
-- Cycles through 3 example Q&A conversations
-- Shows a simplified chat interface with:
-  - Remy avatar on responses
-  - Typing indicator animation
-  - Smooth text reveal for responses
-- Uses existing animation patterns from QuestionFlowDemo
-
-**3. Redesign RemySection Component**
-
-Update `src/components/landing/RemySection.tsx`:
-
-Layout structure:
 ```text
-+------------------------------------------+
-|          Meet Remy — Your Personal       |
-|           Rest Easy Manager              |
-|        (centered headline + subtext)     |
-+------------------------------------------+
-|                                          |
-|  +----------------+  +----------------+  |
-|  | Remy Avatar    |  | "Ask Remy"     |  |
-|  | Intro card     |  |  Demo          |  |
-|  | with 3 caps    |  |  (chat flow)   |  |
-|  +----------------+  +----------------+  |
-|                                          |
-|           [Talk with Remy] CTA           |
-+------------------------------------------+
+Desktop (lg+):
++--sidebar--+---------- Main Content ----------+--- Right Panel ---+
+|            | Essential Documents       0/27   | Trust Network     |
+| EasyVault* | Overall Progress          0%     | Trusted Contacts  |
+|            | [Info banner]                    | Who Trusts You    |
+|            |                                  | Invite Network    |
+|            | > Financial        7 missing  v  |                   |
+|            | > Legal            6 missing  v  |                   |
+|            | > Healthcare       ...        v  |                   |
+|            | > Digital          ...        v  |                   |
+|            | > Insurance        ...        v  |                   |
+|            | > Personal         ...        v  |                   |
++------------+----------------------------------+-------------------+
+
+Mobile: Stacked vertically, Trust Network below categories
 ```
 
-- Remove all pulse ring animations and shimmer overlay
-- Use BentoCard-style styling for consistency
-- Include the new Remy avatar image
-- Keep the 3 capability highlights in a more compact format
-
-**4. Update CSS Animations**
-
-Clean up `src/index.css`:
-- Remove `animate-remy-pulse` and `animate-remy-shimmer` (no longer needed)
-- Keep `animate-remy-float` for subtle avatar movement
-- Add new animations for the chat demo:
-  - `@keyframes typing-dot` - Pulsing dots for typing indicator
-  - `@keyframes message-appear` - Fade in for chat messages
+Uses shadcn Accordion for collapsible categories, Badge for priority levels, Progress for bars, and Card for panels.
 
 ---
 
-### Content Preservation
+### Document Categories & Items
 
-All existing content will be preserved:
-- **Headline**: "Meet Remy — Your Personal Rest Easy Manager"
-- **Subheadline**: "A calm, trustworthy companion who helps you understand your Life Readiness journey and guides you toward peace of mind."
-- **Capabilities**: Understands Your Journey, Explains in Plain Language, Adapts as Life Changes
-- **CTA**: "Talk with Remy" (disabled with "Coming soon")
+Each category contains recommended document types personalized by the user's profile (static for now):
+
+1. **Financial** (7 items): Bank Accounts, Investment Accounts, Retirement Accounts, Tax Returns, Insurance Policies, Debts/Loans, Property Valuations
+2. **Legal** (8 items): Vehicle Titles, Will/Testament, Power of Attorney, Trust Documents, Property Deeds, Guardian Designation, Beneficiary Designations, Marriage/Divorce Docs
+3. **Healthcare** (4 items): Healthcare Directive, HIPAA Authorization, Organ Donor Info, Medical History
+4. **Digital** (4 items): Digital Account Inventory, Password Manager Info, Social Media Wishes, Email Access Instructions
+5. **Insurance** (3 items): Life Insurance, Home/Renters Insurance, Auto Insurance
+6. **Personal** (1 item): Letter of Intent / Personal Wishes
 
 ---
 
 ### Files to Create/Modify
 
-| File | Action |
-|------|--------|
-| `src/assets/remy-avatar.png` | Copy from user upload |
-| `src/components/landing/demos/RemyChatDemo.tsx` | Create new demo component |
-| `src/components/landing/RemySection.tsx` | Redesign with bento layout |
-| `src/index.css` | Update animations (remove old, add new) |
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/pages/EasyVault.tsx` | Create | Main vault page with layout, categories, and trust panel |
+| `src/components/vault/VaultProgress.tsx` | Create | Top progress card (X/27 completed, overall %) |
+| `src/components/vault/DocumentCategory.tsx` | Create | Collapsible accordion category with progress bar and document rows |
+| `src/components/vault/DocumentRow.tsx` | Create | Individual document item row with status, priority badge, upload placeholder |
+| `src/components/vault/TrustNetworkPanel.tsx` | Create | Right-side panel for trusted contacts and invite actions |
+| `src/components/vault/VaultPaywall.tsx` | Create | Lock overlay shown to non-paid users |
+| `src/components/vault/index.ts` | Create | Barrel export |
+| `src/data/vaultDocuments.ts` | Create | Static data for document categories and items |
+| `src/App.tsx` | Modify | Add `/vault` route |
+| `src/components/layout/AppSidebar.tsx` | Modify | Add "EasyVault" nav item with Vault icon |
+| `src/components/layout/AppLayout.tsx` | Modify | Add `/vault` to APP_ROUTES |
+| `src/components/layout/BottomNav.tsx` | Modify | Add EasyVault to mobile nav |
 
 ---
 
-### Accessibility Considerations
+### Technical Details
 
-- Chat demo respects `prefers-reduced-motion`
-- Remy avatar has proper alt text
-- Demo is purely decorative (aria-hidden)
-- All content remains accessible without animations
+**Data structure** (`src/data/vaultDocuments.ts`):
+```typescript
+interface VaultDocument {
+  id: string;
+  name: string;
+  category: string;
+  priority: "high" | "medium" | "low";
+  description?: string;
+  hasExternalLink?: boolean; // shows external link icon like Will/Testament
+}
+
+interface VaultCategory {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  documents: VaultDocument[];
+}
+```
+
+**Document Row states:**
+- Empty (circle outline + "Missing - add a document with this information" in orange/amber)
+- Uploaded (filled green circle + document name + date uploaded)
+- High priority items get a red "high" badge
+
+**Trust Network Panel** (static UI only):
+- "Your Trusted Contacts" list with avatar circles
+- "Who Trusts You" list
+- "Invite Your Network" section with Email, WhatsApp, Share, Copy Link buttons
+
+**Paywall component:**
+- Semi-transparent overlay with lock icon
+- "Upgrade to access EasyVault" message and CTA button
+- Conditionally rendered based on a `isPaidUser` flag (hardcoded false for now)
+
+**Sidebar update:**
+- Add `Vault` icon from lucide-react
+- New nav item: `{ title: "EasyVault", url: "/vault", icon: Vault }`
+- Placed after "Readiness Report" in the nav list
+
+**Info banner** inside the vault:
+- Yellow/amber tinted banner: "Documents are prioritized based on your personal situation" with "Update preferences" link
+
+---
+
+### Styling Approach
+
+- White background (`bg-background`) consistent with the app aesthetic
+- Soft rounded cards with `border-border/50` borders
+- Category headers use icons and muted progress bars
+- Document rows use subtle `bg-muted/30` hover states
+- Priority badges use destructive/amber variant
+- Trust Network panel uses a card with softer right-column treatment
+- All components use existing shadcn primitives (Accordion, Badge, Progress, Card, Button, Avatar, Separator)
 
