@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      vault_document_exclusions: {
+        Row: {
+          created_at: string
+          document_type_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_type_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_type_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       vault_documents: {
         Row: {
           category: string

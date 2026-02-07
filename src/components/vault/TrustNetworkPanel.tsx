@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Mail, MessageCircle, Share2, Copy, UserPlus, X } from "lucide-react";
+import { Mail, MessageCircle, Copy, UserPlus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -58,19 +58,6 @@ const TrustNetworkPanel = () => {
     window.open(`https://wa.me/?text=${text}`, "_blank");
   }, []);
 
-  const handleShare = useCallback(async () => {
-    const url = getReferralUrl();
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "Rest Easy", text: "Join me on Rest Easy", url });
-      } catch {
-        /* user cancelled */
-      }
-    } else {
-      await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied", description: "Referral link copied to clipboard." });
-    }
-  }, [toast]);
 
   return (
     <>
@@ -142,15 +129,12 @@ const TrustNetworkPanel = () => {
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
               Invite Your Network
             </h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleEmail}>
                 <Mail className="h-3.5 w-3.5" /> Email
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleWhatsApp}>
                 <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleShare}>
-                <Share2 className="h-3.5 w-3.5" /> Share
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleCopyLink}>
                 <Copy className="h-3.5 w-3.5" /> Copy Link
