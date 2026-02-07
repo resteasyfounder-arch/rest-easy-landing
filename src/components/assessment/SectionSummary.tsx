@@ -148,12 +148,12 @@ export function SectionSummary({
         </CardContent>
       </Card>
 
-      {/* AI Insight */}
+      {/* Remy Insight */}
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
         <CardContent className="p-4">
           <h3 className="font-medium text-foreground mb-2 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            AI Insight
+            Remy Insight
           </h3>
           {aiLoading ? (
             <div className="space-y-2">

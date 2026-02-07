@@ -5,9 +5,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
 import { useImprovementItems } from "@/hooks/useImprovementItems";
+import { useRemySurface } from "@/hooks/useRemySurface";
 import { LogOut, RotateCcw, Heart, Trophy, Map } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
+import { RemyBriefCard } from "@/components/remy/RemyBriefCard";
 import {
   ReportStatusBadge,
   AssessmentCTA,
@@ -67,6 +69,27 @@ const Dashboard = () => {
     const storedSubjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
     setSubjectId(storedSubjectId);
   }, []);
+
+  // Backfill subject id from server state if localStorage wasn't populated yet
+  useEffect(() => {
+    if (!subjectId && assessmentState.subject_id) {
+      setSubjectId(assessmentState.subject_id);
+      localStorage.setItem(STORAGE_KEYS.subjectId, assessmentState.subject_id);
+    }
+  }, [subjectId, assessmentState.subject_id]);
+
+  const {
+    payload: remyPayload,
+    isLoading: isLoadingRemy,
+    error: remyError,
+    dismissNudge,
+    acknowledgeAction,
+    refresh: refreshRemy,
+  } = useRemySurface({
+    subjectId: subjectId || assessmentState.subject_id || null,
+    surface: "dashboard",
+    enabled: hasStarted,
+  });
 
   // Fetch schema-driven improvement items for the roadmap
   const {
@@ -186,6 +209,17 @@ const Dashboard = () => {
             <span className="hidden sm:inline">Log Out</span>
           </Button>
         </div>
+
+        {hasStarted && (
+          <RemyBriefCard
+            payload={remyPayload}
+            isLoading={isLoadingRemy}
+            error={remyError}
+            onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
+            onAcknowledge={acknowledgeAction}
+            onRetry={refreshRemy}
+          />
+        )}
 
         {/* ==================== COMPLETED ASSESSMENT VIEW ==================== */}
         {isComplete ? (

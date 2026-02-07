@@ -4,6 +4,8 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
+import { useRemySurface, notifyRemyRefresh } from "@/hooks/useRemySurface";
+import { RemyInlineNudge } from "@/components/remy/RemyInlineNudge";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { CompactLifeCard } from "@/components/profile/CompactLifeCard";
@@ -102,6 +104,18 @@ const Profile = () => {
 
   const { profile_answers, status, overall_progress, report_stale } = assessmentState;
   const hasStarted = status !== "not_started";
+  const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
+  const {
+    payload: remyPayload,
+    isLoading: isLoadingRemy,
+    error: remyError,
+    dismissNudge,
+    acknowledgeAction,
+  } = useRemySurface({
+    subjectId,
+    surface: "profile",
+    enabled: Boolean(subjectId),
+  });
 
   // Calculate stats
   const completedCount = PROFILE_ITEMS.filter(item => profile_answers[item.id] !== undefined).length;
@@ -194,6 +208,8 @@ const Profile = () => {
           description: "Your profile has been updated.",
         });
       }
+
+      notifyRemyRefresh();
     } catch (error) {
       console.error("[Profile] Error saving profile:", error);
       toast({
@@ -259,6 +275,13 @@ const Profile = () => {
           {/* Profile Content - Has started */}
           {hasStarted && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <RemyInlineNudge
+                payload={remyPayload}
+                isLoading={isLoadingRemy}
+                error={remyError}
+                onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
+                onAcknowledge={acknowledgeAction}
+              />
               
               {/* Header + Summary Row */}
               <div className="flex flex-col md:flex-row md:items-center gap-4">

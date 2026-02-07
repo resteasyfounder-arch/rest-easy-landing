@@ -1,6 +1,13 @@
+import { useState } from "react";
 import { User, Settings, HelpCircle, FileText, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/layout/AppLayout";
+import { useRemySurface } from "@/hooks/useRemySurface";
+import { RemyInlineNudge } from "@/components/remy/RemyInlineNudge";
+
+const STORAGE_KEYS = {
+  subjectId: "rest-easy.readiness.subject_id",
+};
 
 const menuItems = [
   { icon: User, label: "Account", description: "Manage your profile" },
@@ -10,6 +17,19 @@ const menuItems = [
 ];
 
 const MenuPage = () => {
+  const [subjectId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.subjectId));
+  const {
+    payload: remyPayload,
+    isLoading: isLoadingRemy,
+    error: remyError,
+    dismissNudge,
+    acknowledgeAction,
+  } = useRemySurface({
+    subjectId,
+    surface: "menu",
+    enabled: Boolean(subjectId),
+  });
+
   return (
     <AppLayout>
       <div className="px-4 py-8">
@@ -17,6 +37,15 @@ const MenuPage = () => {
           <h1 className="text-2xl font-display font-semibold text-foreground mb-6">
             Menu
           </h1>
+
+          <RemyInlineNudge
+            payload={remyPayload}
+            isLoading={isLoadingRemy}
+            error={remyError}
+            onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
+            onAcknowledge={acknowledgeAction}
+            className="mb-5"
+          />
           
           <div className="space-y-2">
             {menuItems.map((item) => {

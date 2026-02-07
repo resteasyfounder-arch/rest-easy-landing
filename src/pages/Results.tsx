@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/layout/AppLayout";
 import type { ReadinessReport } from "@/types/report";
+import { useRemySurface } from "@/hooks/useRemySurface";
+import { RemyPriorityList } from "@/components/remy/RemyPriorityList";
 import { Download, ArrowLeft, Loader2 } from "lucide-react";
 import {
   CoverPage,
@@ -29,16 +31,26 @@ const SUBJECT_ID_KEY = "rest-easy.readiness.subject_id";
 
 const Results = () => {
   const navigate = useNavigate();
+  const [subjectId] = useState<string | null>(() => localStorage.getItem(SUBJECT_ID_KEY));
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+  const {
+    payload: remyPayload,
+    isLoading: isLoadingRemy,
+    error: remyError,
+    dismissNudge,
+    acknowledgeAction,
+  } = useRemySurface({
+    subjectId,
+    surface: "results",
+    enabled: Boolean(subjectId) && !loading && !isGenerating,
+  });
 
   useEffect(() => {
     const fetchReport = async () => {
-      const subjectId = localStorage.getItem(SUBJECT_ID_KEY);
-      
       if (!subjectId) {
         console.log("[Results] No subject_id found, cannot fetch report");
         setLoading(false);
@@ -178,7 +190,7 @@ const Results = () => {
     };
 
     fetchReport();
-  }, []);
+  }, [subjectId]);
 
   const handleDownloadPDF = async () => {
     if (!reportRef.current || !report) return;
@@ -286,6 +298,16 @@ const Results = () => {
 
           {/* Immediate Actions */}
           <ImmediateActions actions={report.immediate_actions} />
+
+          {/* Remy Priorities */}
+          <RemyPriorityList
+            payload={remyPayload}
+            isLoading={isLoadingRemy}
+            error={remyError}
+            onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
+            onAcknowledge={acknowledgeAction}
+            className="mt-8"
+          />
 
           {/* Category Scores with Detailed Analysis */}
           <CategoryScores categories={report.category_analyses} />
