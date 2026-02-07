@@ -1,4 +1,4 @@
-import { Home, BarChart3, Settings, LogIn, Sparkles, UserCircle, Vault } from "lucide-react";
+import { Home, BarChart3, Settings, LogIn, Sparkles, UserCircle, Vault, FileText } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
+import { useVaultDocuments } from "@/hooks/useVaultDocuments";
+import { totalDocumentCount } from "@/data/vaultDocuments";
 import { TierBadge } from "@/components/dashboard";
 import logo from "@/assets/rest-easy-logo.png";
 
@@ -33,10 +35,17 @@ const AppSidebar = () => {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const { assessmentState, hasStarted, isComplete } = useAssessmentState();
+  const { documents, excludedDocIds } = useVaultDocuments();
 
   const applicableSections = assessmentState.sections.filter((s) => s.is_applicable);
   const completedSectionsCount = applicableSections.filter((s) => s.progress === 100).length;
   const totalSections = applicableSections.length;
+
+  // Vault progress
+  const savedTypeIds = new Set(documents.map((d) => d.document_type_id));
+  const vaultCompleted = [...savedTypeIds].filter((id) => !excludedDocIds.has(id)).length;
+  const vaultApplicable = totalDocumentCount - excludedDocIds.size;
+  const vaultPercentage = vaultApplicable > 0 ? Math.round((vaultCompleted / vaultApplicable) * 100) : 0;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -86,10 +95,10 @@ const AppSidebar = () => {
 
         <SidebarSeparator />
 
-        {/* Score Preview Section */}
+        {/* Life Readiness Progress */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-muted-foreground font-body text-xs uppercase tracking-wider">
-            Your Progress
+            Life Readiness Progress
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <div className={`px-3 py-4 ${isCollapsed ? "hidden" : ""}`}>
@@ -132,6 +141,36 @@ const AppSidebar = () => {
                         ? `${Math.round(assessmentState.overall_progress)}%` 
                         : "--"}
                   </span>
+                </div>
+              </div>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* EasyVault Progress */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-muted-foreground font-body text-xs uppercase tracking-wider">
+            EasyVault Progress
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className={`px-3 py-4 ${isCollapsed ? "hidden" : ""}`}>
+              <div className="rounded-lg bg-gradient-to-br from-primary/5 to-accent/10 p-4 border border-primary/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-foreground">Documents</span>
+                  <span className="text-lg font-display font-bold text-primary">
+                    {vaultCompleted}/{vaultApplicable}
+                  </span>
+                </div>
+                <Progress value={vaultPercentage} className="h-2 bg-muted" />
+                <p className="text-xs text-muted-foreground mt-3">
+                  {vaultPercentage}% complete
+                </p>
+              </div>
+            </div>
+            {isCollapsed && (
+              <div className="flex justify-center py-2">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-primary" />
                 </div>
               </div>
             )}
