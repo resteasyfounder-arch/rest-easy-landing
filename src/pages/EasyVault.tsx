@@ -1,15 +1,88 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Info } from "lucide-react";
 import { Accordion } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import AppLayout from "@/components/layout/AppLayout";
 import { VaultProgress, DocumentCategory, TrustNetworkPanel, VaultPaywall } from "@/components/vault";
+import UploadDocumentDialog from "@/components/vault/UploadDocumentDialog";
+import InlineDocumentEditor from "@/components/vault/InlineDocumentEditor";
 import { vaultCategories } from "@/data/vaultDocuments";
+import { useVaultDocuments } from "@/hooks/useVaultDocuments";
+import type { VaultDocument } from "@/data/vaultDocuments";
+
+// Helper to find a document definition by type ID
+function findDocDef(typeId: string): { doc: VaultDocument; categoryId: string } | null {
+  for (const cat of vaultCategories) {
+    const doc = cat.documents.find((d) => d.id === typeId);
+    if (doc) return { doc, categoryId: cat.id };
+  }
+  return null;
+}
 
 const EasyVault = () => {
-  const isPaidUser = true; // hardcoded for UI preview; false to see paywall
-  const [completedIds] = useState<Set<string>>(new Set());
-  const completedCount = completedIds.size;
+  const isPaidUser = true;
+  const { documents, isLoading, upload, saveInline, remove, download } = useVaultDocuments();
+
+  // Map document_type_id → saved row for fast lookup
+  const savedDocsMap = useMemo(() => {
+    const map = new Map<string, (typeof documents)[0]>();
+    for (const d of documents) {
+      map.set(d.document_type_id, d);
+    }
+    return map;
+  }, [documents]);
+
+  const completedCount = savedDocsMap.size;
+
+  // Upload dialog state
+  const [uploadTarget, setUploadTarget] = useState<string | null>(null);
+  const uploadDef = uploadTarget ? findDocDef(uploadTarget) : null;
+
+  // Inline editor state
+  const [inlineTarget, setInlineTarget] = useState<string | null>(null);
+  const inlineDef = inlineTarget ? findDocDef(inlineTarget) : null;
+  const existingInline = inlineTarget ? savedDocsMap.get(inlineTarget) : undefined;
+
+  const handleUpload = useCallback(
+    (file: File, notes?: string) => {
+      if (!uploadDef) return;
+      upload.mutate(
+        { file, documentTypeId: uploadDef.doc.id, category: uploadDef.categoryId, displayName: uploadDef.doc.name, notes },
+        { onSuccess: () => setUploadTarget(null) }
+      );
+    },
+    [uploadDef, upload]
+  );
+
+  const handleSaveInline = useCallback(
+    (content: string) => {
+      if (!inlineDef) return;
+      saveInline.mutate(
+        { documentTypeId: inlineDef.doc.id, category: inlineDef.categoryId, displayName: inlineDef.doc.name, inlineContent: content },
+        { onSuccess: () => setInlineTarget(null) }
+      );
+    },
+    [inlineDef, saveInline]
+  );
+
+  const handleDownload = useCallback(
+    async (docId: string) => {
+      const result = await download.mutateAsync(docId);
+      if (result?.url) {
+        window.open(result.url, "_blank");
+      }
+    },
+    [download]
+  );
+
+  const handleDelete = useCallback(
+    (docId: string) => {
+      if (window.confirm("Are you sure you want to remove this document?")) {
+        remove.mutate(docId);
+      }
+    },
+    [remove]
+  );
 
   return (
     <AppLayout>
@@ -20,7 +93,6 @@ const EasyVault = () => {
           <h1 className="text-2xl font-bold text-foreground mb-6">EasyVault</h1>
 
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Main content */}
             <div className="flex-1 space-y-4">
               <VaultProgress completedCount={completedCount} />
 
@@ -39,19 +111,47 @@ const EasyVault = () => {
                   <DocumentCategory
                     key={category.id}
                     category={category}
-                    completedIds={completedIds}
+                    savedDocs={savedDocsMap}
+                    onUpload={(typeId) => setUploadTarget(typeId)}
+                    onEdit={(typeId) => setInlineTarget(typeId)}
+                    onDownload={handleDownload}
+                    onDelete={handleDelete}
                   />
                 ))}
               </Accordion>
             </div>
 
-            {/* Right panel */}
             <div className="w-full lg:w-80 shrink-0">
               <TrustNetworkPanel />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Upload dialog */}
+      {uploadDef && (
+        <UploadDocumentDialog
+          open={!!uploadTarget}
+          onOpenChange={(v) => !v && setUploadTarget(null)}
+          document={uploadDef.doc}
+          categoryId={uploadDef.categoryId}
+          onUpload={handleUpload}
+          isUploading={upload.isPending}
+        />
+      )}
+
+      {/* Inline editor */}
+      {inlineDef && (
+        <InlineDocumentEditor
+          open={!!inlineTarget}
+          onOpenChange={(v) => !v && setInlineTarget(null)}
+          documentTypeId={inlineDef.doc.id}
+          documentName={inlineDef.doc.name}
+          existingContent={existingInline?.inline_content}
+          onSave={handleSaveInline}
+          isSaving={saveInline.isPending}
+        />
+      )}
     </AppLayout>
   );
 };
