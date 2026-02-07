@@ -16,7 +16,6 @@ import {
   WelcomeHeader,
   ReportSummaryCard,
   ReadinessScoreCard,
-  VaultPreviewCard,
   RoadmapCard,
   QuestionEditModal,
   QuickStatsStrip,
@@ -25,6 +24,7 @@ import {
   ProgressHero,
   JourneyTimeline,
 } from "@/components/dashboard";
+import { VaultProgressCard } from "@/components/dashboard/VaultProgressCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -242,7 +242,7 @@ const Dashboard = () => {
                 onViewByCategory={() => navigate("/results#categories")}
                 className="lg:col-span-3"
               />
-              <VaultPreviewCard className="lg:col-span-2" />
+              <VaultProgressCard className="lg:col-span-2" />
             </div>
 
             {/* Report Summary Card */}

@@ -6,7 +6,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { VaultProgress, DocumentCategory, TrustNetworkPanel, VaultPaywall } from "@/components/vault";
 import UploadDocumentDialog from "@/components/vault/UploadDocumentDialog";
 import InlineDocumentEditor from "@/components/vault/InlineDocumentEditor";
-import { vaultCategories } from "@/data/vaultDocuments";
+import { vaultCategories, totalDocumentCount } from "@/data/vaultDocuments";
 import { useVaultDocuments } from "@/hooks/useVaultDocuments";
 import type { VaultDocument } from "@/data/vaultDocuments";
 
@@ -21,7 +21,7 @@ function findDocDef(typeId: string): { doc: VaultDocument; categoryId: string } 
 
 const EasyVault = () => {
   const isPaidUser = true;
-  const { documents, isLoading, upload, saveInline, remove, download } = useVaultDocuments();
+  const { documents, isLoading, excludedDocIds, upload, saveInline, remove, download, markNotApplicable, unmarkNotApplicable } = useVaultDocuments();
 
   // Map document_type_id → saved row for fast lookup
   const savedDocsMap = useMemo(() => {
@@ -32,7 +32,8 @@ const EasyVault = () => {
     return map;
   }, [documents]);
 
-  const completedCount = savedDocsMap.size;
+  const completedCount = [...savedDocsMap.keys()].filter((id) => !excludedDocIds.has(id)).length;
+  const applicableTotal = totalDocumentCount - excludedDocIds.size;
 
   // Upload dialog state
   const [uploadTarget, setUploadTarget] = useState<string | null>(null);
@@ -94,7 +95,7 @@ const EasyVault = () => {
 
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="flex-1 space-y-4">
-              <VaultProgress completedCount={completedCount} />
+              <VaultProgress completedCount={completedCount} applicableTotal={applicableTotal} />
 
               <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40">
                 <Info className="h-4 w-4 text-amber-600" />
@@ -112,10 +113,13 @@ const EasyVault = () => {
                     key={category.id}
                     category={category}
                     savedDocs={savedDocsMap}
+                    excludedDocIds={excludedDocIds}
                     onUpload={(typeId) => setUploadTarget(typeId)}
                     onEdit={(typeId) => setInlineTarget(typeId)}
                     onDownload={handleDownload}
                     onDelete={handleDelete}
+                    onMarkNA={(typeId) => markNotApplicable.mutate(typeId)}
+                    onUnmarkNA={(typeId) => unmarkNotApplicable.mutate(typeId)}
                   />
                 ))}
               </Accordion>

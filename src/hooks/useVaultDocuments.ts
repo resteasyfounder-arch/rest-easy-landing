@@ -18,6 +18,13 @@ export interface VaultDocumentRow {
   updated_at: string;
 }
 
+export interface VaultExclusionRow {
+  id: string;
+  user_id: string;
+  document_type_id: string;
+  created_at: string;
+}
+
 export function useVaultDocuments() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -26,13 +33,28 @@ export function useVaultDocuments() {
     queryKey: ["vault-documents"],
     queryFn: async (): Promise<VaultDocumentRow[]> => {
       const { data, error } = await supabase
-        .from("vault_documents" as any)
+        .from("vault_documents")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as any) ?? [];
     },
   });
+
+  const exclusionsQuery = useQuery({
+    queryKey: ["vault-exclusions"],
+    queryFn: async (): Promise<VaultExclusionRow[]> => {
+      const { data, error } = await supabase
+        .from("vault_document_exclusions" as any)
+        .select("*");
+      if (error) throw error;
+      return (data as any) ?? [];
+    },
+  });
+
+  const excludedDocIds = new Set(
+    (exclusionsQuery.data ?? []).map((e) => e.document_type_id)
+  );
 
   const uploadMutation = useMutation({
     mutationFn: async (params: {
@@ -76,7 +98,7 @@ export function useVaultDocuments() {
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase
-        .from("vault_documents" as any)
+        .from("vault_documents")
         .upsert(
           {
             user_id: user.id,
@@ -105,7 +127,7 @@ export function useVaultDocuments() {
   const deleteMutation = useMutation({
     mutationFn: async (docId: string) => {
       const { error } = await supabase
-        .from("vault_documents" as any)
+        .from("vault_documents")
         .delete()
         .eq("id", docId);
       if (error) throw error;
@@ -129,12 +151,53 @@ export function useVaultDocuments() {
     },
   });
 
+  const markNotApplicable = useMutation({
+    mutationFn: async (documentTypeId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("vault_document_exclusions" as any)
+        .insert({ user_id: user.id, document_type_id: documentTypeId } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vault-exclusions"] });
+      toast({ title: "Marked as not applicable" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to update", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const unmarkNotApplicable = useMutation({
+    mutationFn: async (documentTypeId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("vault_document_exclusions" as any)
+        .delete()
+        .eq("user_id", user.id)
+        .eq("document_type_id", documentTypeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vault-exclusions"] });
+      toast({ title: "Restored to applicable" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to update", description: err.message, variant: "destructive" });
+    },
+  });
+
   return {
     documents: query.data ?? [],
     isLoading: query.isLoading,
+    excludedDocIds,
     upload: uploadMutation,
     saveInline: saveInlineMutation,
     remove: deleteMutation,
     download: downloadMutation,
+    markNotApplicable,
+    unmarkNotApplicable,
   };
 }

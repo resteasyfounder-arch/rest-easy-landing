@@ -1,15 +1,15 @@
 import { FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { totalDocumentCount } from "@/data/vaultDocuments";
 
 interface VaultProgressProps {
   completedCount: number;
+  applicableTotal: number;
 }
 
-const VaultProgress = ({ completedCount }: VaultProgressProps) => {
-  const percentage = totalDocumentCount > 0
-    ? Math.round((completedCount / totalDocumentCount) * 100)
+const VaultProgress = ({ completedCount, applicableTotal }: VaultProgressProps) => {
+  const percentage = applicableTotal > 0
+    ? Math.round((completedCount / applicableTotal) * 100)
     : 0;
 
   return (
@@ -27,7 +27,7 @@ const VaultProgress = ({ completedCount }: VaultProgressProps) => {
           </div>
           <div className="text-right">
             <span className="text-2xl font-bold text-foreground">{completedCount}</span>
-            <span className="text-muted-foreground">/{totalDocumentCount}</span>
+            <span className="text-muted-foreground">/{applicableTotal}</span>
             <p className="text-xs text-muted-foreground">completed</p>
           </div>
         </div>
