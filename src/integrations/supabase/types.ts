@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      vault_documents: {
+        Row: {
+          category: string
+          created_at: string
+          display_name: string
+          document_type_id: string
+          file_name: string | null
+          file_size: number | null
+          id: string
+          inline_content: string | null
+          mime_type: string | null
+          notes: string | null
+          storage_path: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          display_name: string
+          document_type_id: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          inline_content?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          storage_path?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          display_name?: string
+          document_type_id?: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          inline_content?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          storage_path?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

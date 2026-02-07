@@ -4,14 +4,19 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import DocumentRow from "./DocumentRow";
 import type { VaultCategory } from "@/data/vaultDocuments";
+import type { VaultDocumentRow } from "@/hooks/useVaultDocuments";
 
 interface DocumentCategoryProps {
   category: VaultCategory;
-  completedIds: Set<string>;
+  savedDocs: Map<string, VaultDocumentRow>;
+  onUpload: (docTypeId: string) => void;
+  onEdit: (docTypeId: string) => void;
+  onDownload: (docId: string) => void;
+  onDelete: (docId: string) => void;
 }
 
-const DocumentCategory = ({ category, completedIds }: DocumentCategoryProps) => {
-  const completedCount = category.documents.filter((d) => completedIds.has(d.id)).length;
+const DocumentCategory = ({ category, savedDocs, onUpload, onEdit, onDownload, onDelete }: DocumentCategoryProps) => {
+  const completedCount = category.documents.filter((d) => savedDocs.has(d.id)).length;
   const totalCount = category.documents.length;
   const missingCount = totalCount - completedCount;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -40,13 +45,20 @@ const DocumentCategory = ({ category, completedIds }: DocumentCategoryProps) => 
       </AccordionTrigger>
       <AccordionContent>
         <div className="space-y-1 pb-2">
-          {category.documents.map((doc) => (
-            <DocumentRow
-              key={doc.id}
-              document={doc}
-              isUploaded={completedIds.has(doc.id)}
-            />
-          ))}
+          {category.documents.map((doc) => {
+            const saved = savedDocs.get(doc.id);
+            return (
+              <DocumentRow
+                key={doc.id}
+                document={doc}
+                savedDoc={saved}
+                onUpload={() => onUpload(doc.id)}
+                onEdit={() => onEdit(doc.id)}
+                onDownload={() => saved && onDownload(saved.id)}
+                onDelete={() => saved && onDelete(saved.id)}
+              />
+            );
+          })}
           <Button variant="ghost" size="sm" className="text-primary mt-2 gap-1.5">
             <Plus className="h-4 w-4" />
             Add Document
