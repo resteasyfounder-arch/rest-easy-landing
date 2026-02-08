@@ -1,77 +1,32 @@
 
 
-## Cache Findability Results, Remove "Mission" Language, and Strengthen Sign-Up CTAs
+## Smooth Out Landing Page Background Flow
 
-### Overview
-Three changes: (1) cache the completed assessment in `sessionStorage` so users can navigate away and return to their results without retaking, (2) remove all "mission" / "rescue mission" terminology, and (3) enhance the results page with stronger sign-up messaging.
+### Problem
+Every section uses the same `bg-gradient-hero` class, which applies a diagonal gradient (`135deg`). Because each section restarts the same gradient independently, there are visible "seams" where sections meet -- the gradient pattern repeats at each boundary rather than flowing continuously.
 
-### 1. Session Caching for Assessment Results
+### Solution
+Remove individual section backgrounds and instead apply a single, continuous background to the entire `<main>` element in `Index.tsx`. This way the gradient renders once across the full page height, creating a seamless flow from hero through to the footer.
 
-**Problem:** When a guest completes the assessment, navigates home, and clicks "Take Assessment" again, all state is lost and they start over.
+### Changes
 
-**Solution:** Use `sessionStorage` (persists for the browser tab/session, clears when they close the tab) to cache the completed results. On mount, check for cached results and skip straight to the results screen.
+**`src/pages/Index.tsx`**
+- Add `bg-gradient-hero` to the `<main>` wrapper so the gradient covers all sections in one continuous sweep.
 
-**Edit `src/pages/Assessment.tsx`:**
-- On mount (or in the intro step), check `sessionStorage` for a key like `rest-easy.findability-results`
-- If found, parse it and restore `answers`, `aiSummary`, `score`, and set `step` to `"results"` immediately
-- After the AI summary is generated, save the full results payload (`answers`, `aiSummary`, `score`) to `sessionStorage`
-- On "Retake Assessment", clear the `sessionStorage` key so they get a fresh start
-- Also save in-progress answers to `sessionStorage` as the user answers questions, so if they navigate away mid-assessment they resume where they left off
+**`src/components/Hero.tsx`**
+- Remove `bg-gradient-hero` from the hero `<section>` (it will inherit from `<main>`).
 
-**Cache structure:**
-```
-sessionStorage key: "rest-easy.findability-results"
-value: JSON { answers, aiSummary, score, completedAt }
+**`src/components/landing/ProblemSection.tsx`**
+- Remove `bg-gradient-hero` from the section element.
 
-sessionStorage key: "rest-easy.findability-progress"  
-value: JSON { answers, currentQuestionIndex }
-```
+**`src/components/Solution.tsx`**
+- Remove `bg-gradient-hero` from the section element.
 
-### 2. Remove All "Mission" / "Rescue Mission" Language
+**`src/components/landing/JourneySection.tsx`**
+- Remove `bg-gradient-hero` from the section element.
 
-Replace "mission" terminology with "action plan" or "next steps" language throughout.
+**`src/components/landing/RemySection.tsx`**
+- Remove `bg-gradient-hero` from the section element.
 
-**Edit `src/data/findabilityQuestions.ts`:**
-- Rename the `RescueMission` interface to `ActionPlan`
-- Rename the `rescueMission` property on each question to `actionPlan`
-- Keep all titles and steps content the same (they don't say "mission" in the actual text)
-
-**Rename and edit `src/components/assessment/results/RescueMissionPreview.tsx` to `ActionPlanPreview.tsx`:**
-- Rename component from `RescueMissionPreview` to `ActionPlanPreview`
-- Change "Your first mission" text to "Your first priority"
-- Change "+4 more steps in your full mission" to "+4 more steps when you sign up"
-- Update all internal variable names
-
-**Edit `src/components/assessment/results/ResultsTrustSection.tsx`:**
-- Change "~15 min per mission" to "~15 min to get started"
-- Remove the unused `stats` array referencing "rescue mission"
-
-**Edit `src/components/assessment/FindabilityResults.tsx`:**
-- Update import from `RescueMissionPreview` to `ActionPlanPreview`
-
-### 3. Strengthen the Results Page Sign-Up Messaging
-
-**Edit `src/components/assessment/results/ResultsCTA.tsx`:**
-- Add a stronger narrative section above the value props explaining what the full assessment covers
-- Add specific outcomes: "Personalized action plan", "Step-by-step guidance from Remy", "Secure document vault for your family"
-- Add social proof line: "Join thousands of people getting prepared"
-- Make the primary button more prominent with a gradient or stronger visual treatment
-
-**Edit `src/components/assessment/results/LifeReadinessTeaser.tsx`:**
-- Expand the category list to show all 5 categories (not just 2 + "3 more")
-- Add a brief one-liner under each category explaining what it covers
-- Add a mini CTA button at the bottom: "See Your Full Score" linking to sign-up
-
-**Edit `src/components/assessment/results/ActionPlanPreview.tsx` (renamed):**
-- Add a sign-up nudge at the bottom of the locked steps: "Create a free account to unlock your full action plan"
-
-### Files Changed
-
-- **Edit:** `src/pages/Assessment.tsx` -- add sessionStorage caching for completed results and in-progress answers
-- **Edit:** `src/data/findabilityQuestions.ts` -- rename `RescueMission` to `ActionPlan`, `rescueMission` to `actionPlan`
-- **Rename + Edit:** `src/components/assessment/results/RescueMissionPreview.tsx` to `ActionPlanPreview.tsx` -- remove mission language, add sign-up nudge
-- **Edit:** `src/components/assessment/results/ResultsTrustSection.tsx` -- remove mission references
-- **Edit:** `src/components/assessment/FindabilityResults.tsx` -- update imports, use ActionPlanPreview
-- **Edit:** `src/components/assessment/results/ResultsCTA.tsx` -- stronger sign-up messaging with more detail
-- **Edit:** `src/components/assessment/results/LifeReadinessTeaser.tsx` -- expand categories, add mini CTA
+All sections will then sit on one continuous gradient background with no visible seams between them. The footer retains its own dark `bg-foreground` background, which provides a clean visual break.
 
