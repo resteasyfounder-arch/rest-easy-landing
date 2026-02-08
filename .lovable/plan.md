@@ -1,103 +1,77 @@
 
 
-## Overhaul Findability Assessment Flow
+## Cache Findability Results, Remove "Mission" Language, and Strengthen Sign-Up CTAs
 
 ### Overview
-Streamline the free Findability Assessment into a seamless, uninterrupted experience. Remove mid-assessment pause screens and section transitions that break flow. After the final question, show a brief "generating" moment while Remy (AI) summarizes the user's answers, then display a polished results page with the AI summary and a clear sign-up prompt.
+Three changes: (1) cache the completed assessment in `sessionStorage` so users can navigate away and return to their results without retaking, (2) remove all "mission" / "rescue mission" terminology, and (3) enhance the results page with stronger sign-up messaging.
 
-### Current Problems
-1. **Pause screens** (`pauseAfter` flag) interrupt the flow with a full-screen message and progress bar between questions 3-4 and 6-7. Users must wait ~3.5 seconds or tap to continue.
-2. **Section transitions** (`sectionEnd` flag) show another full-screen interstitial between sections (after questions 4, 6, and 8). Each requires a manual "Continue" tap.
-3. **Results are purely template-based** -- the score, breakdown, and rescue mission are all calculated from static data. No AI personalization.
-4. **The completion screen** is a generic "Thank you" page that routes to `/results`, but `/results` is the full Life Readiness report page (for logged-in users). Free users see a "Complete the Life Readiness assessment" empty state.
-5. **Sign-up prompt** is just a "Start My First Rescue Mission" button linking to `/login` -- no narrative connection to the value of signing up.
+### 1. Session Caching for Assessment Results
 
-### Proposed Flow
+**Problem:** When a guest completes the assessment, navigates home, and clicks "Take Assessment" again, all state is lost and they start over.
 
-```text
-[Intro] --> [Q1] --> [Q2] --> ... --> [Q8] --> [Generating...] --> [Findability Results + Sign-up CTA]
+**Solution:** Use `sessionStorage` (persists for the browser tab/session, clears when they close the tab) to cache the completed results. On mount, check for cached results and skip straight to the results screen.
+
+**Edit `src/pages/Assessment.tsx`:**
+- On mount (or in the intro step), check `sessionStorage` for a key like `rest-easy.findability-results`
+- If found, parse it and restore `answers`, `aiSummary`, `score`, and set `step` to `"results"` immediately
+- After the AI summary is generated, save the full results payload (`answers`, `aiSummary`, `score`) to `sessionStorage`
+- On "Retake Assessment", clear the `sessionStorage` key so they get a fresh start
+- Also save in-progress answers to `sessionStorage` as the user answers questions, so if they navigate away mid-assessment they resume where they left off
+
+**Cache structure:**
+```
+sessionStorage key: "rest-easy.findability-results"
+value: JSON { answers, aiSummary, score, completedAt }
+
+sessionStorage key: "rest-easy.findability-progress"  
+value: JSON { answers, currentQuestionIndex }
 ```
 
-No pauses. No section transitions. Just questions flowing one after another, then a brief AI generation moment, then results.
+### 2. Remove All "Mission" / "Rescue Mission" Language
 
-### Changes
+Replace "mission" terminology with "action plan" or "next steps" language throughout.
 
-**1. Remove pause and section transition interruptions**
+**Edit `src/data/findabilityQuestions.ts`:**
+- Rename the `RescueMission` interface to `ActionPlan`
+- Rename the `rescueMission` property on each question to `actionPlan`
+- Keep all titles and steps content the same (they don't say "mission" in the actual text)
 
-Edit `src/pages/Assessment.tsx`:
-- Remove the `"pause"` and `"section-transition"` steps from the `Step` type
-- Simplify `advanceToNext()` to always go to the next question (no `pauseAfter` or `sectionEnd` checks)
-- Remove `handlePauseContinue`, `handleSectionContinue`, and related rendering blocks
-- After the last question, transition directly to a new `"generating"` step
+**Rename and edit `src/components/assessment/results/RescueMissionPreview.tsx` to `ActionPlanPreview.tsx`:**
+- Rename component from `RescueMissionPreview` to `ActionPlanPreview`
+- Change "Your first mission" text to "Your first priority"
+- Change "+4 more steps in your full mission" to "+4 more steps when you sign up"
+- Update all internal variable names
 
-**2. Add AI-powered summary generation step**
+**Edit `src/components/assessment/results/ResultsTrustSection.tsx`:**
+- Change "~15 min per mission" to "~15 min to get started"
+- Remove the unused `stats` array referencing "rescue mission"
 
-Create a new edge function `supabase/functions/generate-findability-summary/index.ts`:
-- Receives the 8 question-answer pairs + calculated score
-- Uses the Lovable AI Gateway (LOVABLE_API_KEY) to generate a personalized 3-4 sentence summary from Remy's perspective
-- Returns: `{ summary: string, top_priority: string, encouragement: string }`
-- The summary addresses the user's specific gaps and strengths in a warm, Remy-like voice
+**Edit `src/components/assessment/FindabilityResults.tsx`:**
+- Update import from `RescueMissionPreview` to `ActionPlanPreview`
 
-New step in `Assessment.tsx` -- `"generating"`:
-- Shows a calm loading screen with Remy's avatar and a message like "Remy is reviewing your answers..."
-- Calls the edge function
-- On success, transitions to `"results"` with the AI summary in state
+### 3. Strengthen the Results Page Sign-Up Messaging
 
-**3. Redesign the results display (inline, not navigating away)**
+**Edit `src/components/assessment/results/ResultsCTA.tsx`:**
+- Add a stronger narrative section above the value props explaining what the full assessment covers
+- Add specific outcomes: "Personalized action plan", "Step-by-step guidance from Remy", "Secure document vault for your family"
+- Add social proof line: "Join thousands of people getting prepared"
+- Make the primary button more prominent with a gradient or stronger visual treatment
 
-Instead of navigating to `/results` (which is the full Life Readiness report page), show results inline within the Assessment page.
+**Edit `src/components/assessment/results/LifeReadinessTeaser.tsx`:**
+- Expand the category list to show all 5 categories (not just 2 + "3 more")
+- Add a brief one-liner under each category explaining what it covers
+- Add a mini CTA button at the bottom: "See Your Full Score" linking to sign-up
 
-Edit `src/pages/Assessment.tsx` -- the `"results"` step:
-- Replace the current `CompletionScreen` with the `FindabilityResults` component, enhanced with the AI summary
-- Pass the AI summary as a new prop
+**Edit `src/components/assessment/results/ActionPlanPreview.tsx` (renamed):**
+- Add a sign-up nudge at the bottom of the locked steps: "Create a free account to unlock your full action plan"
 
-Edit `src/components/assessment/FindabilityResults.tsx`:
-- Add a new `RemySummaryCard` section at the top (after the score hero), showing Remy's personalized AI summary with the Remy avatar
-- This replaces the generic breakdown as the hero content
+### Files Changed
 
-**4. Redesign the sign-up CTA**
-
-Edit `src/components/assessment/results/ResultsCTA.tsx`:
-- Change primary CTA from "Start My First Rescue Mission" to something like "Create Your Free Account" or "Unlock Your Full Life Readiness Score"
-- Add a brief value proposition above the button: what signing up unlocks (full assessment, Remy guidance, EasyVault)
-- Keep "Retake" as a secondary action
-- Remove "Save & Exit" (results are already in localStorage)
-
-Edit `src/components/assessment/results/LifeReadinessTeaser.tsx`:
-- Strengthen the teaser copy to better connect Findability as "step 1" and the full assessment + EasyVault as the natural next steps
-- Add mention of Remy as the ongoing AI guide
-
-### Technical Details
-
-**New edge function: `supabase/functions/generate-findability-summary/index.ts`**
-- Uses `LOVABLE_API_KEY` with the Lovable AI Gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`)
-- Model: `google/gemini-3-flash-preview` (default)
-- System prompt positions Remy as a warm, knowledgeable guide summarizing what the user's findability answers reveal
-- Non-streaming (simple request/response via `supabase.functions.invoke`)
-- Handles 429/402 errors gracefully
-
-**`src/pages/Assessment.tsx` changes:**
-- Step type becomes: `"intro" | "questions" | "generating" | "results"`
-- New state: `aiSummary: { summary: string; top_priority: string; encouragement: string } | null`
-- `advanceToNext()` simplified: always increments question index, or moves to `"generating"` on last question
-- New `"generating"` step renders a loading screen and calls the edge function
-- `"results"` step renders `FindabilityResults` inline with `aiSummary` passed down
-
-**`src/components/assessment/FindabilityResults.tsx` changes:**
-- New optional prop: `aiSummary?: { summary: string; top_priority: string; encouragement: string }`
-- New `RemySummaryCard` component rendered between ScoreHero and RescueMissionPreview, showing the AI-generated summary with Remy's avatar image
-
-**`src/data/findabilityQuestions.ts` cleanup:**
-- Remove `pauseAfter` and `sectionEnd` flags from question objects (and from the `FindabilityQuestion` type)
-- Remove `sectionInfo` export (no longer needed)
-- Keep `reflectionText` -- the brief reflection moments between questions are subtle and don't break flow
-
-**Files changed:**
-- **New:** `supabase/functions/generate-findability-summary/index.ts` -- Remy AI summary edge function
-- **Edit:** `src/pages/Assessment.tsx` -- remove pauses/transitions, add generating step, show results inline
-- **Edit:** `src/components/assessment/FindabilityResults.tsx` -- add AI summary card, accept new prop
-- **Edit:** `src/components/assessment/results/ResultsCTA.tsx` -- redesign sign-up prompt with value proposition
-- **Edit:** `src/components/assessment/results/LifeReadinessTeaser.tsx` -- strengthen teaser copy
-- **Edit:** `src/data/findabilityQuestions.ts` -- remove `pauseAfter`, `sectionEnd` flags and `sectionInfo`
-- **Edit:** `supabase/config.toml` -- add the new edge function entry
+- **Edit:** `src/pages/Assessment.tsx` -- add sessionStorage caching for completed results and in-progress answers
+- **Edit:** `src/data/findabilityQuestions.ts` -- rename `RescueMission` to `ActionPlan`, `rescueMission` to `actionPlan`
+- **Rename + Edit:** `src/components/assessment/results/RescueMissionPreview.tsx` to `ActionPlanPreview.tsx` -- remove mission language, add sign-up nudge
+- **Edit:** `src/components/assessment/results/ResultsTrustSection.tsx` -- remove mission references
+- **Edit:** `src/components/assessment/FindabilityResults.tsx` -- update imports, use ActionPlanPreview
+- **Edit:** `src/components/assessment/results/ResultsCTA.tsx` -- stronger sign-up messaging with more detail
+- **Edit:** `src/components/assessment/results/LifeReadinessTeaser.tsx` -- expand categories, add mini CTA
 
