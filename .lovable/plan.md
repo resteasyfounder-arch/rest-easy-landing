@@ -1,24 +1,38 @@
 
 
-## Fix: Stable Section Question Count
+## Remove Remy Inline Nudges from the Life Readiness Assessment
 
-### Problem
-When you start the "Legal Planning & Decision Makers" section, it shows "0 of 10 questions." After answering the first question (e.g., "Do you have a will?") with "Yes," a follow-up question becomes applicable (e.g., "Is your will up to date?"), causing the count to jump to "1 of 11." This happens because the question count is recalculated every time an answer changes, since some questions have answer-dependent visibility (`applies_if` conditions that reference other answers).
+### Scope
 
-### Solution
-Snapshot the section question count when the user enters a section, so the denominator stays fixed while they work through it. If answering a question unlocks new follow-up questions, the total will only update the next time the user enters that section (or navigates away and back).
+This change **only** affects `src/pages/Readiness.tsx`. The Remy Brief Card on the Dashboard is a completely separate component (`RemyBriefCard`) and will **not** be touched. Remy features on Profile, Menu, Results, and Dashboard pages all remain intact.
 
-### Technical Changes
+### What Gets Removed
 
-**`src/pages/Readiness.tsx`**
+Six items will be cleaned up from `src/pages/Readiness.tsx`:
 
-1. **Add a new state variable** `sectionQuestionSnapshot` (type `Record<string, number>`) to store the snapshotted question count per section.
+1. **Imports (lines 12-13)**: Remove `notifyRemyRefresh`, `useRemySurface`, and `RemyInlineNudge` imports.
 
-2. **Snapshot on section entry**: When `focusedSectionId` or `currentSection` changes to a new section, capture the current count of applicable questions for that section and store it in the snapshot map.
+2. **Remy surface variables (lines 760-767)**: Remove the `remySurface`, `remySectionId`, and `remyEnabled` computed values that configure which Remy surface to query.
 
-3. **Use the snapshot for display**: Change `currentSectionQuestionCount` to read from the snapshot instead of recalculating from the live `applicableQuestions` list. Fall back to the live count if no snapshot exists.
+3. **`useRemySurface` hook call (lines 769-780)**: Remove the hook and all its destructured return values (`remyPayload`, `isLoadingRemy`, `remyError`, `dismissNudge`, `acknowledgeAction`).
 
-4. **Clear snapshot on section exit**: When the user leaves a section (navigates to a different section or exits to the journey view), remove that section's entry from the snapshot so the next entry gets a fresh count.
+4. **`notifyRemyRefresh()` calls (~4 occurrences)**: Remove the refresh triggers at lines 848, 903, 961, and 1062 that fire after profile saves and answer saves.
 
-This ensures the "Question X of Y" label stays stable within a section while still being accurate when you first enter it.
+5. **`<RemyInlineNudge>` in section summary view (line 1425)**: Remove the nudge card that appears at the top of the section summary content area.
+
+6. **`<RemyInlineNudge>` in assessment question view (line 1806)**: Remove the nudge card that appears above the question card during active assessment.
+
+### What Stays Unchanged
+
+| Page | Remy Feature | Status |
+|------|-------------|--------|
+| Dashboard | `RemyBriefCard` with priorities and nudge | Kept |
+| Profile | `RemyInlineNudge` | Kept |
+| Menu | `RemyInlineNudge` | Kept |
+| Results | `useRemySurface` + priority list | Kept |
+| Global | `RemyGlobalLauncher` | Kept |
+
+### Risk
+
+None. The removed code is self-contained within Readiness.tsx and has no side effects on other pages. The `notifyRemyRefresh()` calls being removed only triggered Remy re-fetches on the Readiness page itself, so removing them has no impact elsewhere.
 
