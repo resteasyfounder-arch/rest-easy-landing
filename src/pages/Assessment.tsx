@@ -22,6 +22,9 @@ import { supabase } from "@/integrations/supabase/client";
 import FindabilityResults from "@/components/assessment/FindabilityResults";
 import GeneratingScreen from "@/components/assessment/GeneratingScreen";
 
+const RESULTS_KEY = "rest-easy.findability-results";
+const PROGRESS_KEY = "rest-easy.findability-progress";
+
 type Step = "intro" | "questions" | "generating" | "results";
 
 interface AiSummary {
@@ -42,6 +45,30 @@ const Assessment = () => {
   const totalQuestions = findabilityQuestions.length;
   const currentQuestion = findabilityQuestions[currentQuestionIndex];
 
+  // Restore cached results or in-progress answers on mount
+  useEffect(() => {
+    try {
+      const cachedResults = sessionStorage.getItem(RESULTS_KEY);
+      if (cachedResults) {
+        const parsed = JSON.parse(cachedResults);
+        setAnswers(parsed.answers);
+        setAiSummary(parsed.aiSummary);
+        setStep("results");
+        return;
+      }
+
+      const cachedProgress = sessionStorage.getItem(PROGRESS_KEY);
+      if (cachedProgress) {
+        const parsed = JSON.parse(cachedProgress);
+        setAnswers(parsed.answers);
+        setCurrentQuestionIndex(parsed.currentQuestionIndex);
+        setStep("questions");
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, []);
+
   const handleStart = () => {
     setStep("questions");
   };
@@ -58,32 +85,41 @@ const Assessment = () => {
         categoryLabel: q.categoryLabel,
       }));
 
+      let summary: AiSummary;
       try {
         const { data, error } = await supabase.functions.invoke(
           "generate-findability-summary",
           { body: { answers, score, questions: questionsPayload } }
         );
-
         if (error) throw error;
-        setAiSummary(data);
+        summary = data;
       } catch (e) {
         console.error("Failed to generate summary:", e);
-        // Use fallback
-        setAiSummary({
+        summary = {
           summary:
             "You've taken a meaningful first step by completing this assessment. Your answers reveal areas where a little organization could make a big difference for the people who matter most to you.",
           top_priority:
             "Start by making sure your trusted person knows where to find your most critical documents.",
           encouragement:
             "The fact that you're thinking about this puts you ahead of most people.",
-        });
+        };
       }
 
-      // Save results
-      const score2 = calculateScore(answers);
+      setAiSummary(summary);
+
+      // Cache completed results
+      const finalScore = calculateScore(answers);
+      try {
+        sessionStorage.setItem(
+          RESULTS_KEY,
+          JSON.stringify({ answers, aiSummary: summary, score: finalScore, completedAt: new Date().toISOString() })
+        );
+        sessionStorage.removeItem(PROGRESS_KEY);
+      } catch { /* ignore */ }
+
       localStorage.setItem(
         "findabilityResults",
-        JSON.stringify({ score: score2, answers, completedAt: new Date().toISOString() })
+        JSON.stringify({ score: finalScore, answers, completedAt: new Date().toISOString() })
       );
       setStep("results");
     };
@@ -95,11 +131,20 @@ const Assessment = () => {
     setShowReflection(false);
 
     if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+
+      // Cache progress
+      try {
+        sessionStorage.setItem(
+          PROGRESS_KEY,
+          JSON.stringify({ answers, currentQuestionIndex: nextIndex })
+        );
+      } catch { /* ignore */ }
     } else {
       setStep("generating");
     }
-  }, [currentQuestionIndex, totalQuestions]);
+  }, [currentQuestionIndex, totalQuestions, answers]);
 
   const handleAnswer = (answer: AnswerValue) => {
     const newAnswers = { ...answers, [currentQuestion.id]: answer };
@@ -141,6 +186,10 @@ const Assessment = () => {
     setAiSummary(null);
     setStep("intro");
     setShowReflection(false);
+    try {
+      sessionStorage.removeItem(RESULTS_KEY);
+      sessionStorage.removeItem(PROGRESS_KEY);
+    } catch { /* ignore */ }
   };
 
   // Intro screen

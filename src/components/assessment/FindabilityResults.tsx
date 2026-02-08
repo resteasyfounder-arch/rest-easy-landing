@@ -2,7 +2,7 @@ import { type AnswerValue } from "@/data/findabilityQuestions";
 import ResultsScoreHero from "./results/ResultsScoreHero";
 import RemySummaryCard from "./results/RemySummaryCard";
 import ResultsBreakdown from "./results/ResultsBreakdown";
-import RescueMissionPreview from "./results/RescueMissionPreview";
+import ActionPlanPreview from "./results/ActionPlanPreview";
 import LifeReadinessTeaser from "./results/LifeReadinessTeaser";
 import ResultsTrustSection from "./results/ResultsTrustSection";
 import ResultsCTA from "./results/ResultsCTA";
@@ -28,7 +28,7 @@ const FindabilityResults = ({ score, answers, onRetake, aiSummary }: Findability
 
         {aiSummary && <RemySummaryCard aiSummary={aiSummary} />}
 
-        <RescueMissionPreview answers={answers} />
+        <ActionPlanPreview answers={answers} />
         <ResultsBreakdown answers={answers} />
         <LifeReadinessTeaser />
         <ResultsTrustSection />
