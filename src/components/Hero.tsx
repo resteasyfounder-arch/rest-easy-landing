@@ -51,12 +51,12 @@ const Hero = () => {
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
       <div className="max-w-3xl mx-auto text-center space-y-6 lg:space-y-8 relative">
           {/* Large watermark logo behind text */}
-          <HeroAnimatedItem delay={0} duration={800} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+          <HeroAnimatedItem delay={0} duration={800} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
             <img
               src={heartLogo}
               alt=""
               aria-hidden="true"
-              className="w-64 h-64 sm:w-80 sm:h-80 lg:w-[28rem] lg:h-[28rem] object-contain animate-hero-heartbeat opacity-60"
+              className="w-[22rem] h-[22rem] sm:w-[28rem] sm:h-[28rem] lg:w-[40rem] lg:h-[40rem] object-contain animate-hero-heartbeat opacity-60"
             />
           </HeroAnimatedItem>
 
