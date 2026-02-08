@@ -1,51 +1,103 @@
 
 
-## Fix Active Section Highlighting in Navigation
+## Overhaul Findability Assessment Flow
 
-### Problems Identified
+### Overview
+Streamline the free Findability Assessment into a seamless, uninterrupted experience. Remove mid-assessment pause screens and section transitions that break flow. After the final question, show a brief "generating" moment while Remy (AI) summarizes the user's answers, then display a polished results page with the AI summary and a clear sign-up prompt.
 
-1. **Auto-highlights on load**: The Problem section sits right below the hero, so the IntersectionObserver immediately detects it as intersecting on page load -- even before the user scrolls. The nav should show no active state until the user actually scrolls down or clicks a nav link.
+### Current Problems
+1. **Pause screens** (`pauseAfter` flag) interrupt the flow with a full-screen message and progress bar between questions 3-4 and 6-7. Users must wait ~3.5 seconds or tap to continue.
+2. **Section transitions** (`sectionEnd` flag) show another full-screen interstitial between sections (after questions 4, 6, and 8). Each requires a manual "Continue" tap.
+3. **Results are purely template-based** -- the score, breakdown, and rescue mission are all calculated from static data. No AI personalization.
+4. **The completion screen** is a generic "Thank you" page that routes to `/results`, but `/results` is the full Life Readiness report page (for logged-in users). Free users see a "Complete the Life Readiness assessment" empty state.
+5. **Sign-up prompt** is just a "Start My First Rescue Mission" button linking to `/login` -- no narrative connection to the value of signing up.
 
-2. **Unreliable transitions**: The current observer only sets active on `isIntersecting: true`. When scrolling quickly between sections, multiple entries can fire and the last one wins unpredictably. The observer needs to track which section is most visible or use a more robust approach.
+### Proposed Flow
 
-### Solution
+```text
+[Intro] --> [Q1] --> [Q2] --> ... --> [Q8] --> [Generating...] --> [Findability Results + Sign-up CTA]
+```
 
-**Rewrite `src/hooks/useActiveSection.ts`** with two fixes:
+No pauses. No section transitions. Just questions flowing one after another, then a brief AI generation moment, then results.
 
-1. **Scroll threshold gate**: Track whether the user has scrolled past a minimum distance (e.g., the hero section height, roughly `window.innerHeight * 0.5`). Until that threshold is crossed, return `null` -- no section is highlighted. Once the user scrolls back to the top (above the threshold), reset to `null` again so the nav goes back to its neutral state.
+### Changes
 
-2. **Better section detection**: Instead of relying solely on IntersectionObserver `isIntersecting`, use a scroll event listener that checks each section's `getBoundingClientRect()` position relative to the viewport. The section whose top is closest to (but not below) a target line (~20-25% from top of viewport) wins. This is more reliable for adjacent sections.
+**1. Remove pause and section transition interruptions**
 
-**Update `src/components/Header.tsx`**:
+Edit `src/pages/Assessment.tsx`:
+- Remove the `"pause"` and `"section-transition"` steps from the `Step` type
+- Simplify `advanceToNext()` to always go to the next question (no `pauseAfter` or `sectionEnd` checks)
+- Remove `handlePauseContinue`, `handleSectionContinue`, and related rendering blocks
+- After the last question, transition directly to a new `"generating"` step
 
-3. **Click-to-activate**: When a nav link is clicked, immediately set the active section to that item's id (so the pill animates instantly on click), then let the scroll listener take over once scrolling settles.
+**2. Add AI-powered summary generation step**
+
+Create a new edge function `supabase/functions/generate-findability-summary/index.ts`:
+- Receives the 8 question-answer pairs + calculated score
+- Uses the Lovable AI Gateway (LOVABLE_API_KEY) to generate a personalized 3-4 sentence summary from Remy's perspective
+- Returns: `{ summary: string, top_priority: string, encouragement: string }`
+- The summary addresses the user's specific gaps and strengths in a warm, Remy-like voice
+
+New step in `Assessment.tsx` -- `"generating"`:
+- Shows a calm loading screen with Remy's avatar and a message like "Remy is reviewing your answers..."
+- Calls the edge function
+- On success, transitions to `"results"` with the AI summary in state
+
+**3. Redesign the results display (inline, not navigating away)**
+
+Instead of navigating to `/results` (which is the full Life Readiness report page), show results inline within the Assessment page.
+
+Edit `src/pages/Assessment.tsx` -- the `"results"` step:
+- Replace the current `CompletionScreen` with the `FindabilityResults` component, enhanced with the AI summary
+- Pass the AI summary as a new prop
+
+Edit `src/components/assessment/FindabilityResults.tsx`:
+- Add a new `RemySummaryCard` section at the top (after the score hero), showing Remy's personalized AI summary with the Remy avatar
+- This replaces the generic breakdown as the hero content
+
+**4. Redesign the sign-up CTA**
+
+Edit `src/components/assessment/results/ResultsCTA.tsx`:
+- Change primary CTA from "Start My First Rescue Mission" to something like "Create Your Free Account" or "Unlock Your Full Life Readiness Score"
+- Add a brief value proposition above the button: what signing up unlocks (full assessment, Remy guidance, EasyVault)
+- Keep "Retake" as a secondary action
+- Remove "Save & Exit" (results are already in localStorage)
+
+Edit `src/components/assessment/results/LifeReadinessTeaser.tsx`:
+- Strengthen the teaser copy to better connect Findability as "step 1" and the full assessment + EasyVault as the natural next steps
+- Add mention of Remy as the ongoing AI guide
 
 ### Technical Details
 
-**`src/hooks/useActiveSection.ts`** -- full rewrite:
+**New edge function: `supabase/functions/generate-findability-summary/index.ts`**
+- Uses `LOVABLE_API_KEY` with the Lovable AI Gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`)
+- Model: `google/gemini-3-flash-preview` (default)
+- System prompt positions Remy as a warm, knowledgeable guide summarizing what the user's findability answers reveal
+- Non-streaming (simple request/response via `supabase.functions.invoke`)
+- Handles 429/402 errors gracefully
 
-```
-function useActiveSection(sectionIds: string[]):
-  - State: activeSection (string | null), starts null
-  - On scroll event (throttled with requestAnimationFrame):
-    - If scrollY < threshold (~300px), set activeSection to null and return
-    - Loop through sectionIds, get each element's getBoundingClientRect()
-    - Find the section whose top is closest to 20% of viewport height (from above)
-    - Set that as activeSection
-  - Cleanup: remove scroll listener
-  - Return activeSection
-```
+**`src/pages/Assessment.tsx` changes:**
+- Step type becomes: `"intro" | "questions" | "generating" | "results"`
+- New state: `aiSummary: { summary: string; top_priority: string; encouragement: string } | null`
+- `advanceToNext()` simplified: always increments question index, or moves to `"generating"` on last question
+- New `"generating"` step renders a loading screen and calls the edge function
+- `"results"` step renders `FindabilityResults` inline with `aiSummary` passed down
 
-Key behaviors:
-- Returns `null` when user is at the top of the page (hero visible) -- no pill is highlighted
-- Accurately tracks the "current" section during smooth scrolling
-- Uses `requestAnimationFrame` for scroll throttling to avoid performance issues
+**`src/components/assessment/FindabilityResults.tsx` changes:**
+- New optional prop: `aiSummary?: { summary: string; top_priority: string; encouragement: string }`
+- New `RemySummaryCard` component rendered between ScoreHero and RescueMissionPreview, showing the AI-generated summary with Remy's avatar image
 
-**`src/components/Header.tsx`** -- minor update:
-- When a nav button is clicked, call a setter to force the active section immediately (for instant visual feedback), then `scrollToSection()` as before
-- The hook can expose a `setOverride` function, or the Header can manage a local override state that clears after a short delay (letting the scroll listener take back over)
+**`src/data/findabilityQuestions.ts` cleanup:**
+- Remove `pauseAfter` and `sectionEnd` flags from question objects (and from the `FindabilityQuestion` type)
+- Remove `sectionInfo` export (no longer needed)
+- Keep `reflectionText` -- the brief reflection moments between questions are subtle and don't break flow
 
-### Files Changed
-- **Edit:** `src/hooks/useActiveSection.ts` -- rewrite with scroll-based detection and top-of-page null state
-- **Edit:** `src/components/Header.tsx` -- add click-to-activate immediate feedback
+**Files changed:**
+- **New:** `supabase/functions/generate-findability-summary/index.ts` -- Remy AI summary edge function
+- **Edit:** `src/pages/Assessment.tsx` -- remove pauses/transitions, add generating step, show results inline
+- **Edit:** `src/components/assessment/FindabilityResults.tsx` -- add AI summary card, accept new prop
+- **Edit:** `src/components/assessment/results/ResultsCTA.tsx` -- redesign sign-up prompt with value proposition
+- **Edit:** `src/components/assessment/results/LifeReadinessTeaser.tsx` -- strengthen teaser copy
+- **Edit:** `src/data/findabilityQuestions.ts` -- remove `pauseAfter`, `sectionEnd` flags and `sectionInfo`
+- **Edit:** `supabase/config.toml` -- add the new edge function entry
 
