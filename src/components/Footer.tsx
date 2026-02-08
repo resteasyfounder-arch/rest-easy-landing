@@ -1,23 +1,41 @@
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import logo from "@/assets/rest-easy-logo.png";
 
 const footerLinks = {
   product: [
-    { label: "Features", href: "#solution" },
-    { label: "How It Works", href: "#how-it-works" },
-    { label: "Security", href: "#" },
+    { label: "The Problem", href: "/#problem" },
+    { label: "Our Solution", href: "/#solution" },
+    { label: "Your Journey", href: "/#journey" },
+    { label: "Meet Remy", href: "/#remy" },
   ],
   company: [
-    { label: "About", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Contact", href: "#" },
+    { label: "About", href: "/about" },
+    { label: "Contact", href: "/contact" },
   ],
   legal: [
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
   ],
 };
+
+const FooterLinkList = ({ title, links }: { title: string; links: typeof footerLinks.product }) => (
+  <div>
+    <h4 className="font-display font-semibold text-primary-foreground mb-4">{title}</h4>
+    <ul className="space-y-3">
+      {links.map((link) => (
+        <li key={link.href + link.label}>
+          <Link
+            to={link.href}
+            className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+          >
+            {link.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
 
 const Footer = () => {
   return (
@@ -32,56 +50,9 @@ const Footer = () => {
             </p>
           </div>
 
-          {/* Product Links */}
-          <div>
-            <h4 className="font-display font-semibold text-primary-foreground mb-4">Product</h4>
-            <ul className="space-y-3">
-              {footerLinks.product.map((link) => (
-                <li key={link.href + link.label}>
-                  <a
-                    href={link.href}
-                    className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company Links */}
-          <div>
-            <h4 className="font-display font-semibold text-primary-foreground mb-4">Company</h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.href + link.label}>
-                  <a
-                    href={link.href}
-                    className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal Links */}
-          <div>
-            <h4 className="font-display font-semibold text-primary-foreground mb-4">Legal</h4>
-            <ul className="space-y-3">
-              {footerLinks.legal.map((link) => (
-                <li key={link.href + link.label}>
-                  <a
-                    href={link.href}
-                    className="font-body text-primary-foreground/70 hover:text-primary-foreground transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FooterLinkList title="Product" links={footerLinks.product} />
+          <FooterLinkList title="Company" links={footerLinks.company} />
+          <FooterLinkList title="Legal" links={footerLinks.legal} />
         </div>
 
         <Separator className="bg-primary-foreground/10 mb-8" />
