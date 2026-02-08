@@ -49,33 +49,32 @@ const Hero = () => {
       </div>
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
-        <div className="max-w-3xl mx-auto text-center space-y-6 lg:space-y-8">
-          {/* Heart Logo with heartbeat */}
-          <HeroAnimatedItem delay={0} duration={600}>
-            <div className="flex justify-center mb-2">
-              <img
-                src={heartLogo}
-                alt="Rest Easy"
-                className="w-24 h-24 lg:w-32 lg:h-32 object-contain animate-hero-heartbeat"
-              />
-            </div>
+      <div className="max-w-3xl mx-auto text-center space-y-6 lg:space-y-8 relative">
+          {/* Large watermark logo behind text */}
+          <HeroAnimatedItem delay={0} duration={800} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+            <img
+              src={heartLogo}
+              alt=""
+              aria-hidden="true"
+              className="w-64 h-64 sm:w-80 sm:h-80 lg:w-[28rem] lg:h-[28rem] object-contain animate-hero-heartbeat opacity-[0.12]"
+            />
           </HeroAnimatedItem>
 
-          <HeroAnimatedItem delay={100} duration={700} movement={6}>
+          <HeroAnimatedItem delay={100} duration={700} movement={6} className="relative z-10">
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
               Get your affairs in order with{" "}
               <span className="text-primary">Rest Easy</span>
             </h1>
           </HeroAnimatedItem>
 
-          <HeroAnimatedItem delay={200} duration={700} movement={6}>
+          <HeroAnimatedItem delay={200} duration={700} movement={6} className="relative z-10">
             <p className="font-body text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed">
               Rest Easy helps you achieve Life Readiness — organizing your
               affairs for any unexpected moment, not just end-of-life.
             </p>
           </HeroAnimatedItem>
 
-          <HeroAnimatedItem delay={350} duration={600} movement={0}>
+          <HeroAnimatedItem delay={350} duration={600} movement={0} className="relative z-10">
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
@@ -99,7 +98,7 @@ const Hero = () => {
           </HeroAnimatedItem>
 
           {/* Trust indicators */}
-          <HeroAnimatedItem delay={500} duration={600} movement={0}>
+          <HeroAnimatedItem delay={500} duration={600} movement={0} className="relative z-10">
             <div className="flex flex-wrap gap-6 justify-center pt-4">
               <div className="flex items-center gap-2">
                 <Heart className="w-5 h-5 text-primary" />
