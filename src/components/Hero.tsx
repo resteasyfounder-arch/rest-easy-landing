@@ -1,6 +1,6 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Heart } from "lucide-react";
-import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import heartLogo from "@/assets/rest-easy-heart.png";
 
 const HeroAnimatedItem = ({
@@ -16,11 +16,14 @@ const HeroAnimatedItem = ({
   movement?: number;
   className?: string;
 }) => {
-  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+  const [isVisible, setIsVisible] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <div
-      ref={ref}
       className={className}
       style={{
         transitionProperty: "opacity, transform",
@@ -53,7 +56,7 @@ const Hero = () => {
               <img
                 src={heartLogo}
                 alt="Rest Easy"
-                className="w-16 h-16 lg:w-20 lg:h-20 object-contain animate-hero-heartbeat"
+                className="w-24 h-24 lg:w-32 lg:h-32 object-contain animate-hero-heartbeat"
               />
             </div>
           </HeroAnimatedItem>
