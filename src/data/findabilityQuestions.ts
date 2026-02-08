@@ -1,4 +1,4 @@
-export interface RescueMission {
+export interface ActionPlan {
   title: string;
   steps: string[];
 }
@@ -16,7 +16,7 @@ export interface FindabilityQuestion {
     somewhat: string;
     no: string;
   };
-  rescueMission: RescueMission;
+  actionPlan: ActionPlan;
   reflectionText?: Record<AnswerValue, string>;
 }
 
@@ -41,7 +41,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "You have someone in mind, but they may not fully know their role yet. A quick conversation could make all the difference.",
       no: "This is where everyone starts. Choosing your person is the single most important step, and we'll help you figure out who that should be."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Choose & Inform Your Person",
       steps: [
         "Identify who should be your go-to person",
@@ -68,7 +68,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "There's a general idea, but specifics matter when stress is high. Let's make the path crystal clear.",
       no: "No worries — most people haven't thought about this. Creating a simple 'start here' guide takes just minutes."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Create Your 'Start Here' Guide",
       steps: [
         "List where your critical documents live",
@@ -90,7 +90,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "Some access exists, but there may be gaps when it matters most. Let's identify what's missing.",
       no: "This is one of the most common blind spots we see. The good news? It's completely fixable with the right setup."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Unlock Access for Your Person",
       steps: [
         "Set up a secure password sharing system",
@@ -112,7 +112,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "Some things are organized, others are scattered. Let's create one central hub for what matters most.",
       no: "You're not alone — most people's important documents are spread across a dozen places. We'll help you consolidate."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Consolidate Your Critical Documents",
       steps: [
         "Identify your top 10 most important documents",
@@ -134,7 +134,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "The documents may exist, but accessibility matters. Seconds count in medical situations.",
       no: "This is a critical gap, but it's also one of the fastest to fix. We'll walk you through exactly what you need."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Prepare Your Healthcare Access Kit",
       steps: [
         "Locate or create your healthcare directive",
@@ -161,7 +161,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "Some things are covered, but there might be gaps. Let's make sure nothing falls through the cracks.",
       no: "This is more common than you'd think. A simple financial overview document can prevent a lot of chaos."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Create Your Financial Overview",
       steps: [
         "List all recurring bills and due dates",
@@ -183,7 +183,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "Some things are accessible offline, but your digital footprint might have gaps.",
       no: "Our digital lives are vast and often locked behind screens. Let's create a backup access plan."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Build Your Digital Backup Plan",
       steps: [
         "Set up device access for your person",
@@ -205,7 +205,7 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "Some things are documented, but there's probably more in your head than you realize.",
       no: "This is universal — we all carry knowledge that isn't written down anywhere. Let's start capturing it."
     },
-    rescueMission: {
+    actionPlan: {
       title: "Document Your Personal Knowledge",
       steps: [
         "Brain dump the things only you know",
@@ -234,8 +234,6 @@ export const scoreTiers = {
   unclear: { min: 40, label: "Findability Unclear", color: "amber" },
   fragile: { min: 0, label: "Findability Fragile", color: "red" },
 } as const;
-
-
 
 export function calculateScore(answers: Record<string, AnswerValue>): number {
   const rawScore = Object.values(answers).reduce((sum, answer) => {
