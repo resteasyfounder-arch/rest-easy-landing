@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import ProfileReview from "@/components/assessment/ProfileReview";
@@ -259,6 +259,7 @@ const Readiness = () => {
   const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
   const [focusedSectionId, setFocusedSectionId] = useState<string | null>(null);
   const [viewingCompletedSection, setViewingCompletedSection] = useState(false);
+  const [sectionQuestionSnapshot, setSectionQuestionSnapshot] = useState<Record<string, number>>({});
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [hasPendingNavigation, setHasPendingNavigation] = useState(false);
 
@@ -661,6 +662,35 @@ const Readiness = () => {
     return applicableQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
   }, [currentQuestion, applicableQuestions]);
 
+  // Snapshot section question count on entry so denominator stays stable
+  useEffect(() => {
+    const activeSectionId = currentSection?.id ?? focusedSectionId;
+    if (!activeSectionId || !schema) return;
+
+    // Only snapshot if we don't already have one for this section
+    if (sectionQuestionSnapshot[activeSectionId] != null) return;
+
+    const count = applicableQuestions.filter(q => q.section_id === activeSectionId).length;
+    setSectionQuestionSnapshot(prev => ({ ...prev, [activeSectionId]: count }));
+  }, [currentSection?.id, focusedSectionId, schema, applicableQuestions, sectionQuestionSnapshot]);
+
+  // Clear snapshot when leaving a section so re-entry gets a fresh count
+  const prevSectionRef = useRef<string | null>(null);
+  useEffect(() => {
+    const activeSectionId = currentSection?.id ?? focusedSectionId;
+    const prev = prevSectionRef.current;
+    prevSectionRef.current = activeSectionId;
+
+    if (prev && prev !== activeSectionId) {
+      setSectionQuestionSnapshot(old => {
+        if (!(prev in old)) return old;
+        const next = { ...old };
+        delete next[prev];
+        return next;
+      });
+    }
+  }, [currentSection?.id, focusedSectionId]);
+
   // Section-specific question progress (more stable UX than global count)
   const currentSectionQuestionIndex = useMemo(() => {
     if (!currentQuestion || !currentSection) return 0;
@@ -670,8 +700,12 @@ const Readiness = () => {
 
   const currentSectionQuestionCount = useMemo(() => {
     if (!currentSection) return 0;
+    // Use snapshot if available, fall back to live count
+    if (sectionQuestionSnapshot[currentSection.id] != null) {
+      return sectionQuestionSnapshot[currentSection.id];
+    }
     return applicableQuestions.filter(q => q.section_id === currentSection.id).length;
-  }, [currentSection, applicableQuestions]);
+  }, [currentSection, applicableQuestions, sectionQuestionSnapshot]);
 
   const currentProfileIndex = useMemo(() => {
     if (!schema || !currentProfileQuestion) return 0;
@@ -686,13 +720,16 @@ const Readiness = () => {
     for (const section of schema.sections) {
       const sectionQuestions = applicableQuestions.filter(q => q.section_id === section.id);
       const completedInSection = sectionQuestions.filter(q => answers[q.id]).length;
+      const total = sectionQuestionSnapshot[section.id] != null
+        ? sectionQuestionSnapshot[section.id]
+        : sectionQuestions.length;
       progress[section.id] = {
         completed: completedInSection,
-        total: sectionQuestions.length,
+        total,
       };
     }
     return progress;
-  }, [schema, applicableQuestions, answers]);
+  }, [schema, applicableQuestions, answers, sectionQuestionSnapshot]);
 
   // Completed sections for journey sidebar - only from applicable sections
   const completedSections = useMemo(() => {
