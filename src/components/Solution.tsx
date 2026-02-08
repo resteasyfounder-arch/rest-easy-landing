@@ -10,26 +10,32 @@ const features = [
   {
     name: "Findability Assessment",
     description: "Quick check to see how easily your loved ones could locate your important information",
+    included: [true, true, true],
   },
   {
     name: "Life Readiness Assessment",
     description: "Comprehensive evaluation across 6 life areas to understand your full preparedness picture",
+    included: [false, true, true],
   },
   {
     name: "Personalized Report",
     description: "Detailed analysis with scores, strengths, and areas needing attention tailored to your situation",
+    included: [false, true, true],
   },
   {
     name: "Remy AI Guide",
     description: "Your personal AI companion that explains results, answers questions, and guides your next steps",
+    included: [false, true, true],
   },
   {
     name: "Actionable Roadmap",
     description: "Step-by-step plan with prioritized tasks and progress tracking to improve your readiness score",
+    included: [false, false, true],
   },
   {
     name: "EasyVault Document Storage",
     description: "Secure, organized storage for essential documents across 6 categories with progress tracking",
+    included: [false, false, true],
   },
 ];
 
@@ -40,7 +46,6 @@ const tiers = [
     price: "Free",
     priceSub: "No credit card needed",
     icon: Search,
-    included: [true, false, false, false, false, false],
     cta: "Take Quick Check",
     href: "/assessment",
     variant: "outline" as const,
@@ -53,7 +58,6 @@ const tiers = [
     price: "$99",
     priceSub: "One-time payment",
     icon: Activity,
-    included: [true, true, true, true, false, false],
     cta: "Get Your Report",
     href: "/readiness",
     variant: "default" as const,
@@ -67,7 +71,6 @@ const tiers = [
     priceSub: "/month",
     priceNote: "Cancel anytime",
     icon: Shield,
-    included: [true, true, true, true, true, true],
     cta: "Go Pro",
     href: "/readiness",
     variant: "default" as const,
@@ -75,6 +78,8 @@ const tiers = [
     premium: true,
   },
 ];
+
+const tierNames = ["Discover", "Readiness", "Pro"];
 
 const Solution = () => {
   return (
@@ -93,6 +98,7 @@ const Solution = () => {
           </p>
         </AnimatedSection>
 
+        {/* Tier Cards */}
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           {tiers.map((tier, i) => (
             <AnimatedItem key={tier.name} delay={i * 120}>
@@ -140,22 +146,17 @@ const Solution = () => {
 
                   <Separator className="my-6" />
 
-                  <ul className="w-full space-y-4 text-left">
+                  <ul className="w-full space-y-2.5 text-left">
                     {features.map((feature, fi) => (
-                      <li key={feature.name} className="flex gap-3">
-                        {tier.included[fi] ? (
-                          <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      <li key={feature.name} className="flex gap-2.5 items-center">
+                        {feature.included[i] ? (
+                          <Check className="w-4 h-4 text-primary shrink-0" />
                         ) : (
-                          <Minus className="w-4 h-4 text-muted-foreground/40 shrink-0 mt-0.5" />
+                          <Minus className="w-4 h-4 text-muted-foreground/40 shrink-0" />
                         )}
-                        <div className="flex flex-col">
-                          <span className={cn("font-body text-sm font-medium", tier.included[fi] ? "text-foreground" : "text-muted-foreground/50")}>
-                            {feature.name}
-                          </span>
-                          <span className={cn("font-body text-xs leading-snug mt-0.5", tier.included[fi] ? "text-muted-foreground" : "text-muted-foreground/30")}>
-                            {feature.description}
-                          </span>
-                        </div>
+                        <span className={cn("font-body text-sm", feature.included[i] ? "text-foreground" : "text-muted-foreground/50")}>
+                          {feature.name}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -164,6 +165,39 @@ const Solution = () => {
             </AnimatedItem>
           ))}
         </div>
+
+        {/* Feature Breakdown */}
+        <AnimatedSection className="max-w-3xl mx-auto mt-20">
+          <h3 className="font-display text-2xl font-semibold text-foreground text-center mb-10">
+            What's Included
+          </h3>
+
+          <div className="space-y-0">
+            {features.map((feature, fi) => (
+              <div key={feature.name}>
+                {fi > 0 && <Separator className="my-0" />}
+                <div className="py-6">
+                  <p className="font-body text-base font-medium text-foreground">{feature.name}</p>
+                  <p className="font-body text-sm text-muted-foreground mt-1 mb-4">{feature.description}</p>
+                  <div className="flex gap-6">
+                    {tierNames.map((tn, ti) => (
+                      <div key={tn} className="flex items-center gap-1.5">
+                        {feature.included[ti] ? (
+                          <Check className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <Minus className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        )}
+                        <span className={cn("font-body text-xs", feature.included[ti] ? "text-foreground" : "text-muted-foreground/40")}>
+                          {tn}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </AnimatedSection>
       </div>
     </section>
   );
