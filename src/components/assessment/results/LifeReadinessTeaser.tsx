@@ -1,17 +1,8 @@
-import { Heart, Wallet, Lock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Heart, Wallet, Lock, Brain } from "lucide-react";
 
 const categories = [
-  {
-    icon: Heart,
-    label: "Healthcare Directives",
-    description: "Medical wishes & proxy access",
-  },
-  {
-    icon: Wallet,
-    label: "Financial Access",
-    description: "Bills, accounts & assets",
-  },
+  { icon: Heart, label: "Healthcare Directives" },
+  { icon: Wallet, label: "Financial Access" },
 ];
 
 const LifeReadinessTeaser = () => {
@@ -23,10 +14,10 @@ const LifeReadinessTeaser = () => {
         </div>
         <div className="flex-1">
           <h3 className="font-display text-base font-semibold text-foreground">
-            Findability is just the beginning
+            Findability is step one
           </h3>
           <p className="font-body text-sm text-muted-foreground">
-            The full Life Readiness Score covers more
+            Your full Life Readiness Score covers 5 categories — with Remy guiding you through each one
           </p>
         </div>
       </div>
@@ -44,8 +35,9 @@ const LifeReadinessTeaser = () => {
           </div>
         ))}
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+          <Brain className="w-3 h-3 text-primary" />
           <span className="font-body text-xs text-primary font-medium">
-            +3 more categories
+            +3 more with Remy
           </span>
         </div>
       </div>

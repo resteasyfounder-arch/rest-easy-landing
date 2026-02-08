@@ -184,3 +184,6 @@ verify_jwt = false
 
 [functions.vault-download]
 verify_jwt = false
+
+[functions.generate-findability-summary]
+verify_jwt = false

@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ArrowLeft, FileText, Heart, Wallet } from "lucide-react";
+import { X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   GentleIntro,
@@ -11,20 +11,24 @@ import {
   SkipButton,
   AutosaveIndicator,
   ReflectionMoment,
-  PauseScreen,
-  SectionTransition,
-  CompletionScreen,
-  pauseMessages,
 } from "@/components/assessment/shared";
 import {
   findabilityQuestions,
   calculateScore,
-  sectionInfo,
   answerLabels,
   type AnswerValue,
 } from "@/data/findabilityQuestions";
+import { supabase } from "@/integrations/supabase/client";
+import FindabilityResults from "@/components/assessment/FindabilityResults";
+import GeneratingScreen from "@/components/assessment/GeneratingScreen";
 
-type Step = "intro" | "questions" | "pause" | "section-transition" | "results";
+type Step = "intro" | "questions" | "generating" | "results";
+
+interface AiSummary {
+  summary: string;
+  top_priority: string;
+  encouragement: string;
+}
 
 const Assessment = () => {
   const navigate = useNavigate();
@@ -33,7 +37,7 @@ const Assessment = () => {
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [showReflection, setShowReflection] = useState(false);
   const [lastSaved, setLastSaved] = useState(false);
-  const [pauseMessageIndex, setPauseMessageIndex] = useState(0);
+  const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
 
   const totalQuestions = findabilityQuestions.length;
   const currentQuestion = findabilityQuestions[currentQuestionIndex];
@@ -42,44 +46,68 @@ const Assessment = () => {
     setStep("questions");
   };
 
-  const advanceToNext = useCallback(() => {
-    setShowReflection(false);
-    
-    if (currentQuestionIndex < totalQuestions - 1) {
-      // Check if we need a pause screen
-      if (currentQuestion.pauseAfter && step === "questions") {
-        setPauseMessageIndex((prev) => (prev + 1) % pauseMessages.length);
-        setStep("pause");
-        return;
-      }
-      
-      // Check if section is ending
-      if (currentQuestion.sectionEnd && step === "questions") {
-        setStep("section-transition");
-        return;
-      }
-      
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      // All done - save and show results
+  // Generate AI summary when entering "generating" step
+  useEffect(() => {
+    if (step !== "generating") return;
+
+    const generateSummary = async () => {
       const score = calculateScore(answers);
+      const questionsPayload = findabilityQuestions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        categoryLabel: q.categoryLabel,
+      }));
+
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "generate-findability-summary",
+          { body: { answers, score, questions: questionsPayload } }
+        );
+
+        if (error) throw error;
+        setAiSummary(data);
+      } catch (e) {
+        console.error("Failed to generate summary:", e);
+        // Use fallback
+        setAiSummary({
+          summary:
+            "You've taken a meaningful first step by completing this assessment. Your answers reveal areas where a little organization could make a big difference for the people who matter most to you.",
+          top_priority:
+            "Start by making sure your trusted person knows where to find your most critical documents.",
+          encouragement:
+            "The fact that you're thinking about this puts you ahead of most people.",
+        });
+      }
+
+      // Save results
+      const score2 = calculateScore(answers);
       localStorage.setItem(
         "findabilityResults",
-        JSON.stringify({ score, answers, completedAt: new Date().toISOString() })
+        JSON.stringify({ score: score2, answers, completedAt: new Date().toISOString() })
       );
       setStep("results");
+    };
+
+    generateSummary();
+  }, [step, answers]);
+
+  const advanceToNext = useCallback(() => {
+    setShowReflection(false);
+
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      setStep("generating");
     }
-  }, [currentQuestionIndex, totalQuestions, currentQuestion, answers, step]);
+  }, [currentQuestionIndex, totalQuestions]);
 
   const handleAnswer = (answer: AnswerValue) => {
     const newAnswers = { ...answers, [currentQuestion.id]: answer };
     setAnswers(newAnswers);
-    
-    // Show autosave indicator
+
     setLastSaved(true);
     setTimeout(() => setLastSaved(false), 100);
 
-    // Check if there's a reflection for this answer
     const reflection = currentQuestion.reflectionText?.[answer];
     if (reflection) {
       setShowReflection(true);
@@ -93,26 +121,7 @@ const Assessment = () => {
     advanceToNext();
   };
 
-  const handlePauseContinue = () => {
-    // Check if section also ends here
-    if (currentQuestion.sectionEnd) {
-      setStep("section-transition");
-    } else {
-      setStep("questions");
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
-
-  const handleSectionContinue = () => {
-    setStep("questions");
-    setCurrentQuestionIndex(currentQuestionIndex + 1);
-  };
-
   const handleBack = () => {
-    if (step === "pause" || step === "section-transition") {
-      setStep("questions");
-      return;
-    }
     if (step === "questions" && currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     } else if (step === "questions" && currentQuestionIndex === 0) {
@@ -129,22 +138,9 @@ const Assessment = () => {
   const handleRetake = () => {
     setAnswers({});
     setCurrentQuestionIndex(0);
+    setAiSummary(null);
     setStep("intro");
     setShowReflection(false);
-  };
-
-  // Get section icon based on category
-  const getSectionIcon = (category: string) => {
-    switch (category) {
-      case "documents":
-        return FileText;
-      case "healthcare":
-        return Heart;
-      case "financial":
-        return Wallet;
-      default:
-        return FileText;
-    }
   };
 
   // Intro screen
@@ -175,49 +171,23 @@ const Assessment = () => {
     );
   }
 
-  // Pause screen
-  if (step === "pause") {
-    return (
-      <PauseScreen
-        message={pauseMessages[pauseMessageIndex]}
-        onContinue={handlePauseContinue}
-        autoAdvanceMs={3500}
-      />
-    );
+  // Generating screen
+  if (step === "generating") {
+    return <GeneratingScreen />;
   }
 
-  // Section transition
-  if (step === "section-transition") {
-    const section = sectionInfo[currentQuestion.category];
-    const Icon = getSectionIcon(currentQuestion.category);
-    
-    return (
-      <SectionTransition
-        icon={Icon}
-        closingMessage={section?.closingMessage || "That's helpful context."}
-        nextSectionHint={section?.nextHint}
-        onContinue={handleSectionContinue}
-      />
-    );
-  }
-
-  // Results screen
+  // Results screen (inline)
   if (step === "results") {
     const score = calculateScore(answers);
-
     return (
-      <CompletionScreen
-        headline="Thank you for taking the time."
-        message="Everything you've shared helps bring peace of mind — for you and the people who matter most."
-        primaryAction={{
-          label: "View Your Results",
-          onClick: () => navigate("/results", { state: { score, answers } }),
-        }}
-        secondaryAction={{
-          label: "Return to Dashboard",
-          onClick: () => navigate("/"),
-        }}
-      />
+      <div className="fixed inset-0 bg-background z-50 overflow-y-auto safe-area-top safe-area-bottom">
+        <FindabilityResults
+          score={score}
+          answers={answers}
+          onRetake={handleRetake}
+          aiSummary={aiSummary ?? undefined}
+        />
+      </div>
     );
   }
 
@@ -227,7 +197,6 @@ const Assessment = () => {
 
   return (
     <div className="fixed inset-0 bg-gradient-hero z-50 flex flex-col safe-area-top safe-area-bottom">
-      {/* Minimal header */}
       <header className="flex items-center justify-between px-4 h-14">
         <Button
           variant="ghost"
@@ -250,27 +219,22 @@ const Assessment = () => {
         </Button>
       </header>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-md mx-auto space-y-8 question-enter">
-          {/* Soft progress */}
           <SoftProgress
             current={currentQuestionIndex + 1}
             total={totalQuestions}
             sectionName={currentQuestion.categoryLabel}
           />
 
-          {/* Question card */}
           <QuestionCard question={currentQuestion.question}>
             <WhyThisMatters content={currentQuestion.whyWeAsk} className="mt-4 text-center" />
           </QuestionCard>
 
-          {/* Reflection moment (shows after answering) */}
           {reflectionText && (
             <ReflectionMoment message={reflectionText} show={showReflection} />
           )}
 
-          {/* Answer buttons */}
           <div className="space-y-3">
             {(["yes", "somewhat", "no"] as AnswerValue[]).map((value) => (
               <AnswerButton
@@ -282,7 +246,6 @@ const Assessment = () => {
             ))}
           </div>
 
-          {/* Skip and autosave row */}
           <div className="flex items-center justify-between pt-2">
             <SkipButton onClick={handleSkip} />
             <AutosaveIndicator show={lastSaved} />
