@@ -1,53 +1,66 @@
 
 
-## Add "The Problem" Section to Landing Page
+## Update Landing Page Navigation Bar
 
 ### Overview
-Create a new, content-rich "Problem" section placed between the Hero/Journey sections and the Solution section. This section reframes the problem as one of ambiguity -- not motivation -- and positions Rest Easy as a readiness platform for unfinished business. It incorporates three uploaded photos and key statistics.
+Add section-based anchor links to the public landing page header so visitors can quickly jump to key sections. This navigation is completely separate from the logged-in sidebar/bottom nav -- it only appears on the unauthenticated homepage.
 
-### Section Structure
+### Current State
+- The `Header` component shows logo + "Log In" / "Get Your Findability Score" buttons on desktop, and just a centered logo on mobile.
+- Landing page sections (Hero, Problem, Journey, Remy, Solution, Footer) don't have consistent `id` attributes for anchor scrolling.
 
-The section will be broken into four visual blocks within a single component:
+### Changes
 
-1. **Header** -- Badge ("The Problem") + headline ("This isn't a motivation problem. It's an ambiguity problem.") + supporting paragraph about overload vs. denial.
+**1. Add `id` attributes to each landing section**
 
-2. **Statistics Strip** -- Three stats in a horizontal card (76% No Will, 212+ Hours Lost, 30M Deaths Expected), reusing the same card/grid pattern already in `Problem.tsx`.
+Each section component needs an `id` so the nav links can scroll to them:
 
-3. **Photo + Narrative Block** -- A two-column layout with an image on one side and narrative text on the other, alternating sides across three rows:
-   - Row 1 (Image left: `Family_unprepared.png`): "Families don't struggle later because people didn't care..." paragraph about scattered information.
-   - Row 2 (Image right: `prepared_person.png`): "Rest Easy is a Readiness Platform for unfinished business..." paragraph about clarity, not finality.
-   - Row 3 (Image left: `Family_talking_about_end_of_life.png`): "We don't push people to finish tasks; we help them see..." paragraph with the four bullet points (Where things stand today / What's covered / What's missing / What matters most next).
+| File | Add `id` |
+|------|----------|
+| `src/components/landing/ProblemSection.tsx` | `id="problem"` on the `<section>` |
+| `src/components/landing/JourneySection.tsx` | `id="journey"` on the `<section>` |
+| `src/components/landing/RemySection.tsx` | `id="remy"` on the `<section>` |
+| `src/components/Solution.tsx` | Already has `id="solution"` -- no change needed |
 
-4. **Closing line** -- "Nothing more. Nothing less." centered as a subtle typographic anchor.
+**2. Update `src/components/Header.tsx` (desktop)**
 
-### Files Changed
+Add section navigation links between the logo and the auth buttons:
 
-**New file: `src/components/landing/ProblemSection.tsx`**
-- Self-contained component with all copy, stats, and image imports
-- Uses `AnimatedSection` / `AnimatedItem` from `useScrollAnimation` for scroll-triggered fade-ups (consistent with other landing sections)
-- Uses existing UI primitives: `Card`, `CardContent`, `Badge`, `Separator`
-- Images imported from `src/assets/` as ES6 modules
+```text
+[ Logo ]    [ The Problem | Your Journey | Meet Remy | Our Solution ]    [ Log In ] [ Get Your Findability Score ]
+```
 
-**Copy uploaded images into project:**
-- `user-uploads://Family_unprepared.png` to `src/assets/family-unprepared.png`
-- `user-uploads://prepared_person.png` to `src/assets/prepared-person.png`
-- `user-uploads://Family_talking_about_end_of_life.png` to `src/assets/family-talking.png`
+- Each link calls `scrollIntoView({ behavior: "smooth" })` on the target section element
+- Links styled with `text-sm font-medium text-muted-foreground hover:text-foreground` for a subtle, clean look
+- Active section highlighting is not needed for v1 -- simple scroll links are sufficient
 
-**Edit: `src/pages/Index.tsx`**
-- Import `ProblemSection` from `@/components/landing/ProblemSection`
-- Place `<ProblemSection />` after `<JourneySection />` and before `<RemySection />`
+**3. Update `src/components/Header.tsx` (mobile)**
 
-**Edit: `src/components/landing/index.ts`**
-- Add export for `ProblemSection`
+Add a compact horizontal scrollable row of section links below the logo, or use a hamburger menu. Given the current mobile pattern (centered logo only), the simplest approach:
 
-**No other files changed.** The existing `src/components/Problem.tsx` will remain untouched (it is not currently used on the landing page).
+- Add the section links as a slim horizontal row beneath the logo bar, using `text-xs` sizing and `gap-4` spacing
+- The header height increases slightly to accommodate, and the hero section's top padding adjusts accordingly
+- Alternatively, if space is tight, show a small menu icon that opens a dropdown with section links
+
+**4. No changes to logged-in navigation**
+
+The `AppSidebar`, `DesktopLayout`, and `BottomNav` components remain untouched. The `Header` already returns `null` for authenticated users, so this separation is already enforced.
 
 ### Technical Details
 
-- Images rendered with `rounded-2xl object-cover` and constrained height (`h-64 lg:h-80`) to keep the section compact
-- On mobile, images stack above their text block; on desktop they alternate left/right using `lg:flex-row` / `lg:flex-row-reverse`
-- Stats strip reuses the same grid pattern from the existing `Problem.tsx` component
-- Background: `bg-secondary/30` to provide subtle contrast from the white sections above and below
-- All text uses existing `font-display` / `font-body` classes and muted color tokens
-- The four "what Rest Easy shows you" bullets use `Check` icons from lucide-react in primary color
+- Smooth scroll helper function added inside `Header.tsx`:
+  ```typescript
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+  ```
+- Nav items defined as a simple array: `[{ label: "The Problem", id: "problem" }, { label: "Your Journey", id: "journey" }, { label: "Meet Remy", id: "remy" }, { label: "Our Solution", id: "solution" }]`
+- On mobile, links displayed as a centered horizontal row with `overflow-x-auto` for safety, using smaller text
+- The header remains `fixed top-0` with backdrop blur -- no structural change to positioning
+- Hero section may need a minor top-padding tweak on mobile if the header height increases
 
+### Files Modified
+- `src/components/Header.tsx` -- add section nav links for both desktop and mobile
+- `src/components/landing/ProblemSection.tsx` -- add `id="problem"`
+- `src/components/landing/JourneySection.tsx` -- add `id="journey"`
+- `src/components/landing/RemySection.tsx` -- add `id="remy"`
