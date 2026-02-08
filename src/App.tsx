@@ -15,6 +15,10 @@ import NotFound from "./pages/NotFound";
 import Readiness from "./pages/Readiness";
 import Profile from "./pages/Profile";
 import EasyVault from "./pages/EasyVault";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +39,10 @@ const App = () => (
             <Route path="/readiness" element={<Readiness />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/vault" element={<EasyVault />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
