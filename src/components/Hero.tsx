@@ -84,7 +84,7 @@ const Hero = () => {
                   className="font-body text-base px-8 py-6 transition-all duration-150 active:scale-[0.98]"
                   asChild
                 >
-                  <a href="/login">Sign Up</a>
+                  <a href="/assessment">Free Findability Assessment</a>
                 </Button>
               </div>
             </HeroAnimatedItem>
