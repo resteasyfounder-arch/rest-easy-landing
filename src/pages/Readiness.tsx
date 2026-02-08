@@ -9,8 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, X, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
-import { notifyRemyRefresh, useRemySurface } from "@/hooks/useRemySurface";
-import { RemyInlineNudge } from "@/components/remy/RemyInlineNudge";
 import {
   GentleIntro,
   SkipButton,
@@ -757,27 +755,7 @@ const Readiness = () => {
       });
   }, [schema, profileAnswers]);
 
-  const remySurface = flowPhase === "section-summary" ? "section_summary" : "readiness";
-  const remySectionId =
-    flowPhase === "section-summary" ? (focusedSectionId ?? undefined) : (currentSection?.id ?? undefined);
-  const remyEnabled = Boolean(subjectId) && (
-    flowPhase === "assessment" ||
-    flowPhase === "review" ||
-    flowPhase === "section-summary"
-  );
 
-  const {
-    payload: remyPayload,
-    isLoading: isLoadingRemy,
-    error: remyError,
-    dismissNudge,
-    acknowledgeAction,
-  } = useRemySurface({
-    subjectId,
-    surface: remySurface,
-    sectionId: remySectionId,
-    enabled: remyEnabled,
-  });
 
   const handleStartProfile = () => {
     if (schema && schema.profile_questions.length > 0) {
@@ -845,7 +823,6 @@ const Readiness = () => {
           localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id);
         }
 
-        notifyRemyRefresh();
         if (response.assessment_id && !assessmentId) {
           setAssessmentId(response.assessment_id);
         }
@@ -900,7 +877,6 @@ const Readiness = () => {
         if (returnTo === "dashboard") {
           console.log("[Readiness] Answer saved, returning to dashboard");
           setReturnTo(null); // Clear the returnTo state
-          notifyRemyRefresh();
           navigate("/dashboard");
           return;
         }
@@ -958,7 +934,6 @@ const Readiness = () => {
           }
         }
 
-        notifyRemyRefresh();
         return;
       }
 
@@ -1059,7 +1034,7 @@ const Readiness = () => {
         answers: updatedAnswers,
       });
 
-      notifyRemyRefresh();
+
 
       // Clear any cached section insights for this section
       if (focusedSectionId) {
@@ -1422,14 +1397,6 @@ const Readiness = () => {
 
               {/* Content Area */}
               <div className="flex-1 overflow-y-auto px-6 py-8 bg-gradient-hero">
-                <RemyInlineNudge
-                  payload={remyPayload}
-                  isLoading={isLoadingRemy}
-                  error={remyError}
-                  onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
-                  onAcknowledge={acknowledgeAction}
-                  className="max-w-lg mx-auto mb-4"
-                />
                 <SectionSummary
                   sectionId={focusedSectionId}
                   sectionLabel={focusedSection.label}
@@ -1803,14 +1770,6 @@ const Readiness = () => {
                 />
               ) : (
                 <div className="max-w-lg mx-auto space-y-8">
-                  <RemyInlineNudge
-                    payload={remyPayload}
-                    isLoading={isLoadingRemy}
-                    error={remyError}
-                    onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
-                    onAcknowledge={acknowledgeAction}
-                  />
-
                   {/* Section Label */}
                   <div className="text-center space-y-2">
                     <p className="text-sm text-primary font-medium uppercase tracking-wide">
