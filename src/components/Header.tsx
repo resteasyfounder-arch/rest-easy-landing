@@ -24,8 +24,12 @@ const scrollToSection = (id: string) => {
 
 const Header = ({ isAuthenticated = false }: HeaderProps) => {
   const isMobile = useIsMobile();
-  const activeSection = useActiveSection(sectionIds);
+  const { activeSection, setOverride } = useActiveSection(sectionIds);
 
+  const handleNavClick = (id: string) => {
+    setOverride(id);
+    scrollToSection(id);
+  };
   if (isAuthenticated) {
     return null;
   }
@@ -46,7 +50,7 @@ const Header = ({ isAuthenticated = false }: HeaderProps) => {
               {navItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => scrollToSection(item.id)}
+                  onClick={() => handleNavClick(item.id)}
                   className={cn(
                     "text-xs font-medium whitespace-nowrap py-1 px-2 transition-all duration-200 border-b-2",
                     activeSection === item.id
@@ -76,7 +80,7 @@ const Header = ({ isAuthenticated = false }: HeaderProps) => {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => scrollToSection(item.id)}
+                onClick={() => handleNavClick(item.id)}
                 className={cn(
                   "text-sm font-medium font-body rounded-full px-4 py-1.5 transition-all duration-200",
                   activeSection === item.id
