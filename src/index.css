@@ -579,7 +579,7 @@ html {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.02);
+    transform: scale(1.04);
   }
 }
 
@@ -592,7 +592,7 @@ html {
 }
 
 .animate-hero-heartbeat {
-  animation: hero-heartbeat 7s ease-in-out infinite;
+  animation: hero-heartbeat 5s ease-in-out infinite;
 }
 
 /* Reduced motion support for Remy and Hero animations */
