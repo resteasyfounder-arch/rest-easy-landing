@@ -98,7 +98,7 @@ const Header = ({ isAuthenticated = false }: HeaderProps) => {
               <Link to="/login">Log In</Link>
             </Button>
             <Button asChild>
-              <Link to="/assessment">Get Started</Link>
+              <Link to="/assessment">Free Findability Assessment</Link>
             </Button>
           </div>
         </div>
