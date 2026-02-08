@@ -1,54 +1,51 @@
 
 
-## Redesign Landing Page Navigation with Active Section Highlighting
+## Fix Active Section Highlighting in Navigation
 
-### Overview
-Improve the header navigation design and add scroll-spy active section highlighting so visitors always know where they are on the page.
+### Problems Identified
 
-### Design Improvements
+1. **Auto-highlights on load**: The Problem section sits right below the hero, so the IntersectionObserver immediately detects it as intersecting on page load -- even before the user scrolls. The nav should show no active state until the user actually scrolls down or clicks a nav link.
 
-**Desktop:**
-- Replace plain text buttons with a pill-style nav group: a subtle `bg-secondary/50` rounded container holding the links, giving them visual structure
-- Active link gets a solid `bg-primary text-primary-foreground` pill/chip treatment with a smooth transition
-- Inactive links remain `text-muted-foreground` with hover state
-- Slightly increase spacing and add `font-body` for consistency
-- Reduce CTA button text from "Get Your Findability Score" to "Get Started" to save horizontal space and balance the bar
+2. **Unreliable transitions**: The current observer only sets active on `isIntersecting: true`. When scrolling quickly between sections, multiple entries can fire and the last one wins unpredictably. The observer needs to track which section is most visible or use a more robust approach.
 
-**Mobile:**
-- Replace the two-row layout (logo row + links row) with a single-row layout: logo left, compact horizontal pill nav right
-- Active link gets a small underline indicator (2px bottom border in primary color) instead of a pill (saves space)
-- Keep `text-xs` sizing but tighten gaps
+### Solution
 
-### Active Section Highlighting (Scroll Spy)
+**Rewrite `src/hooks/useActiveSection.ts`** with two fixes:
 
-Add a `useActiveSection` hook (or inline logic in Header) using `IntersectionObserver`:
-- Observe each section element (`#problem`, `#journey`, `#remy`, `#solution`)
-- Track which section is currently most visible in the viewport
-- Update an `activeSection` state variable
-- Apply active styles to the matching nav link
+1. **Scroll threshold gate**: Track whether the user has scrolled past a minimum distance (e.g., the hero section height, roughly `window.innerHeight * 0.5`). Until that threshold is crossed, return `null` -- no section is highlighted. Once the user scrolls back to the top (above the threshold), reset to `null` again so the nav goes back to its neutral state.
+
+2. **Better section detection**: Instead of relying solely on IntersectionObserver `isIntersecting`, use a scroll event listener that checks each section's `getBoundingClientRect()` position relative to the viewport. The section whose top is closest to (but not below) a target line (~20-25% from top of viewport) wins. This is more reliable for adjacent sections.
+
+**Update `src/components/Header.tsx`**:
+
+3. **Click-to-activate**: When a nav link is clicked, immediately set the active section to that item's id (so the pill animates instantly on click), then let the scroll listener take over once scrolling settles.
 
 ### Technical Details
 
-**New hook: `src/hooks/useActiveSection.ts`**
-```typescript
-// Uses IntersectionObserver with rootMargin to detect
-// which section is in the upper portion of the viewport
-// Returns the id string of the active section
+**`src/hooks/useActiveSection.ts`** -- full rewrite:
+
+```
+function useActiveSection(sectionIds: string[]):
+  - State: activeSection (string | null), starts null
+  - On scroll event (throttled with requestAnimationFrame):
+    - If scrollY < threshold (~300px), set activeSection to null and return
+    - Loop through sectionIds, get each element's getBoundingClientRect()
+    - Find the section whose top is closest to 20% of viewport height (from above)
+    - Set that as activeSection
+  - Cleanup: remove scroll listener
+  - Return activeSection
 ```
 
-- Observes elements by their `id` attributes
-- Uses `rootMargin: "-20% 0px -75% 0px"` so the section is considered "active" when it enters the top ~25% of the viewport
-- Cleans up observers on unmount
-- Returns `null` when no section is intersecting (e.g., user is at the very top in the hero)
+Key behaviors:
+- Returns `null` when user is at the top of the page (hero visible) -- no pill is highlighted
+- Accurately tracks the "current" section during smooth scrolling
+- Uses `requestAnimationFrame` for scroll throttling to avoid performance issues
 
-**Edit: `src/components/Header.tsx`**
-- Import and use `useActiveSection` hook
-- Desktop: wrap nav items in a `rounded-full bg-secondary/50 px-1.5 py-1.5` container; each item becomes a `rounded-full px-4 py-1.5` button; active item gets `bg-primary text-primary-foreground`
-- Mobile: single row with logo left, scrollable nav right; active item gets `text-foreground` + a `border-b-2 border-primary` underline
-- Add `transition-all duration-200` for smooth active state changes
-- Shorten CTA text to "Get Started"
+**`src/components/Header.tsx`** -- minor update:
+- When a nav button is clicked, call a setter to force the active section immediately (for instant visual feedback), then `scrollToSection()` as before
+- The hook can expose a `setOverride` function, or the Header can manage a local override state that clears after a short delay (letting the scroll listener take back over)
 
 ### Files Changed
-- **New:** `src/hooks/useActiveSection.ts` -- IntersectionObserver-based scroll spy hook
-- **Edit:** `src/components/Header.tsx` -- redesigned layout + active highlighting for both desktop and mobile
+- **Edit:** `src/hooks/useActiveSection.ts` -- rewrite with scroll-based detection and top-of-page null state
+- **Edit:** `src/components/Header.tsx` -- add click-to-activate immediate feedback
 
