@@ -71,7 +71,7 @@ const steps = [
 
 const Solution = () => {
   return (
-    <section id="solution" className="py-20 lg:py-32 bg-gradient-hero">
+    <section id="solution" className="py-20 lg:py-32">
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
         <AnimatedSection className="text-center max-w-3xl mx-auto mb-16">
