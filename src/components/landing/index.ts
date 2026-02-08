@@ -2,6 +2,7 @@ export { BentoCard } from "./BentoCard";
 export { default as BentoGrid } from "./BentoGrid";
 export { default as JourneySection } from "./JourneySection";
 export { default as JourneyStep } from "./JourneyStep";
+export { default as ProblemSection } from "./ProblemSection";
 export { default as RemySection } from "./RemySection";
 export { default as QuestionFlowDemo } from "./demos/QuestionFlowDemo";
 export { default as JourneyProgressDemo } from "./demos/JourneyProgressDemo";
