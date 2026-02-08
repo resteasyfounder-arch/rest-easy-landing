@@ -25,9 +25,9 @@ const Index = () => {
       <main>
         <Hero />
         <ProblemSection />
+        <Solution />
         <JourneySection />
         <RemySection />
-        <Solution />
       </main>
       <Footer />
     </AppLayout>

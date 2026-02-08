@@ -11,9 +11,9 @@ interface HeaderProps {
 
 const navItems = [
   { label: "The Problem", id: "problem" },
+  { label: "Our Solution", id: "solution" },
   { label: "Your Journey", id: "journey" },
   { label: "Meet Remy", id: "remy" },
-  { label: "Our Solution", id: "solution" },
 ];
 
 const sectionIds = navItems.map((item) => item.id);
