@@ -1,84 +1,50 @@
 
 
-## Redesign Hero Banner with Subtle, Reassuring Animations
+## Fix Hero Animations and Enlarge Pulsing Logo
 
-### What Changes
+### Problem
+Two issues are preventing the hero from feeling animated:
 
-**Files modified:**
-- `src/components/Hero.tsx` -- Rewrite with new animations, updated CTAs, and breathing background
-- `src/index.css` -- Add new keyframes for gradient drift, heartbeat pulse, and arrow micro-interaction
+1. **Fade-in never fires**: The `HeroAnimatedItem` wrapper relies on `IntersectionObserver` to detect when elements scroll into view. But the hero is at the very top of the page -- it is already visible when the observer attaches, so the transition from `opacity: 0` to `opacity: 1` may not trigger visibly (or fires before the browser paints). The elements start invisible and may stay that way or flash instantly.
 
----
+2. **Logo too small to notice heartbeat**: The heart logo is only 64px / 80px. A 2% scale change on an 80px image is less than 2 pixels of movement -- virtually invisible.
 
-### Animation Details
+### Solution
 
-#### 1. Background: Breathing Gradient Drift
-Add two soft radial gradient blobs (already present as static elements) and animate them with a very slow CSS keyframe:
-- 12-15s loop, alternating scale (1.0 to 1.08) and slight position drift
-- Opacity shifts of ~3-5%
-- Pure CSS, no JS -- uses `@keyframes hero-drift-1` and `hero-drift-2` with offset timing
-- Wrapped in `@media (prefers-reduced-motion: no-preference)` so they freeze for reduced-motion users
+**File: `src/components/Hero.tsx`**
 
-#### 2. Headline Reveal: Staggered Fade-Up
-Keep existing `AnimatedItem` pattern but adjust timing to match the spec:
-- Heart logo: 0ms delay, 600ms duration
-- Badge removed (per memory: keep hero clean and uncluttered)
-- Headline: 100ms delay, 700ms duration, translateY(6px) only (smaller movement than current 24px)
-- Subtext: 200ms delay, 700ms duration
-- Buttons: 350ms delay, fade only (no translateY)
-- Trust indicators: 500ms delay, fade only
+- **Enlarge the logo** from `w-16 h-16 lg:w-20 lg:h-20` to `w-24 h-24 lg:w-32 lg:h-32` (96px / 128px). This makes the heartbeat pulse clearly visible.
+- **Fix the fade-in reliability**: Add an initial `useState(false)` that flips to `true` via `useEffect` on mount (with a short `requestAnimationFrame` or 50ms timeout). This guarantees the transition always plays on page load regardless of IntersectionObserver timing. Replace `useScrollAnimation` in `HeroAnimatedItem` with this mount-based trigger so the staggered reveal always fires.
 
-To achieve the gentler 6px movement (instead of the default 24px in `AnimatedItem`), the hero will use inline style overrides or a custom wrapper rather than modifying the shared `AnimatedItem`.
+**File: `src/index.css`**
 
-#### 3. Heart Logo: Subtle Heartbeat
-Add a new CSS keyframe `hero-heartbeat`:
-- Scale 1.0 to 1.02 to 1.0 over 7s
-- Continuous loop, applied to the heart logo image
-- Stops via `@media (prefers-reduced-motion: reduce)` -- sets `animation: none`
+- **Increase heartbeat intensity slightly**: Change the scale from `1.02` to `1.04` so the pulse is clearly visible even at a glance. Still subtle, but perceptible on a 128px logo.
+- Shorten the heartbeat loop from 7s to 5s so it feels more alive.
 
-#### 4. CTA Micro-interactions
-- Primary button ("Log In"): On hover, arrow icon shifts 3px right via `group-hover:translate-x-0.5` transition. On active/tap, `active:scale-[0.98]` with 100ms transition.
-- Secondary button ("Sign Up"): Outline variant, same tap scale-down, no arrow.
-- No glow, no bounce, no shadow pop.
+### Technical Details
 
-#### 5. CTA Text Updates
-- Primary CTA: Change from "Get Started" to **"Log In"** linking to `/login`
-- Secondary CTA: Change from "Learn More" to **"Sign Up"** linking to `/login` (same page for now since auth is simulated)
-
----
-
-### CSS Additions (in `src/index.css`)
-
-```css
-/* Hero breathing gradient */
-@keyframes hero-drift-1 { ... }  /* ~14s, scale + slight translate */
-@keyframes hero-drift-2 { ... }  /* ~12s, offset timing */
-@keyframes hero-heartbeat { ... } /* ~7s, scale 1 -> 1.02 -> 1 */
-
-/* Reduced motion: disable all hero animations */
-@media (prefers-reduced-motion: reduce) {
-  .animate-hero-drift, .animate-hero-heartbeat { animation: none; }
-}
+**HeroAnimatedItem change (Hero.tsx):**
+```text
+// Replace useScrollAnimation with a simple mount trigger
+const [isVisible, setIsVisible] = useState(false);
+useEffect(() => {
+  const frame = requestAnimationFrame(() => setIsVisible(true));
+  return () => cancelAnimationFrame(frame);
+}, []);
 ```
+This removes the IntersectionObserver dependency for the hero (which is always above the fold) and ensures the staggered fade-up always plays reliably on load.
 
----
+**Logo size change (Hero.tsx):**
+- Change: `w-16 h-16 lg:w-20 lg:h-20` to `w-24 h-24 lg:w-32 lg:h-32`
 
-### What Gets Removed
-- The "Life Readiness Platform" `Badge` below the logo (keeping hero minimal per design memory)
-- The current blurred background circles replaced with animated versions
-- "Get Started" and "Learn More" button text
+**Heartbeat keyframe change (index.css):**
+- Change scale from `1.02` to `1.04`
+- Change animation duration from `7s` to `5s`
 
-### What Gets Added
-- Animated background gradient blobs (CSS only)
-- Heartbeat animation on heart logo
-- Arrow micro-interaction on primary CTA
-- Tap scale-down on both buttons
-- Updated CTA labels and hrefs
+### What stays the same
+- All copy, CTAs, and links unchanged
+- Background drift animations unchanged
+- Button micro-interactions unchanged
+- Reduced-motion media queries unchanged
+- Trust indicators unchanged
 
----
-
-### Accessibility
-- All motion wrapped in `prefers-reduced-motion` media queries
-- Text remains static after reveal completes
-- Color contrast unchanged
-- All existing alt text preserved
