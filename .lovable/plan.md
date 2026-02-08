@@ -1,50 +1,53 @@
 
 
-## Fix Hero Animations and Enlarge Pulsing Logo
+## Add "The Problem" Section to Landing Page
 
-### Problem
-Two issues are preventing the hero from feeling animated:
+### Overview
+Create a new, content-rich "Problem" section placed between the Hero/Journey sections and the Solution section. This section reframes the problem as one of ambiguity -- not motivation -- and positions Rest Easy as a readiness platform for unfinished business. It incorporates three uploaded photos and key statistics.
 
-1. **Fade-in never fires**: The `HeroAnimatedItem` wrapper relies on `IntersectionObserver` to detect when elements scroll into view. But the hero is at the very top of the page -- it is already visible when the observer attaches, so the transition from `opacity: 0` to `opacity: 1` may not trigger visibly (or fires before the browser paints). The elements start invisible and may stay that way or flash instantly.
+### Section Structure
 
-2. **Logo too small to notice heartbeat**: The heart logo is only 64px / 80px. A 2% scale change on an 80px image is less than 2 pixels of movement -- virtually invisible.
+The section will be broken into four visual blocks within a single component:
 
-### Solution
+1. **Header** -- Badge ("The Problem") + headline ("This isn't a motivation problem. It's an ambiguity problem.") + supporting paragraph about overload vs. denial.
 
-**File: `src/components/Hero.tsx`**
+2. **Statistics Strip** -- Three stats in a horizontal card (76% No Will, 212+ Hours Lost, 30M Deaths Expected), reusing the same card/grid pattern already in `Problem.tsx`.
 
-- **Enlarge the logo** from `w-16 h-16 lg:w-20 lg:h-20` to `w-24 h-24 lg:w-32 lg:h-32` (96px / 128px). This makes the heartbeat pulse clearly visible.
-- **Fix the fade-in reliability**: Add an initial `useState(false)` that flips to `true` via `useEffect` on mount (with a short `requestAnimationFrame` or 50ms timeout). This guarantees the transition always plays on page load regardless of IntersectionObserver timing. Replace `useScrollAnimation` in `HeroAnimatedItem` with this mount-based trigger so the staggered reveal always fires.
+3. **Photo + Narrative Block** -- A two-column layout with an image on one side and narrative text on the other, alternating sides across three rows:
+   - Row 1 (Image left: `Family_unprepared.png`): "Families don't struggle later because people didn't care..." paragraph about scattered information.
+   - Row 2 (Image right: `prepared_person.png`): "Rest Easy is a Readiness Platform for unfinished business..." paragraph about clarity, not finality.
+   - Row 3 (Image left: `Family_talking_about_end_of_life.png`): "We don't push people to finish tasks; we help them see..." paragraph with the four bullet points (Where things stand today / What's covered / What's missing / What matters most next).
 
-**File: `src/index.css`**
+4. **Closing line** -- "Nothing more. Nothing less." centered as a subtle typographic anchor.
 
-- **Increase heartbeat intensity slightly**: Change the scale from `1.02` to `1.04` so the pulse is clearly visible even at a glance. Still subtle, but perceptible on a 128px logo.
-- Shorten the heartbeat loop from 7s to 5s so it feels more alive.
+### Files Changed
+
+**New file: `src/components/landing/ProblemSection.tsx`**
+- Self-contained component with all copy, stats, and image imports
+- Uses `AnimatedSection` / `AnimatedItem` from `useScrollAnimation` for scroll-triggered fade-ups (consistent with other landing sections)
+- Uses existing UI primitives: `Card`, `CardContent`, `Badge`, `Separator`
+- Images imported from `src/assets/` as ES6 modules
+
+**Copy uploaded images into project:**
+- `user-uploads://Family_unprepared.png` to `src/assets/family-unprepared.png`
+- `user-uploads://prepared_person.png` to `src/assets/prepared-person.png`
+- `user-uploads://Family_talking_about_end_of_life.png` to `src/assets/family-talking.png`
+
+**Edit: `src/pages/Index.tsx`**
+- Import `ProblemSection` from `@/components/landing/ProblemSection`
+- Place `<ProblemSection />` after `<JourneySection />` and before `<RemySection />`
+
+**Edit: `src/components/landing/index.ts`**
+- Add export for `ProblemSection`
+
+**No other files changed.** The existing `src/components/Problem.tsx` will remain untouched (it is not currently used on the landing page).
 
 ### Technical Details
 
-**HeroAnimatedItem change (Hero.tsx):**
-```text
-// Replace useScrollAnimation with a simple mount trigger
-const [isVisible, setIsVisible] = useState(false);
-useEffect(() => {
-  const frame = requestAnimationFrame(() => setIsVisible(true));
-  return () => cancelAnimationFrame(frame);
-}, []);
-```
-This removes the IntersectionObserver dependency for the hero (which is always above the fold) and ensures the staggered fade-up always plays reliably on load.
-
-**Logo size change (Hero.tsx):**
-- Change: `w-16 h-16 lg:w-20 lg:h-20` to `w-24 h-24 lg:w-32 lg:h-32`
-
-**Heartbeat keyframe change (index.css):**
-- Change scale from `1.02` to `1.04`
-- Change animation duration from `7s` to `5s`
-
-### What stays the same
-- All copy, CTAs, and links unchanged
-- Background drift animations unchanged
-- Button micro-interactions unchanged
-- Reduced-motion media queries unchanged
-- Trust indicators unchanged
+- Images rendered with `rounded-2xl object-cover` and constrained height (`h-64 lg:h-80`) to keep the section compact
+- On mobile, images stack above their text block; on desktop they alternate left/right using `lg:flex-row` / `lg:flex-row-reverse`
+- Stats strip reuses the same grid pattern from the existing `Problem.tsx` component
+- Background: `bg-secondary/30` to provide subtle contrast from the white sections above and below
+- All text uses existing `font-display` / `font-body` classes and muted color tokens
+- The four "what Rest Easy shows you" bullets use `Check` icons from lucide-react in primary color
 
