@@ -49,70 +49,72 @@ const Hero = () => {
       </div>
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
-      <div className="max-w-3xl mx-auto text-center space-y-6 lg:space-y-8 relative">
-          {/* Large watermark logo behind text */}
-          <HeroAnimatedItem delay={0} duration={800} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+          {/* Left: Text and buttons */}
+          <div className="flex-1 text-center lg:text-left space-y-6 lg:space-y-8">
+            <HeroAnimatedItem delay={100} duration={700} movement={6}>
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
+                Get your affairs in order with{" "}
+                <span className="text-primary">Rest Easy</span>
+              </h1>
+            </HeroAnimatedItem>
+
+            <HeroAnimatedItem delay={200} duration={700} movement={6}>
+              <p className="font-body text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Rest Easy helps you achieve Life Readiness — organizing your
+                affairs for any unexpected moment, not just end-of-life.
+              </p>
+            </HeroAnimatedItem>
+
+            <HeroAnimatedItem delay={350} duration={600} movement={0}>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <Button
+                  size="lg"
+                  className="group font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-all duration-150 active:scale-[0.98]"
+                  asChild
+                >
+                  <a href="/login">
+                    Log In
+                    <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="font-body text-base px-8 py-6 transition-all duration-150 active:scale-[0.98]"
+                  asChild
+                >
+                  <a href="/login">Sign Up</a>
+                </Button>
+              </div>
+            </HeroAnimatedItem>
+
+            {/* Trust indicators */}
+            <HeroAnimatedItem delay={500} duration={600} movement={0}>
+              <div className="flex flex-wrap gap-6 justify-center lg:justify-start pt-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  <span className="font-body text-sm text-muted-foreground">
+                    Trusted by families
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <span className="font-body text-sm text-muted-foreground">
+                    Bank-level security
+                  </span>
+                </div>
+              </div>
+            </HeroAnimatedItem>
+          </div>
+
+          {/* Right: Heart logo */}
+          <HeroAnimatedItem delay={0} duration={800} className="flex-shrink-0">
             <img
               src={heartLogo}
-              alt=""
-              aria-hidden="true"
-              className="w-[22rem] h-[22rem] sm:w-[28rem] sm:h-[28rem] lg:w-[40rem] lg:h-[40rem] object-contain animate-hero-heartbeat opacity-60"
+              alt="Rest Easy"
+              className="w-48 h-48 sm:w-64 sm:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96 object-contain animate-hero-heartbeat"
             />
-          </HeroAnimatedItem>
-
-          <HeroAnimatedItem delay={100} duration={700} movement={6} className="relative z-10">
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
-              Get your affairs in order with{" "}
-              <span className="text-primary">Rest Easy</span>
-            </h1>
-          </HeroAnimatedItem>
-
-          <HeroAnimatedItem delay={200} duration={700} movement={6} className="relative z-10">
-            <p className="font-body text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              Rest Easy helps you achieve Life Readiness — organizing your
-              affairs for any unexpected moment, not just end-of-life.
-            </p>
-          </HeroAnimatedItem>
-
-          <HeroAnimatedItem delay={350} duration={600} movement={0} className="relative z-10">
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="group font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-all duration-150 active:scale-[0.98]"
-                asChild
-              >
-                <a href="/login">
-                  Log In
-                  <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
-                </a>
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="font-body text-base px-8 py-6 transition-all duration-150 active:scale-[0.98]"
-                asChild
-              >
-                <a href="/login">Sign Up</a>
-              </Button>
-            </div>
-          </HeroAnimatedItem>
-
-          {/* Trust indicators */}
-          <HeroAnimatedItem delay={500} duration={600} movement={0} className="relative z-10">
-            <div className="flex flex-wrap gap-6 justify-center pt-4">
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-primary" />
-                <span className="font-body text-sm text-muted-foreground">
-                  Trusted by families
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                <span className="font-body text-sm text-muted-foreground">
-                  Bank-level security
-                </span>
-              </div>
-            </div>
           </HeroAnimatedItem>
         </div>
       </div>
