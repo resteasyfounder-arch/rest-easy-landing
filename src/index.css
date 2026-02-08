@@ -551,10 +551,57 @@ html {
   animation-delay: 0.3s;
 }
 
-/* Reduced motion support for Remy animations */
+/* Hero breathing gradient drift */
+@keyframes hero-drift-1 {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.05;
+  }
+  50% {
+    transform: scale(1.08) translate(-10px, 8px);
+    opacity: 0.08;
+  }
+}
+
+@keyframes hero-drift-2 {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(1.06) translate(8px, -6px);
+    opacity: 0.23;
+  }
+}
+
+@keyframes hero-heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.animate-hero-drift-1 {
+  animation: hero-drift-1 14s ease-in-out infinite;
+}
+
+.animate-hero-drift-2 {
+  animation: hero-drift-2 12s ease-in-out infinite;
+}
+
+.animate-hero-heartbeat {
+  animation: hero-heartbeat 7s ease-in-out infinite;
+}
+
+/* Reduced motion support for Remy and Hero animations */
 @media (prefers-reduced-motion: reduce) {
   .animate-remy-float,
-  .animate-typing-dot {
+  .animate-typing-dot,
+  .animate-hero-drift-1,
+  .animate-hero-drift-2,
+  .animate-hero-heartbeat {
     animation: none;
   }
 }
