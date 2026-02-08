@@ -17,10 +17,7 @@ export interface FindabilityQuestion {
     no: string;
   };
   rescueMission: RescueMission;
-  // New metadata for the calming assessment experience
   reflectionText?: Record<AnswerValue, string>;
-  pauseAfter?: boolean;
-  sectionEnd?: boolean;
 }
 
 // Answer options with warmer labels
@@ -101,7 +98,6 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Test that your person can actually log in"
       ]
     },
-    pauseAfter: true
   },
   {
     id: "document-reality",
@@ -124,7 +120,6 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Move or copy everything to that hub"
       ]
     },
-    sectionEnd: true
   },
   {
     id: "healthcare-moment",
@@ -174,8 +169,6 @@ export const findabilityQuestions: FindabilityQuestion[] = [
         "Set up authorized access for critical accounts"
       ]
     },
-    pauseAfter: true,
-    sectionEnd: true
   },
   {
     id: "phone-problem",
@@ -225,7 +218,6 @@ export const findabilityQuestions: FindabilityQuestion[] = [
       somewhat: "More lives in your head than you might realize.",
       no: "We all carry things that aren't written down."
     },
-    sectionEnd: true
   },
 ];
 
@@ -243,20 +235,7 @@ export const scoreTiers = {
   fragile: { min: 0, label: "Findability Fragile", color: "red" },
 } as const;
 
-// Section groupings for transitions
-export const sectionInfo: Record<string, { closingMessage: string; nextHint?: string }> = {
-  documents: {
-    closingMessage: "That brings clarity around your documents and access.",
-    nextHint: "Now let's look at healthcare and finances..."
-  },
-  financial: {
-    closingMessage: "You've thought through the financial basics.",
-    nextHint: "A few more questions about your digital life..."
-  },
-  digital: {
-    closingMessage: "That covers how people can reach what you've built digitally.",
-  }
-};
+
 
 export function calculateScore(answers: Record<string, AnswerValue>): number {
   const rawScore = Object.values(answers).reduce((sum, answer) => {
