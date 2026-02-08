@@ -1,100 +1,84 @@
 
 
-## Redesign Pricing as a Progressive Journey
-
-Replace the current three-column pricing grid and feature breakdown with a vertical, step-based layout that reads like a natural progression. This approach is calmer, clearer, and better suited for an older adult audience.
-
----
+## Redesign Hero Banner with Subtle, Reassuring Animations
 
 ### What Changes
 
-**File:** `src/components/Solution.tsx` -- Full rewrite
+**Files modified:**
+- `src/components/Hero.tsx` -- Rewrite with new animations, updated CTAs, and breathing background
+- `src/index.css` -- Add new keyframes for gradient drift, heartbeat pulse, and arrow micro-interaction
 
 ---
 
-### New Section Structure
+### Animation Details
 
-#### Header
-- Headline: **"Choose how far you want to go"**
-- Subtext: "Start with a simple check, understand your full readiness, or unlock tools to take action and stay organized."
-- Remove the "Choose Your Path" badge -- keep it clean and direct
+#### 1. Background: Breathing Gradient Drift
+Add two soft radial gradient blobs (already present as static elements) and animate them with a very slow CSS keyframe:
+- 12-15s loop, alternating scale (1.0 to 1.08) and slight position drift
+- Opacity shifts of ~3-5%
+- Pure CSS, no JS -- uses `@keyframes hero-drift-1` and `hero-drift-2` with offset timing
+- Wrapped in `@media (prefers-reduced-motion: no-preference)` so they freeze for reduced-motion users
 
-#### Step 1: Findability Assessment (Free)
-- Step label badge: "Step 1"
-- Title: "Findability Assessment"
-- Price: "Free"
-- Description paragraph explaining the value in plain language
-- Bullet list (no checkmarks, just clean text with subtle icons):
-  - A short findability assessment
-  - A simple summary of strengths and gaps
-  - No account required
-  - No credit card
-- CTA button (outline variant): "Start Free Findability Check"
+#### 2. Headline Reveal: Staggered Fade-Up
+Keep existing `AnimatedItem` pattern but adjust timing to match the spec:
+- Heart logo: 0ms delay, 600ms duration
+- Badge removed (per memory: keep hero clean and uncluttered)
+- Headline: 100ms delay, 700ms duration, translateY(6px) only (smaller movement than current 24px)
+- Subtext: 200ms delay, 700ms duration
+- Buttons: 350ms delay, fade only (no translateY)
+- Trust indicators: 500ms delay, fade only
 
-#### Step 2: Life Readiness Assessment ($99)
-- Step label badge: "Step 2"
-- Title: "Life Readiness Assessment"
-- Price: "$99 one-time"
-- Description paragraph
-- Bullet list:
-  - Full Life Readiness Assessment
-  - Personalized scores and insights
-  - A clear, easy-to-read readiness report
-  - Guidance from Remy, your AI guide
-- CTA button (primary/solid): "Get My Life Readiness Report"
-- Visual emphasis: Subtle left border accent or slightly larger card to signal this is the foundation for everything after
+To achieve the gentler 6px movement (instead of the default 24px in `AnimatedItem`), the hero will use inline style overrides or a custom wrapper rather than modifying the shared `AnimatedItem`.
 
-#### Step 3: Rest Easy Pro ($14.99/mo)
-- Step label badge: "Step 3"
-- Title: "Rest Easy Pro"
-- Price: "$14.99 / month"
-- Prerequisite note (muted but clearly visible): "Requires completion of the $99 Life Readiness Assessment"
-- Description paragraph
-- Bullet list:
-  - Actionable Roadmap inside the dashboard
-  - Progress tracking toward readiness goals
-  - EasyVault secure document storage
-  - Continued guidance from Remy
-  - Everything included in the previous steps
-- CTA button (primary variant): "Upgrade to Pro"
+#### 3. Heart Logo: Subtle Heartbeat
+Add a new CSS keyframe `hero-heartbeat`:
+- Scale 1.0 to 1.02 to 1.0 over 7s
+- Continuous loop, applied to the heart logo image
+- Stops via `@media (prefers-reduced-motion: reduce)` -- sets `animation: none`
+
+#### 4. CTA Micro-interactions
+- Primary button ("Log In"): On hover, arrow icon shifts 3px right via `group-hover:translate-x-0.5` transition. On active/tap, `active:scale-[0.98]` with 100ms transition.
+- Secondary button ("Sign Up"): Outline variant, same tap scale-down, no arrow.
+- No glow, no bounce, no shadow pop.
+
+#### 5. CTA Text Updates
+- Primary CTA: Change from "Get Started" to **"Log In"** linking to `/login`
+- Secondary CTA: Change from "Learn More" to **"Sign Up"** linking to `/login` (same page for now since auth is simulated)
 
 ---
 
-### Visual Design
+### CSS Additions (in `src/index.css`)
 
-- **Layout**: Single-column, vertically stacked cards (max-width ~700px, centered)
-- **Progress connector**: A thin vertical line or dashed connector between steps (similar to the existing `JourneyPath` pattern) to reinforce the sequential flow
-- **Step badges**: Small `Badge` components labeled "Step 1", "Step 2", "Step 3"
-- **Step 2 emphasis**: A subtle `border-l-4 border-primary` left accent to visually anchor it as the key step
-- **Step 3 prerequisite**: A small muted note with an info-style presentation below the price
-- **Icons**: One icon per step (Search, Activity, Shield) placed inline with the title -- not in large hero circles
-- **Bullet points**: Use a small dot or subtle circle icon instead of checkmarks -- keeping it conversational, not checklist-like
-- **No feature comparison grid** at the bottom -- the step descriptions themselves make the progression clear
-- **Scroll animations**: Each step uses `AnimatedItem` with staggered delays
+```css
+/* Hero breathing gradient */
+@keyframes hero-drift-1 { ... }  /* ~14s, scale + slight translate */
+@keyframes hero-drift-2 { ... }  /* ~12s, offset timing */
+@keyframes hero-heartbeat { ... } /* ~7s, scale 1 -> 1.02 -> 1 */
+
+/* Reduced motion: disable all hero animations */
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-drift, .animate-hero-heartbeat { animation: none; }
+}
+```
 
 ---
 
 ### What Gets Removed
-
-- The three-column pricing card grid
-- The "What's Included" feature breakdown section below the cards
-- The `features` array with `included` boolean matrix
-- The `tiers` array and `tierNames` constant
-- "Most Popular" badge and premium background styling
+- The "Life Readiness Platform" `Badge` below the logo (keeping hero minimal per design memory)
+- The current blurred background circles replaced with animated versions
+- "Get Started" and "Learn More" button text
 
 ### What Gets Added
-
-- A `steps` data array containing step number, title, price, description, bullet points, CTA text, href, and visual config
-- Vertical step layout with connector lines between cards
-- Prerequisite callout for Step 3
-- Calmer, plain-language copy throughout
+- Animated background gradient blobs (CSS only)
+- Heartbeat animation on heart logo
+- Arrow micro-interaction on primary CTA
+- Tap scale-down on both buttons
+- Updated CTA labels and hrefs
 
 ---
 
-### Technical Notes
-
-- Same file, same component name, same exports
-- Uses existing components: `Card`, `CardContent`, `Badge`, `Button`, `Separator`
-- Uses existing animation utilities: `AnimatedSection`, `AnimatedItem`
-- Uses existing icons from lucide-react
-- No new dependencies or files needed
+### Accessibility
+- All motion wrapped in `prefers-reduced-motion` media queries
+- Text remains static after reveal completes
+- Color contrast unchanged
+- All existing alt text preserved
