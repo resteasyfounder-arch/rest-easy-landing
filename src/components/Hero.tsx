@@ -56,7 +56,7 @@ const Hero = () => {
               src={heartLogo}
               alt=""
               aria-hidden="true"
-              className="w-64 h-64 sm:w-80 sm:h-80 lg:w-[28rem] lg:h-[28rem] object-contain animate-hero-heartbeat opacity-[0.12]"
+              className="w-64 h-64 sm:w-80 sm:h-80 lg:w-[28rem] lg:h-[28rem] object-contain animate-hero-heartbeat opacity-60"
             />
           </HeroAnimatedItem>
 
