@@ -1,103 +1,79 @@
 
 
-## EasyVault Improvements (4 Changes)
+## Reinvent the "Solution" Section as a Pricing Tiers Display
+
+Transform the current two-path card into a polished three-tier pricing section that clearly communicates the value progression from free to premium.
 
 ---
 
-### 1. Remove "Add Document" Button from Category Sections
+### Tier Breakdown
 
-The "Add Document" ghost button at the bottom of each accordion section is redundant since each document row already has its own upload/edit action button.
-
-**File:** `src/components/vault/DocumentCategory.tsx`
-- Remove the `<Button>` with `<Plus>` icon (lines 62-65) and the `Plus` import
+| | Discover (Free) | Readiness ($99 one-time) | Rest Easy Pro ($199 one-time) |
+|---|---|---|---|
+| Findability Assessment | Yes | Yes | Yes |
+| Life Readiness Assessment | -- | Yes | Yes |
+| Personalized Report | -- | Yes | Yes |
+| Actionable Roadmap | -- | -- | Yes |
+| EasyVault Document Storage | -- | -- | Yes |
+| Remy AI Guide | -- | -- | Yes |
 
 ---
 
-### 2. "Not Applicable" Support for Document Types
+### Design Approach
 
-Allow users to mark individual documents as "not applicable" so they are excluded from progress tracking. This adjusts both the per-category and overall totals dynamically.
+A horizontal three-column layout (stacks vertically on mobile) with the middle tier visually highlighted as "Most Popular." Each tier card includes:
 
-**Database:** Add a `vault_document_exclusions` table (or reuse `vault_documents` with a special marker). The simplest approach: store N/A status as a vault_documents row with a special `inline_content` value of `"__na__"` (no new table needed, uses the existing upsert pattern).
+- **Icon** at the top representing the tier theme
+- **Tier name** and short tagline
+- **Price** prominently displayed (Free / $99 / $199)
+- **Feature checklist** with checkmarks for included features and dimmed dashes for excluded ones
+- **CTA button** -- outline for free, solid primary for the highlighted tier, solid for premium
 
-Actually, a cleaner approach: add a new database table to track exclusions separately, keeping vault_documents clean.
+The middle card ("Readiness") gets a subtle border highlight and a "Most Popular" badge to draw attention. The premium card gets a subtle gradient background to feel aspirational.
 
-**Migration (new table):**
-```sql
-CREATE TABLE public.vault_document_exclusions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  document_type_id TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(user_id, document_type_id)
-);
-ALTER TABLE public.vault_document_exclusions ENABLE ROW LEVEL SECURITY;
--- RLS: auth.uid() = user_id for SELECT, INSERT, DELETE
+---
+
+### File Changes
+
+**`src/components/Solution.tsx`** -- Full rewrite of the component:
+
+- Replace the two-column card layout with a three-column pricing grid
+- Update the section header badge from "Two Paths Forward" to "Choose Your Path"
+- Update the headline to something like "Find your level of readiness"
+- Each tier rendered as its own card with:
+  - Tier icon (Search for Discover, Activity for Readiness, Shield for Rest Easy Pro)
+  - Name, tagline, and price
+  - Feature list with Check/Minus icons showing inclusion
+  - CTA button linking to the appropriate route (/assessment, /readiness, /readiness)
+- Use the existing `AnimatedSection` wrapper for scroll animation
+- Mobile: single column stack; Tablet+: three columns side by side
+- Middle tier card uses `border-primary` and a "Most Popular" badge
+- Premium tier uses a subtle `bg-primary/5` background
+
+No new files or dependencies needed -- this is a self-contained component rewrite using existing UI primitives (Card, Badge, Button, lucide icons).
+
+---
+
+### Visual Hierarchy (top to bottom per card)
+
+```text
++---------------------------+
+|  [Icon]                   |
+|  TIER NAME                |
+|  Short tagline            |
+|                           |
+|  $0 / $99 / $199          |
+|  "one-time" or "free"     |
+|                           |
+|  [CTA Button]             |
+|                           |
+|  --- Feature List ---     |
+|  [check] Feature 1        |
+|  [check] Feature 2        |
+|  [dash]  Feature 3        |
+|  [dash]  Feature 4        |
++---------------------------+
 ```
 
-**Hook:** `src/hooks/useVaultDocuments.ts`
-- Add a query for `vault_document_exclusions`
-- Add `markNotApplicable(docTypeId)` and `unmarkNotApplicable(docTypeId)` mutations
-- Export an `excludedDocs` set alongside `documents`
-
-**UI -- DocumentRow:**
-- Add a "Not applicable" button (e.g., a small `Ban` or `MinusCircle` icon) in the hover actions for incomplete documents
-- When marked N/A, show the row with a strikethrough/dimmed style, a "N/A" badge, and an "Undo" button on hover
-- N/A documents are neither "completed" nor "missing"
-
-**UI -- DocumentCategory:**
-- Adjust `completedCount` and `totalCount` to exclude N/A documents
-- Update "X missing" count to exclude N/A docs
-
-**UI -- VaultProgress:**
-- Accept both `completedCount` and `applicableTotal` (instead of using the static `totalDocumentCount`)
-- The denominator becomes `totalDocumentCount - excludedCount`
-
-**UI -- EasyVault.tsx:**
-- Compute `applicableTotal = totalDocumentCount - excludedDocs.size`
-- Pass `applicableTotal` to `VaultProgress`
-- Pass `excludedDocs` set down to `DocumentCategory`
-
----
-
-### 3. Remove "Share" Button from Trust Network
-
-**File:** `src/components/vault/TrustNetworkPanel.tsx`
-- Remove the Share button (lines 152-154) from the invite grid
-- Remove the `Share2` import and `handleShare` function
-- Change grid from `grid-cols-2` to `grid-cols-3` (Email, WhatsApp, Copy Link)
-
----
-
-### 4. Add EasyVault Progress to Dashboard
-
-Add a vault progress card on the dashboard alongside the Life Readiness tracking section.
-
-**File:** `src/pages/Dashboard.tsx`
-- Import `useVaultDocuments` hook and `vaultCategories`/`totalDocumentCount` from data
-- In the completed assessment view, replace the static `VaultPreviewCard` with a live vault progress card showing:
-  - Document count (completed / applicable total)
-  - Progress bar
-  - Link to `/vault`
-- In the in-progress view, keep the existing teaser but optionally add a small vault stat
-
-**New component:** `src/components/dashboard/VaultProgressCard.tsx`
-- A compact card that uses data from `useVaultDocuments` hook
-- Shows completed count, applicable total, percentage, and a "Go to Vault" link
-- Styled consistently with the dashboard's existing cards
-
----
-
-### Technical Summary
-
-| File | Action |
-|------|--------|
-| Migration SQL | Create `vault_document_exclusions` table with RLS |
-| `src/hooks/useVaultDocuments.ts` | Add exclusions query + mutations |
-| `src/components/vault/DocumentRow.tsx` | Add N/A toggle, dimmed state |
-| `src/components/vault/DocumentCategory.tsx` | Remove Add button, adjust counts for N/A |
-| `src/components/vault/VaultProgress.tsx` | Accept dynamic total |
-| `src/components/vault/TrustNetworkPanel.tsx` | Remove Share button |
-| `src/pages/EasyVault.tsx` | Wire exclusions, compute dynamic totals |
-| `src/components/dashboard/VaultProgressCard.tsx` | Create new dashboard card |
-| `src/pages/Dashboard.tsx` | Replace static VaultPreviewCard with live progress |
+The middle card is slightly taller with a top badge reading "Most Popular" and a primary-colored border. The premium card has a warm background tint to feel like the aspirational choice.
 
