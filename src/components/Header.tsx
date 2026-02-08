@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { useActiveSection } from "@/hooks/useActiveSection";
 import logo from "@/assets/rest-easy-logo.png";
 
 interface HeaderProps {
@@ -14,12 +16,15 @@ const navItems = [
   { label: "Our Solution", id: "solution" },
 ];
 
+const sectionIds = navItems.map((item) => item.id);
+
 const scrollToSection = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 };
 
 const Header = ({ isAuthenticated = false }: HeaderProps) => {
   const isMobile = useIsMobile();
+  const activeSection = useActiveSection(sectionIds);
 
   if (isAuthenticated) {
     return null;
@@ -33,21 +38,26 @@ const Header = ({ isAuthenticated = false }: HeaderProps) => {
     return (
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-center h-14">
-            <button onClick={scrollToTop} className="flex items-center">
-              <img src={logo} alt="Rest Easy" className="h-10 w-auto" />
+          <div className="flex items-center justify-between h-14">
+            <button onClick={scrollToTop} className="flex items-center shrink-0">
+              <img src={logo} alt="Rest Easy" className="h-8 w-auto" />
             </button>
-          </div>
-          <div className="flex items-center justify-center gap-4 pb-2 overflow-x-auto">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => scrollToSection(item.id)}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
-              >
-                {item.label}
-              </button>
-            ))}
+            <nav className="flex items-center gap-1 overflow-x-auto ml-3">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => scrollToSection(item.id)}
+                  className={cn(
+                    "text-xs font-medium whitespace-nowrap py-1 px-2 transition-all duration-200 border-b-2",
+                    activeSection === item.id
+                      ? "text-foreground border-primary"
+                      : "text-muted-foreground border-transparent hover:text-foreground"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
           </div>
         </div>
       </header>
@@ -62,12 +72,17 @@ const Header = ({ isAuthenticated = false }: HeaderProps) => {
             <img src={logo} alt="Rest Easy" className="h-10 w-auto" />
           </button>
 
-          <nav className="flex items-center gap-6">
+          <nav className="flex items-center rounded-full bg-secondary/50 px-1.5 py-1.5">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => scrollToSection(item.id)}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className={cn(
+                  "text-sm font-medium font-body rounded-full px-4 py-1.5 transition-all duration-200",
+                  activeSection === item.id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
                 {item.label}
               </button>
@@ -79,7 +94,7 @@ const Header = ({ isAuthenticated = false }: HeaderProps) => {
               <Link to="/login">Log In</Link>
             </Button>
             <Button asChild>
-              <Link to="/assessment">Get Your Findability Score</Link>
+              <Link to="/assessment">Get Started</Link>
             </Button>
           </div>
         </div>
