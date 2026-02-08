@@ -51,7 +51,7 @@ const journeySteps = [
 
 const JourneySection = () => {
   return (
-    <section className="py-16 lg:py-24 bg-background relative">
+    <section id="journey" className="py-16 lg:py-24 bg-background relative">
       {/* Section Header */}
       <div className="container mx-auto px-4 lg:px-8 mb-12 lg:mb-16 text-center">
         <AnimatedItem animation="fade-up" delay={0}>

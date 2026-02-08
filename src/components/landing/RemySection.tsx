@@ -33,7 +33,7 @@ const RemySection = () => {
   };
 
   return (
-    <section className="py-16 lg:py-24 bg-background relative overflow-hidden">
+    <section id="remy" className="py-16 lg:py-24 bg-background relative overflow-hidden">
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
