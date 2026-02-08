@@ -1,32 +1,43 @@
 
 
-## Smooth Out Landing Page Background Flow
+## Footer Update and New Pages
 
-### Problem
-Every section uses the same `bg-gradient-hero` class, which applies a diagonal gradient (`135deg`). Because each section restarts the same gradient independently, there are visible "seams" where sections meet -- the gradient pattern repeats at each boundary rather than flowing continuously.
+### Changes Overview
 
-### Solution
-Remove individual section backgrounds and instead apply a single, continuous background to the entire `<main>` element in `Index.tsx`. This way the gradient renders once across the full page height, creating a seamless flow from hero through to the footer.
+1. **Update Footer Product links** to point to actual landing page sections
+2. **Remove "Blog"** from the Company section
+3. **Create 4 new pages**: About, Contact, Privacy Policy, Terms of Service
+4. **Add routes** for the new pages in `App.tsx`
+5. **Update Footer links** to use React Router `Link` for internal navigation
 
-### Changes
+---
 
-**`src/pages/Index.tsx`**
-- Add `bg-gradient-hero` to the `<main>` wrapper so the gradient covers all sections in one continuous sweep.
+### Detailed Changes
 
-**`src/components/Hero.tsx`**
-- Remove `bg-gradient-hero` from the hero `<section>` (it will inherit from `<main>`).
+**`src/components/Footer.tsx`**
+- Update the Product links to match the actual section IDs on the landing page:
+  - "The Problem" -> `/#problem`
+  - "Our Solution" -> `/#solution`
+  - "Your Journey" -> `/#journey`
+  - "Meet Remy" -> `/#remy`
+- Remove "Blog" from the Company section, leaving just "About" and "Contact"
+- Update Company links: About -> `/about`, Contact -> `/contact`
+- Update Legal links: Privacy Policy -> `/privacy`, Terms of Service -> `/terms`
+- Use React Router `Link` components instead of plain `<a>` tags for internal routes
 
-**`src/components/landing/ProblemSection.tsx`**
-- Remove `bg-gradient-hero` from the section element.
+**New Pages (simple placeholder pages with consistent styling):**
 
-**`src/components/Solution.tsx`**
-- Remove `bg-gradient-hero` from the section element.
+- `src/pages/About.tsx` -- Company about page with header, content area, and footer
+- `src/pages/Contact.tsx` -- Contact page with a basic contact form or info
+- `src/pages/PrivacyPolicy.tsx` -- Privacy policy page with placeholder legal text
+- `src/pages/TermsOfService.tsx` -- Terms of service page with placeholder legal text
 
-**`src/components/landing/JourneySection.tsx`**
-- Remove `bg-gradient-hero` from the section element.
+Each page will include the `Header` and `Footer` components wrapped in `AppLayout` for consistent navigation, matching the landing page pattern.
 
-**`src/components/landing/RemySection.tsx`**
-- Remove `bg-gradient-hero` from the section element.
-
-All sections will then sit on one continuous gradient background with no visible seams between them. The footer retains its own dark `bg-foreground` background, which provides a clean visual break.
+**`src/App.tsx`**
+- Import and add routes for the 4 new pages:
+  - `/about` -> About
+  - `/contact` -> Contact
+  - `/privacy` -> PrivacyPolicy
+  - `/terms` -> TermsOfService
 
