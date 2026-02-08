@@ -22,7 +22,7 @@ const Index = () => {
   return (
     <AppLayout>
       <Header />
-      <main>
+      <main className="bg-gradient-hero">
         <Hero />
         <ProblemSection />
         <Solution />

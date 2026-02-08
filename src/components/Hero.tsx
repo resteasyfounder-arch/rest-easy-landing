@@ -41,7 +41,7 @@ const HeroAnimatedItem = ({
 
 const Hero = () => {
   return (
-    <section className="relative min-h-[70vh] lg:min-h-[80vh] flex items-center overflow-hidden bg-gradient-hero pt-20 pb-12 lg:pb-20">
+    <section className="relative min-h-[70vh] lg:min-h-[80vh] flex items-center overflow-hidden pt-20 pb-12 lg:pb-20">
       {/* Animated background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -right-20 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-hero-drift-1" />
