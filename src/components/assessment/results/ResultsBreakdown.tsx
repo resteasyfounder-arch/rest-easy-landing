@@ -1,11 +1,5 @@
-import { Check, AlertCircle, X, ChevronDown } from "lucide-react";
+import { Check, Circle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import {
   findabilityQuestions,
   type AnswerValue,
@@ -15,76 +9,112 @@ interface ResultsBreakdownProps {
   answers: Record<string, AnswerValue>;
 }
 
-const answerLabels: Record<AnswerValue, string> = {
-  yes: "Yes",
-  somewhat: "Somewhat",
-  no: "No",
-};
+interface GroupConfig {
+  key: AnswerValue;
+  title: string;
+  icon: typeof Check;
+  bgClass: string;
+  iconBgClass: string;
+  iconColorClass: string;
+}
+
+const groups: GroupConfig[] = [
+  {
+    key: "yes",
+    title: "Solid",
+    icon: Check,
+    bgClass: "bg-primary/[0.04] border-primary/10",
+    iconBgClass: "bg-primary/15",
+    iconColorClass: "text-primary",
+  },
+  {
+    key: "somewhat",
+    title: "Needs Attention",
+    icon: Circle,
+    bgClass: "bg-amber-500/[0.04] border-amber-500/10",
+    iconBgClass: "bg-amber-500/15",
+    iconColorClass: "text-amber-600",
+  },
+  {
+    key: "no",
+    title: "Not Yet Covered",
+    icon: ArrowRight,
+    bgClass: "bg-muted/40 border-border",
+    iconBgClass: "bg-muted",
+    iconColorClass: "text-muted-foreground",
+  },
+];
 
 const ResultsBreakdown = ({ answers }: ResultsBreakdownProps) => {
+  const grouped = groups.map((group) => ({
+    ...group,
+    items: findabilityQuestions.filter((q) => answers[q.id] === group.key),
+  }));
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <h2 className="font-display text-base font-semibold text-foreground text-center">
         Your Breakdown
       </h2>
 
-      <Accordion type="single" collapsible className="space-y-1.5">
-        {findabilityQuestions.map((question) => {
-          const answer = answers[question.id];
-          const guidance = answer ? question.guidance[answer] : "";
-
-          return (
-            <AccordionItem
-              key={question.id}
-              value={question.id}
-              className={cn(
-                "border rounded-lg px-3 overflow-hidden transition-colors",
-                answer === "yes" && "bg-green-500/5 border-green-500/20",
-                answer === "somewhat" && "bg-amber-500/5 border-amber-500/20",
-                answer === "no" && "bg-red-400/5 border-red-400/20"
-              )}
-            >
-              <AccordionTrigger className="hover:no-underline py-2.5">
-                <div className="flex items-center gap-2 text-left">
-                  {/* Status icon */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {grouped
+          .filter((g) => g.items.length > 0)
+          .map((group) => {
+            const Icon = group.icon;
+            return (
+              <div
+                key={group.key}
+                className={cn(
+                  "rounded-2xl border p-4 space-y-3",
+                  group.bgClass
+                )}
+              >
+                {/* Group header */}
+                <div className="flex items-center gap-2">
                   <div
                     className={cn(
-                      "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
-                      answer === "yes" && "bg-green-500 text-white",
-                      answer === "somewhat" && "bg-amber-500 text-white",
-                      answer === "no" && "bg-red-400 text-white"
+                      "w-6 h-6 rounded-full flex items-center justify-center",
+                      group.iconBgClass
                     )}
                   >
-                    {answer === "yes" && <Check className="w-3 h-3" />}
-                    {answer === "somewhat" && <AlertCircle className="w-2.5 h-2.5" />}
-                    {answer === "no" && <X className="w-3 h-3" />}
+                    <Icon className={cn("w-3.5 h-3.5", group.iconColorClass)} />
                   </div>
-
-                  {/* Question info - single line */}
-                  <p className="font-body font-medium text-foreground text-sm flex-1">
-                    {question.categoryLabel}
-                  </p>
+                  <span className="font-body text-sm font-semibold text-foreground">
+                    {group.title}
+                  </span>
+                  <span className="font-body text-xs text-muted-foreground ml-auto">
+                    {group.items.length}
+                  </span>
                 </div>
-              </AccordionTrigger>
 
-              <AccordionContent className="pb-3">
-                <div className="pl-7">
-                  <div
-                    className={cn(
-                      "p-2.5 rounded-lg text-sm font-body",
-                      answer === "yes" && "bg-green-500/10 text-green-800",
-                      answer === "somewhat" && "bg-amber-500/10 text-amber-800",
-                      answer === "no" && "bg-red-400/10 text-red-800"
-                    )}
-                  >
-                    {guidance}
-                  </div>
+                {/* Items */}
+                <div className="space-y-2">
+                  {group.items.map((question) => {
+                    const guidance = question.guidance[group.key];
+                    // Truncate guidance to first sentence
+                    const shortGuidance =
+                      guidance.split(/[.!]/).filter(Boolean)[0]?.trim() + ".";
+
+                    return (
+                      <div
+                        key={question.id}
+                        className="space-y-0.5"
+                      >
+                        <p className="font-body text-sm font-medium text-foreground/90">
+                          {question.categoryLabel}
+                        </p>
+                        <p className="font-body text-xs text-muted-foreground leading-relaxed">
+                          {shortGuidance}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+              </div>
+            );
+          })}
+      </div>
     </div>
   );
 };

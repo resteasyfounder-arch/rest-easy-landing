@@ -12,7 +12,7 @@ interface RemySummaryCardProps {
 
 const RemySummaryCard = ({ aiSummary }: RemySummaryCardProps) => {
   return (
-    <div className="bg-card rounded-xl border border-border p-5 space-y-4">
+    <div className="bg-primary/[0.03] rounded-2xl border border-primary/10 p-6 md:p-8 space-y-4">
       {/* Remy header */}
       <div className="flex items-center gap-3">
         <img
@@ -20,29 +20,21 @@ const RemySummaryCard = ({ aiSummary }: RemySummaryCardProps) => {
           alt="Remy"
           className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
         />
-        <div>
-          <p className="font-display text-sm font-semibold text-foreground">Remy's Take</p>
-          <p className="font-body text-xs text-muted-foreground">Your personal assessment summary</p>
-        </div>
+        <p className="font-display text-sm font-semibold text-foreground">Remy's Take</p>
       </div>
 
-      {/* Summary */}
-      <p className="font-body text-sm text-foreground/90 leading-relaxed">
-        {aiSummary.summary}
+      {/* Merged summary + encouragement */}
+      <p className="font-body text-sm text-foreground/85 leading-relaxed">
+        {aiSummary.summary} {aiSummary.encouragement}
       </p>
 
-      {/* Top priority */}
-      <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
-        <p className="font-body text-xs font-medium text-primary mb-1">Your #1 Priority</p>
+      {/* Focus area */}
+      <div className="bg-card rounded-xl p-3.5 border border-border">
+        <p className="font-body text-xs font-medium text-muted-foreground mb-1">Where to focus first</p>
         <p className="font-body text-sm text-foreground/80">
           {aiSummary.top_priority}
         </p>
       </div>
-
-      {/* Encouragement */}
-      <p className="font-body text-sm text-muted-foreground italic">
-        {aiSummary.encouragement}
-      </p>
     </div>
   );
 };
