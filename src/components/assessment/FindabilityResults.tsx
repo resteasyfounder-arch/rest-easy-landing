@@ -23,13 +23,17 @@ interface FindabilityResultsProps {
 const FindabilityResults = ({ score, answers, onRetake, aiSummary }: FindabilityResultsProps) => {
   return (
     <div className="min-h-full bg-gradient-to-b from-background to-muted/20">
-      <div className="max-w-lg mx-auto px-4 pb-6 space-y-5">
-        <ResultsScoreHero score={score} />
+      <div className="max-w-lg md:max-w-3xl mx-auto px-4 pb-6 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <ResultsScoreHero score={score} />
+          {aiSummary && <RemySummaryCard aiSummary={aiSummary} />}
+        </div>
 
-        {aiSummary && <RemySummaryCard aiSummary={aiSummary} />}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <ActionPlanPreview answers={answers} />
+          <ResultsBreakdown answers={answers} />
+        </div>
 
-        <ActionPlanPreview answers={answers} />
-        <ResultsBreakdown answers={answers} />
         <LifeReadinessTeaser />
         <ResultsTrustSection />
         <ResultsCTA onRetake={onRetake} />
