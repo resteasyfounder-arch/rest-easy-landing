@@ -43,7 +43,7 @@ const steps = [
     cta: "Get My Life Readiness Report",
     href: "/readiness",
     variant: "default" as const,
-    emphasis: true,
+    emphasis: false,
     prerequisite: null,
   },
   {
@@ -86,30 +86,18 @@ const Solution = () => {
         {/* Steps – horizontal grid */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           {steps.map((step, i) => (
-            <AnimatedItem key={step.step} delay={i * 150} className={cn("h-full", step.emphasis && "lg:scale-105 z-10")}>
+            <AnimatedItem key={step.step} delay={i * 150} className="h-full">
               <Card
-                className={cn(
-                  "h-full flex flex-col border-border/50 bg-background overflow-hidden transition-all duration-300 hover:shadow-elevated hover:-translate-y-1",
-                  step.emphasis
-                    ? "border-t-4 border-t-primary shadow-lg"
-                    : "shadow-sm"
-                )}
+                className="h-full flex flex-col border-border/50 bg-background overflow-hidden transition-all duration-300 hover:shadow-elevated hover:-translate-y-1 shadow-sm"
               >
                 <CardContent className="p-8 flex flex-col h-full">
-                  {/* Most Popular badge for emphasized card */}
-                  {step.emphasis && (
-                    <Badge className="mb-4 self-start bg-primary text-primary-foreground border-0 font-body text-xs">
-                      Most Popular
-                    </Badge>
-                  )}
-
                   {/* Step badge */}
-                  <Badge className="mb-4 self-start bg-primary/10 text-primary border-0 font-body text-xs">
+                  <Badge className="mb-5 self-start bg-primary/10 text-primary border-0 font-body text-xs">
                     Step {step.step}
                   </Badge>
 
                   {/* Title row with icon */}
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-3">
                     <step.icon className="w-5 h-5 text-primary shrink-0" />
                     <h3 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
                       {step.title}
@@ -117,7 +105,7 @@ const Solution = () => {
                   </div>
 
                   {/* Price */}
-                  <div className="flex items-baseline gap-1.5 mb-1">
+                  <div className="flex items-baseline gap-1.5 mb-4">
                     <span className={cn(
                       "font-display text-4xl font-bold",
                       step.price === "Free" ? "text-primary" : "text-foreground"
@@ -142,7 +130,7 @@ const Solution = () => {
                   )}
 
                   {/* Description */}
-                  <p className="font-body text-sm text-muted-foreground leading-relaxed mt-3 mb-5">
+                  <p className="font-body text-sm text-muted-foreground leading-relaxed mb-6">
                     {step.description}
                   </p>
 
