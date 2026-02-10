@@ -50,11 +50,6 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
 
   return (
     <div className="bg-card rounded-2xl border border-border p-6 md:p-8 space-y-5">
-      {/* Step indicator */}
-      <span className="inline-block font-body text-xs text-muted-foreground tracking-wide uppercase">
-        Step 1 of 3
-      </span>
-
       {/* Score + text horizontal on desktop */}
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
         {/* Score circle */}
@@ -84,7 +79,7 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
         </div>
 
         {/* Text content */}
-        <div className="space-y-2 text-center sm:text-left flex-1">
+        <div className="space-y-3 text-center sm:text-left flex-1">
           <h1 className="font-display text-xl md:text-2xl font-semibold text-foreground">
             {tierHeadlines[tierKey]}
           </h1>
@@ -92,7 +87,14 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
             {tierSubheadlines[tierKey]}
           </p>
           <p className="font-body text-sm text-muted-foreground/80 leading-relaxed">
-            This measures whether the right people could find and act on what matters if they needed to.
+            Your Findability Score measures whether the right people could find and act on what matters — like important documents, accounts, and wishes — if they ever needed to.
+          </p>
+          <p className="font-body text-sm text-muted-foreground/70 leading-relaxed">
+            {tierKey === "strong"
+              ? "Most people haven't thought about this at all. You're in a strong position — let's make sure it stays that way."
+              : tierKey === "unclear"
+              ? "Many people don't even know where to start. The fact that you're here means you're already ahead."
+              : "Most families aren't prepared for the unexpected. Taking this assessment is the first real step toward changing that."}
           </p>
         </div>
       </div>
