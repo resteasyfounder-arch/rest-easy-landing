@@ -48,6 +48,37 @@ function sanitizeInternalPath(path: string | undefined): string | null {
   return path.slice(0, 512);
 }
 
+function sanitizeMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, string | number | boolean | null> {
+  if (!metadata || typeof metadata !== "object") return {};
+
+  const result: Record<string, string | number | boolean | null> = {};
+  for (const [rawKey, value] of Object.entries(metadata).slice(0, 12)) {
+    const key = rawKey.trim().slice(0, 64);
+    if (!key) continue;
+    if (!/^[a-zA-Z0-9_.:-]+$/.test(key)) continue;
+
+    if (typeof value === "string") {
+      result[key] = value.trim().slice(0, 160);
+      continue;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      result[key] = value;
+      continue;
+    }
+    if (typeof value === "boolean") {
+      result[key] = value;
+      continue;
+    }
+    if (value === null) {
+      result[key] = null;
+    }
+  }
+
+  return result;
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -321,6 +352,7 @@ serve(async (req) => {
       action_id: actionId,
       target_href: targetHref,
       surface: payload.surface || "dashboard",
+      metadata: sanitizeMetadata(payload.metadata),
       acknowledged_at: new Date().toISOString(),
     };
 

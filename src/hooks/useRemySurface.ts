@@ -19,6 +19,7 @@ interface UseRemySurfaceReturn {
   refresh: () => Promise<void>;
   dismissNudge: (nudgeId: string, ttlHours?: number) => Promise<void>;
   acknowledgeAction: (actionId: string, targetHref?: string) => Promise<void>;
+  trackEvent: (eventId: string, metadata?: Record<string, unknown>) => Promise<void>;
 }
 
 export function notifyRemyRefresh() {
@@ -114,6 +115,24 @@ export function useRemySurface({
     [subjectId, surface],
   );
 
+  const trackEvent = useCallback(
+    async (eventId: string, metadata: Record<string, unknown> = {}) => {
+      const requestPayload: Record<string, unknown> = {
+        action: "ack_action",
+        assessment_id: "readiness_v1",
+        surface,
+        action_id: eventId,
+        metadata,
+      };
+      if (subjectId) {
+        requestPayload.subject_id = subjectId;
+      }
+
+      await callRemy(requestPayload);
+    },
+    [subjectId, surface],
+  );
+
   useEffect(() => {
     mountedRef.current = true;
     refresh();
@@ -140,6 +159,7 @@ export function useRemySurface({
     refresh,
     dismissNudge,
     acknowledgeAction,
+    trackEvent,
   };
 }
 

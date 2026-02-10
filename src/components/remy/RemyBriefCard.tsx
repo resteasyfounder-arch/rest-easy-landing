@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { MessageCircle, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { describeRemySourceRef } from "@/lib/remySourceRefs";
 import { getSafeRemyPath } from "@/lib/remyNavigation";
-import type { RemyPriority, RemySurfacePayload } from "@/types/remy";
+import { openRemyLauncher } from "@/lib/remyLauncherEvents";
+import type { RemySurfacePayload } from "@/types/remy";
 
 interface RemyBriefCardProps {
   payload: RemySurfacePayload | null;
@@ -18,21 +18,6 @@ interface RemyBriefCardProps {
   onAcknowledge?: (actionId: string, targetHref?: string) => Promise<void> | void;
   onRetry?: () => Promise<void> | void;
   className?: string;
-}
-
-function PriorityBadge({ priority }: { priority: RemyPriority }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide",
-        priority === "HIGH" && "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-        priority === "MEDIUM" && "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-        priority === "LOW" && "bg-slate-500/10 text-slate-700 dark:text-slate-300",
-      )}
-    >
-      {priority}
-    </span>
-  );
 }
 
 export function RemyBriefCard({
@@ -46,22 +31,28 @@ export function RemyBriefCard({
 }: RemyBriefCardProps) {
   const navigate = useNavigate();
 
-  const priorities = useMemo(() => payload?.priorities.slice(0, 3) || [], [payload?.priorities]);
-  const nudge = payload?.nudge;
+  const summaryText = useMemo(() => {
+    if (!payload) return "";
+    if (payload.nudge?.body) return payload.nudge.body;
+    return payload.reassurance.body;
+  }, [payload]);
 
   if (isLoading) {
     return (
       <Card className={cn("border-primary/20 bg-gradient-to-br from-primary/5 to-background", className)}>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Skeleton className="h-6 w-6 rounded-full" />
-            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-5 w-32" />
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-4 w-4/5" />
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-28" />
+            <Skeleton className="h-8 w-28" />
+          </div>
         </CardContent>
       </Card>
     );
@@ -70,8 +61,8 @@ export function RemyBriefCard({
   if (error) {
     return (
       <Card className={cn("border-amber-300/40 bg-amber-50/40 dark:bg-amber-950/10", className)}>
-        <CardHeader>
-          <CardTitle className="font-display text-base">Remy Brief</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="font-display text-base">Remy Snapshot</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">{error}</p>
@@ -88,99 +79,54 @@ export function RemyBriefCard({
   if (!payload) return null;
 
   const handlePrimaryAction = async () => {
-    if (!nudge?.cta) return;
-    const safeTarget = getSafeRemyPath(nudge.cta.href, "/dashboard");
+    if (!payload.nudge?.cta) return;
+    const safeTarget = getSafeRemyPath(payload.nudge.cta.href, "/dashboard");
     if (onAcknowledge) {
-      await onAcknowledge(nudge.id, safeTarget);
+      await onAcknowledge(payload.nudge.id, safeTarget);
     }
     navigate(safeTarget);
   };
 
   return (
     <Card className={cn("border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5", className)}>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
               <Sparkles className="h-4 w-4 text-primary" />
             </div>
-            <CardTitle className="font-display text-lg">Remy Brief</CardTitle>
+            <CardTitle className="font-display text-lg">Remy Snapshot</CardTitle>
           </div>
           <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-            Product Guidance
+            Companion
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {nudge && (
-          <div className="space-y-2 rounded-lg border border-border/50 bg-card/60 p-3">
-            <p className="text-sm font-medium text-foreground">{nudge.title}</p>
-            <p className="text-sm text-muted-foreground">{nudge.body}</p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {nudge.cta && (
-                <Button size="sm" className="gap-1.5" onClick={handlePrimaryAction}>
-                  {nudge.cta.label}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {onDismiss && (
-                <Button variant="ghost" size="sm" onClick={() => onDismiss(nudge.id)}>
-                  Not now
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
 
-        {priorities.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Priorities
-            </p>
-            <div className="space-y-2">
-              {priorities.map((item) => (
-                <button
-                  key={item.id}
-                  className="w-full rounded-lg border border-border/50 p-3 text-left hover:bg-muted/40 transition-colors"
-                  onClick={async () => {
-                    const safeTarget = getSafeRemyPath(item.target_href, "/dashboard");
-                    if (onAcknowledge) await onAcknowledge(item.id, safeTarget);
-                    navigate(safeTarget);
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium text-foreground leading-snug">{item.title}</p>
-                    <PriorityBadge priority={item.priority} />
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{item.why_now}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+      <CardContent className="space-y-3">
+        {payload.nudge && <p className="text-sm font-medium text-foreground">{payload.nudge.title}</p>}
+        <p className="text-sm text-muted-foreground">{summaryText}</p>
 
-        {payload.explanations.length > 0 && (
-          <details className="rounded-lg border border-border/50 bg-card/60 p-3">
-            <summary className="cursor-pointer text-sm font-medium text-foreground">
-              Why this recommendation
-            </summary>
-            <div className="mt-2 space-y-2">
-              {payload.explanations.slice(0, 2).map((item) => (
-                <div key={item.id} className="space-y-1">
-                  <p className="text-xs font-medium text-foreground">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.body}</p>
-                  <p className="text-[11px] text-muted-foreground/90">
-                    Based on: {item.source_refs.slice(0, 2).map(describeRemySourceRef).join(" • ")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-
-        <div className="rounded-lg bg-primary/5 p-3">
-          <p className="text-sm font-medium text-foreground">{payload.reassurance.title}</p>
-          <p className="text-sm text-muted-foreground">{payload.reassurance.body}</p>
+        <div className="flex flex-wrap gap-2">
+          {payload.nudge?.cta && (
+            <Button size="sm" onClick={handlePrimaryAction}>
+              {payload.nudge.cta.label}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => openRemyLauncher()}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Chat with Remy
+          </Button>
+          {payload.nudge && onDismiss && (
+            <Button variant="ghost" size="sm" onClick={() => onDismiss(payload.nudge!.id)}>
+              Not now
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

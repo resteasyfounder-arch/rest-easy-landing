@@ -4,8 +4,7 @@ import { AnimatedItem } from "@/hooks/useScrollAnimation";
 import { BentoCard } from "./BentoCard";
 import RemyChatDemo from "./demos/RemyChatDemo";
 import remyAvatar from "@/assets/remy-avatar.png";
-
-const REMY_OPEN_LAUNCHER_EVENT = "remy:open-launcher";
+import { openRemyLauncher } from "@/lib/remyLauncherEvents";
 
 const capabilities = [
   {
@@ -27,9 +26,7 @@ const capabilities = [
 
 const RemySection = () => {
   const handleOpenRemy = () => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(REMY_OPEN_LAUNCHER_EVENT));
-    }
+    openRemyLauncher();
   };
 
   return (
