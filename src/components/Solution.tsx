@@ -83,86 +83,93 @@ const Solution = () => {
           </p>
         </AnimatedSection>
 
-        {/* Steps */}
-        <div className="max-w-2xl mx-auto flex flex-col">
+        {/* Steps – horizontal grid */}
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-4 items-center">
           {steps.map((step, i) => (
-            <div key={step.step} className="flex flex-col items-center">
-              {/* Connector line between steps */}
-              {i > 0 && (
-                <div className="w-px h-10 border-l-2 border-dashed border-muted-foreground/25" />
-              )}
-
-              <AnimatedItem delay={i * 150} className="w-full">
-                <Card
-                  className={cn(
-                    "border-border/50 shadow-card bg-background overflow-hidden",
-                    step.emphasis && "border-l-4 border-l-primary shadow-lg"
-                  )}
-                >
-                  <CardContent className="p-8">
-                    {/* Step badge */}
-                    <Badge className="mb-4 bg-primary/10 text-primary border-0 font-body text-xs">
-                      Step {step.step}
+            <AnimatedItem key={step.step} delay={i * 150} className={cn("h-full", step.emphasis && "lg:scale-105 z-10")}>
+              <Card
+                className={cn(
+                  "h-full flex flex-col border-border/50 bg-background overflow-hidden transition-shadow",
+                  step.emphasis
+                    ? "border-t-4 border-t-primary shadow-lg"
+                    : "shadow-sm hover:shadow-md"
+                )}
+              >
+                <CardContent className="p-8 flex flex-col h-full">
+                  {/* Most Popular badge for emphasized card */}
+                  {step.emphasis && (
+                    <Badge className="mb-4 self-start bg-primary text-primary-foreground border-0 font-body text-xs">
+                      Most Popular
                     </Badge>
+                  )}
 
-                    {/* Title row with icon */}
-                    <div className="flex items-center gap-3 mb-2">
-                      <step.icon className="w-5 h-5 text-primary shrink-0" />
-                      <h3 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
-                        {step.title}
-                      </h3>
-                    </div>
+                  {/* Step badge */}
+                  <Badge className="mb-4 self-start bg-primary/10 text-primary border-0 font-body text-xs">
+                    Step {step.step}
+                  </Badge>
 
-                    {/* Price */}
-                    <div className="flex items-baseline gap-1.5 mb-1">
-                      <span className="font-display text-3xl font-bold text-foreground">
-                        {step.price}
+                  {/* Title row with icon */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <step.icon className="w-5 h-5 text-primary shrink-0" />
+                    <h3 className="font-display text-xl sm:text-2xl font-semibold text-foreground">
+                      {step.title}
+                    </h3>
+                  </div>
+
+                  {/* Price */}
+                  <div className="flex items-baseline gap-1.5 mb-1">
+                    <span className={cn(
+                      "font-display text-4xl font-bold",
+                      step.price === "Free" ? "text-primary" : "text-foreground"
+                    )}>
+                      {step.price}
+                    </span>
+                    {step.priceSub && (
+                      <span className="font-body text-sm text-muted-foreground">
+                        {step.priceSub}
                       </span>
-                      {step.priceSub && (
-                        <span className="font-body text-sm text-muted-foreground">
-                          {step.priceSub}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Prerequisite note */}
-                    {step.prerequisite && (
-                      <div className="flex items-start gap-2 mt-2 mb-4 p-3 rounded-lg bg-muted/50">
-                        <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                        <p className="font-body text-xs text-muted-foreground">
-                          {step.prerequisite}
-                        </p>
-                      </div>
                     )}
+                  </div>
 
-                    {/* Description */}
-                    <p className="font-body text-sm text-muted-foreground leading-relaxed mt-3 mb-5">
-                      {step.description}
-                    </p>
+                  {/* Prerequisite note */}
+                  {step.prerequisite && (
+                    <div className="flex items-start gap-2 mt-2 mb-4 p-3 rounded-lg bg-muted/50">
+                      <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <p className="font-body text-xs text-muted-foreground">
+                        {step.prerequisite}
+                      </p>
+                    </div>
+                  )}
 
-                    {/* Bullet list */}
-                    <ul className="space-y-2.5 mb-6">
-                      {step.bullets.map((bullet) => (
-                        <li key={bullet} className="flex items-start gap-2.5">
-                          <Circle className="w-2 h-2 fill-primary/60 text-primary/60 shrink-0 mt-1.5" />
-                          <span className="font-body text-sm text-foreground">
-                            {bullet}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                  {/* Description */}
+                  <p className="font-body text-sm text-muted-foreground leading-relaxed mt-3 mb-5">
+                    {step.description}
+                  </p>
 
-                    {/* CTA */}
-                    <Button variant={step.variant} className="font-body w-full sm:w-auto" asChild>
+                  {/* Bullet list */}
+                  <ul className="space-y-2.5 mb-6">
+                    {step.bullets.map((bullet) => (
+                      <li key={bullet} className="flex items-start gap-2.5">
+                        <Circle className="w-2 h-2 fill-primary/60 text-primary/60 shrink-0 mt-1.5" />
+                        <span className="font-body text-sm text-foreground">
+                          {bullet}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA – pushed to bottom */}
+                  <div className="mt-auto pt-4">
+                    <Button variant={step.variant} className="font-body w-full" asChild>
                       <a href={step.href}>
                         {step.cta}
                         <ArrowRight className="ml-2 w-4 h-4" />
                       </a>
                     </Button>
-                  </CardContent>
-                </Card>
-              </AnimatedItem>
-            </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </AnimatedItem>
           ))}
         </div>
       </div>
