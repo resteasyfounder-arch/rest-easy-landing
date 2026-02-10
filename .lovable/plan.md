@@ -1,38 +1,29 @@
 
 
-## Remove Remy Inline Nudges from the Life Readiness Assessment
+## Remove "Skip for now" Button from Both Assessments
 
-### Scope
+### What Changes
 
-This change **only** affects `src/pages/Readiness.tsx`. The Remy Brief Card on the Dashboard is a completely separate component (`RemyBriefCard`) and will **not** be touched. Remy features on Profile, Menu, Results, and Dashboard pages all remain intact.
+Remove the "Skip for now" button from the question screens in both the **Findability Assessment** (`Assessment.tsx`) and the **Life Readiness Assessment** (`Readiness.tsx`). As you noted, "Not sure" is already a valid answer option, making the skip button redundant.
 
-### What Gets Removed
+### Technical Changes
 
-Six items will be cleaned up from `src/pages/Readiness.tsx`:
+**`src/pages/Assessment.tsx`**
+1. Remove the `SkipButton` from the imports (line 11)
+2. Delete the `handleSkip` function (lines 165-167)
+3. Remove the `<SkipButton onClick={handleSkip} />` from the question screen UI (line 299), keeping the `<AutosaveIndicator>` in place
 
-1. **Imports (lines 12-13)**: Remove `notifyRemyRefresh`, `useRemySurface`, and `RemyInlineNudge` imports.
-
-2. **Remy surface variables (lines 760-767)**: Remove the `remySurface`, `remySectionId`, and `remyEnabled` computed values that configure which Remy surface to query.
-
-3. **`useRemySurface` hook call (lines 769-780)**: Remove the hook and all its destructured return values (`remyPayload`, `isLoadingRemy`, `remyError`, `dismissNudge`, `acknowledgeAction`).
-
-4. **`notifyRemyRefresh()` calls (~4 occurrences)**: Remove the refresh triggers at lines 848, 903, 961, and 1062 that fire after profile saves and answer saves.
-
-5. **`<RemyInlineNudge>` in section summary view (line 1425)**: Remove the nudge card that appears at the top of the section summary content area.
-
-6. **`<RemyInlineNudge>` in assessment question view (line 1806)**: Remove the nudge card that appears above the question card during active assessment.
+**`src/pages/Readiness.tsx`**
+1. Remove `SkipButton` from the shared imports (line 14)
+2. Delete the `handleSkip` function (lines 1065-1098)
+3. Remove both `<SkipButton>` instances:
+   - Line 1652 in the desktop/default question view
+   - Line 1815 in the mobile question view
+4. Keep the `<AutosaveIndicator>` components in place
 
 ### What Stays Unchanged
 
-| Page | Remy Feature | Status |
-|------|-------------|--------|
-| Dashboard | `RemyBriefCard` with priorities and nudge | Kept |
-| Profile | `RemyInlineNudge` | Kept |
-| Menu | `RemyInlineNudge` | Kept |
-| Results | `useRemySurface` + priority list | Kept |
-| Global | `RemyGlobalLauncher` | Kept |
-
-### Risk
-
-None. The removed code is self-contained within Readiness.tsx and has no side effects on other pages. The `notifyRemyRefresh()` calls being removed only triggered Remy re-fetches on the Readiness page itself, so removing them has no impact elsewhere.
+- The `SkipButton` component file itself (`src/components/assessment/shared/SkipButton.tsx`) remains in the codebase in case it is needed elsewhere in the future
+- The "Skip for now" button in the Profile Prompt Modal (`ProfilePromptModal.tsx`) is unrelated and stays as-is
+- The `handleSkipProfilePrompt` function in Readiness.tsx is unrelated (it skips the profile prompt, not questions) and stays
 
