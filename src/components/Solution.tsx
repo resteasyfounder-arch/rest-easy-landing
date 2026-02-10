@@ -28,7 +28,7 @@ const steps = [
   },
   {
     step: 2,
-    title: "Life Readiness Assessment",
+    title: "Life Readiness",
     icon: Activity,
     price: "$99",
     priceSub: "one-time",
