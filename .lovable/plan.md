@@ -1,51 +1,47 @@
 
-## Widen the Findability Results Page for Larger Screens
 
-### The Problem
+## Redesign Findability Results Page Layout
 
-The results page container is capped at `max-w-lg` (512px), which looks narrow and overly long on desktop/tablet screens. Mobile is fine as-is.
+### What Changes
 
-### The Solution
+Reorganize the results page for better visual flow on desktop, remove the ActionPlanPreview ("Create Your 'Start Here' Guide") section, and expand the LifeReadinessTeaser to show all 11 Life Readiness categories (4 visible, 7 locked). The page order becomes: results/score/breakdown at the top, sign-up content at the bottom.
 
-Use responsive Tailwind classes to widen the container on larger screens and arrange some content side-by-side in a two-column grid, reducing vertical scrolling while keeping the mobile layout unchanged.
+### New Page Order
+
+```text
+Mobile (single column):            Desktop (md: two columns):
++---------------------------+      +-------------------------------------------+
+| Score Hero                |      |  Score Hero       |  Remy's Take          |
+| Remy's Take               |      +-------------------------------------------+
+| Your Breakdown            |      |  Your Breakdown (full width)              |
+| Life Readiness Teaser     |      +-------------------------------------------+
+| Trust Badges              |      |  Life Readiness Teaser (full width)       |
+| CTA                       |      +-------------------------------------------+
++---------------------------+      |  Trust Badges                             |
+                                   +-------------------------------------------+
+                                   |  CTA                                      |
+                                   +-------------------------------------------+
+```
 
 ### Technical Changes
 
-**`src/components/assessment/FindabilityResults.tsx`** (main layout file)
+**1. `src/components/assessment/FindabilityResults.tsx`**
+- Remove the `ActionPlanPreview` import and usage
+- Move `ResultsBreakdown` out of the two-column grid and make it full-width (it has 8 accordion items -- better full-width)
+- Keep Score Hero + Remy Summary in a side-by-side grid on desktop
+- Order: ScoreHero/Remy grid, Breakdown (full-width), LifeReadinessTeaser, TrustSection, CTA
 
-- Change the container from `max-w-lg` to `max-w-lg md:max-w-3xl` (768px on desktop)
-- Wrap the Score Hero and Remy Summary into a two-column grid on `md:` screens so the score circle sits beside the AI summary
-- Wrap Action Plan and Breakdown into a second two-column grid on `md:` screens
-- Life Readiness Teaser, Trust Section, and CTA remain full-width as they are conversion-focused and benefit from visual prominence
+**2. `src/components/assessment/results/LifeReadinessTeaser.tsx`**
+- Update subtitle text: "Your full Life Readiness Score covers 11 categories" (was 5)
+- Replace the current 5 hardcoded categories with the actual 11 from the readiness schema
+- Show the first 4 categories as "preview" items (unlocked styling with category icons)
+- Show the remaining 7 as a single collapsed/locked row: "+7 more categories" with a lock icon
+- Keep the "See Your Full Score" button
 
-**No changes to any child components** -- the layout adjustments happen entirely in the parent container using Tailwind's responsive grid utilities.
+### What Gets Removed
+- `ActionPlanPreview` component usage (the "Create Your 'Start Here' Guide" card) -- the component file stays in the codebase
 
-### Resulting Layout
-
-On mobile (unchanged):
-```text
-+---------------------------+
-| Score Hero                |
-| Remy Summary              |
-| Action Plan               |
-| Breakdown                 |
-| Life Readiness Teaser     |
-| Trust Badges              |
-| CTA                       |
-+---------------------------+
-```
-
-On desktop (md and above):
-```text
-+---------------------------------------------+
-|  Score Hero       |  Remy Summary            |
-+---------------------------------------------+
-|  Action Plan      |  Breakdown               |
-+---------------------------------------------+
-|  Life Readiness Teaser (full width)          |
-+---------------------------------------------+
-|  Trust Badges (full width)                   |
-+---------------------------------------------+
-|  CTA (full width)                            |
-+---------------------------------------------+
-```
+### What Stays Unchanged
+- `ResultsScoreHero`, `RemySummaryCard`, `ResultsBreakdown`, `ResultsTrustSection`, `ResultsCTA` -- no internal changes
+- Mobile layout remains single-column stacked
+- `ActionPlanPreview.tsx` file remains in the codebase
