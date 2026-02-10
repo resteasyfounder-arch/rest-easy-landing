@@ -25,14 +25,10 @@ import {
 } from "@/components/results";
 import { ShareReportDialog } from "@/components/results/ShareReportDialog";
 import restEasyLogo from "@/assets/rest-easy-logo.png";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 async function callAgent(payload: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("agent", {
-    body: payload,
-  });
-  if (error) throw error;
-  return data as Record<string, unknown>;
+  return invokeAuthedFunction<Record<string, unknown>>("agent", payload);
 }
 
 const Results = () => {

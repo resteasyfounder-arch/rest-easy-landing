@@ -11,7 +11,7 @@ import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { CompactLifeCard } from "@/components/profile/CompactLifeCard";
 import TrustNetworkPanel from "@/components/vault/TrustNetworkPanel";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 import {
   UserCircle,
   Heart,
@@ -138,19 +138,13 @@ const Profile = () => {
       const updatedAnswers = { ...profile_answers, [questionId]: value };
       const profileJson = buildProfileJson(updatedAnswers);
 
-      const { error } = await supabase.functions.invoke("agent", {
-        body: {
-          assessment_id: ASSESSMENT_ID,
-          profile: {
-            profile_json: profileJson,
-            version: SCHEMA_VERSION,
-          },
+      await invokeAuthedFunction("agent", {
+        assessment_id: ASSESSMENT_ID,
+        profile: {
+          profile_json: profileJson,
+          version: SCHEMA_VERSION,
         },
       });
-
-      if (error) {
-        throw error;
-      }
 
       const newState = await refresh();
 

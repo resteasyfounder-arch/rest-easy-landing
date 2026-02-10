@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle2, ChevronRight, Edit3, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 type AnswerRecord = {
   question_id: string;
@@ -82,8 +82,9 @@ export function SectionSummary({
       setAiLoading(true);
       setAiError(false);
       try {
-        const { data, error } = await supabase.functions.invoke("generate-section-summary", {
-          body: {
+        const data = await invokeAuthedFunction<{ insight?: string }>(
+          "generate-section-summary",
+          {
             sectionId,
             sectionLabel,
             answers: sectionAnswers.map((a) => ({
@@ -92,12 +93,7 @@ export function SectionSummary({
               answer_label: a.answer_label,
             })),
           },
-        });
-
-        if (error) {
-          setAiError(true);
-          return;
-        }
+        );
 
         const insight = typeof data?.insight === "string" ? data.insight : null;
         if (insight) {

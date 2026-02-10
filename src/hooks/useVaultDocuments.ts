@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 export interface VaultDocumentRow {
   id: string;
@@ -71,11 +72,7 @@ export function useVaultDocuments() {
       formData.append("display_name", params.displayName);
       if (params.notes) formData.append("notes", params.notes);
 
-      const { data, error } = await supabase.functions.invoke("vault-upload", {
-        body: formData,
-      });
-      if (error) throw error;
-      return data as VaultDocumentRow;
+      return invokeAuthedFunction<VaultDocumentRow>("vault-upload", formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vault-documents"] });
@@ -143,11 +140,9 @@ export function useVaultDocuments() {
 
   const downloadMutation = useMutation({
     mutationFn: async (docId: string) => {
-      const { data, error } = await supabase.functions.invoke("vault-download", {
-        body: { document_id: docId },
+      return invokeAuthedFunction<{ url: string; file_name: string }>("vault-download", {
+        document_id: docId,
       });
-      if (error) throw error;
-      return data as { url: string; file_name: string };
     },
   });
 

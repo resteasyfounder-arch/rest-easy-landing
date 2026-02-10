@@ -24,7 +24,7 @@ import {
 } from "@/components/assessment/journey";
 import SectionSummary from "@/components/assessment/SectionSummary";
 import SectionAnswerList from "@/components/assessment/SectionAnswerList";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "section-summary" | "section-edit" | "review" | "complete";
 
@@ -137,14 +137,7 @@ const setNestedValue = (
 };
 
 const callAgent = async (payload: Record<string, unknown>) => {
-  const { data, error } = await supabase.functions.invoke("agent", {
-    body: payload,
-  });
-
-  if (error) {
-    throw error;
-  }
-  return data;
+  return invokeAuthedFunction("agent", payload);
 };
 
 // Loading skeleton component

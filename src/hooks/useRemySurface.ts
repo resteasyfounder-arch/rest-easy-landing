@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RemySurface, RemySurfacePayload } from "@/types/remy";
 import { parseRemySurfacePayload } from "@/lib/remySchema";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 export const REMY_REFRESH_EVENT = "remy:refresh";
 
@@ -28,15 +28,7 @@ export function notifyRemyRefresh() {
 }
 
 async function callRemy(payload: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("remy", {
-    body: payload,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return invokeAuthedFunction("remy", payload);
 }
 
 export function useRemySurface({

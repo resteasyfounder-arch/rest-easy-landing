@@ -14,8 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Share2, Loader2, Mail, CheckCircle, Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import type { ReadinessReport } from "@/types/report";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 interface ShareReportDialogProps {
   report: ReadinessReport;
@@ -118,16 +118,14 @@ export function ShareReportDialog({ report, assessmentId }: ShareReportDialogPro
       // Send to all recipients
       const results = await Promise.all(
         validRecipients.map((recipient) =>
-          supabase.functions.invoke("send-report-email", {
-            body: {
-              assessmentId,
-              recipientEmail: recipient.email,
-              recipientName: recipient.name,
-              senderName: report.userName,
-              reportSummary,
-              personalMessage: personalMessage.trim() || undefined,
-            },
-          })
+          invokeAuthedFunction("send-report-email", {
+            assessmentId,
+            recipientEmail: recipient.email,
+            recipientName: recipient.name,
+            senderName: report.userName,
+            reportSummary,
+            personalMessage: personalMessage.trim() || undefined,
+          }).then(() => ({ error: null })).catch((error: unknown) => ({ error }))
         )
       );
 

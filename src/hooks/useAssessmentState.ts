@@ -6,7 +6,7 @@ import type {
   ScoreTier,
 } from "@/types/assessment";
 import type { ReadinessReport } from "@/types/report";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 // Only keep subject_id in localStorage for session continuity
 const STORAGE_KEYS = {
@@ -16,13 +16,7 @@ const STORAGE_KEYS = {
 const ASSESSMENT_ID = "readiness_v1";
 
 async function callAgent(payload: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("agent", {
-    body: payload,
-  });
-  if (error) {
-    throw error;
-  }
-  return data as Record<string, unknown>;
+  return invokeAuthedFunction<Record<string, unknown>>("agent", payload);
 }
 
 // Tier thresholds

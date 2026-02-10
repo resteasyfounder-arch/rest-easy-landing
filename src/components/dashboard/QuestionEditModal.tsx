@@ -15,7 +15,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { RoadmapItem } from "@/types/assessment";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 // Standard answer scoring map
 const ANSWER_SCORES: Record<string, number | null> = {
@@ -62,28 +62,22 @@ export function QuestionEditModal({
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.functions.invoke("agent", {
-        body: {
-          action: "save_answers",
-          assessment_id: "readiness_v1",
-          answers: [
-            {
-              question_id: item.question_id,
-              item_id: item.question_id,
-              section_id: item.section_id,
-              dimension: item.section_id,
-              answer_value: selectedValue,
-              answer_label: selectedOption.label,
-              score_fraction: scoreFraction,
-              question_text: item.question_text,
-            },
-          ],
-        },
+      await invokeAuthedFunction("agent", {
+        action: "save_answers",
+        assessment_id: "readiness_v1",
+        answers: [
+          {
+            question_id: item.question_id,
+            item_id: item.question_id,
+            section_id: item.section_id,
+            dimension: item.section_id,
+            answer_value: selectedValue,
+            answer_label: selectedOption.label,
+            score_fraction: scoreFraction,
+            question_text: item.question_text,
+          },
+        ],
       });
-
-      if (error) {
-        throw error;
-      }
 
       toast.success("Answer updated successfully");
       setSelectedValue("");

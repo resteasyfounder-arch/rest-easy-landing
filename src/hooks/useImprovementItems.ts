@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { RoadmapItem, CompletedItem, ImprovementItemsResponse } from "@/types/assessment";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 interface UseImprovementItemsOptions {
   subjectId: string | null;
@@ -57,15 +57,10 @@ export function useImprovementItems({
         payload.subject_id = subjectId;
       }
 
-      const { data, error: invokeError } = await supabase.functions.invoke("agent", {
-        body: payload,
-      });
-
-      if (invokeError) {
-        throw invokeError;
-      }
-
-      const parsedData = data as ImprovementItemsResponse | null;
+      const parsedData = await invokeAuthedFunction<ImprovementItemsResponse | null>(
+        "agent",
+        payload,
+      );
       if (!parsedData) {
         throw new Error("Failed to fetch improvement items");
       }
