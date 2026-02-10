@@ -97,20 +97,23 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
         </p>
       </div>
 
-      {/* Feature highlights */}
-      <div className="space-y-3 pt-2">
-        {[
-          { icon: ClipboardList, text: "Up to 72 questions tailored to your life needs" },
-          { icon: FolderLock, text: "Track and store your documents with EasyVault" },
-          { icon: Users, text: "Add your loved ones to your Trust Network, keeping them in the loop as your Life Readiness journey progresses" },
-        ].map(({ icon: Icon, text }) => (
-          <div key={text} className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Icon className="w-4 h-4 text-primary" />
+      {/* Divider + Feature highlights */}
+      <div className="border-t border-primary/10 pt-4 space-y-1.5">
+        <p className="font-body text-xs font-medium text-muted-foreground mb-3">Included in the full report</p>
+        <div className="space-y-3">
+          {[
+            { icon: ClipboardList, text: "Up to 72 questions tailored to your life needs" },
+            { icon: FolderLock, text: "Track and store your documents with EasyVault" },
+            { icon: Users, text: "Add your loved ones to your Trust Network, keeping them in the loop as your Life Readiness journey progresses" },
+          ].map(({ icon: Icon, text }) => (
+            <div key={text} className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="w-4 h-4 text-primary" />
+              </div>
+              <p className="font-body text-sm text-foreground/80 leading-relaxed">{text}</p>
             </div>
-            <p className="font-body text-sm text-foreground/80 leading-relaxed">{text}</p>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
