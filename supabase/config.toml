@@ -168,25 +168,25 @@ s3_access_key = "env(S3_ACCESS_KEY)"
 s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.agent]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-report]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-report-email]
-verify_jwt = true
+verify_jwt = false
 
 [functions.remy]
-verify_jwt = true
+verify_jwt = false
 
 [functions.vault-upload]
-verify_jwt = true
+verify_jwt = false
 
 [functions.vault-download]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-section-summary]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-findability-summary]
 verify_jwt = false

@@ -60,8 +60,8 @@ const Results = () => {
           action: "get_state",
           assessment_id: "readiness_v1",
         });
-        const reportStatus = stateData?.assessment_state?.report_status;
-        const reportStale = stateData?.assessment_state?.report_stale;
+        const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
+        const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
         
         // If generating OR stale, show loading and poll
         if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
@@ -112,8 +112,8 @@ const Results = () => {
             }),
           ]);
           
-          const reportStale = stateData?.assessment_state?.report_stale;
-          const reportStatus = stateData?.assessment_state?.report_status;
+          const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
+          const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
           
           // Only show report if it exists AND is not stale AND status is ready
           if (reportData.report && !reportStale && reportStatus === "ready") {
@@ -328,7 +328,7 @@ const Results = () => {
       {/* Bottom Actions */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 print:hidden">
         <div className="max-w-3xl mx-auto flex gap-3">
-          <ShareReportDialog report={report} />
+          <ShareReportDialog report={report} assessmentId={assessmentState?.assessment_id ?? null} />
           <Button onClick={handleDownloadPDF} disabled={downloading} className="flex-1 gap-2">
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Download PDF
