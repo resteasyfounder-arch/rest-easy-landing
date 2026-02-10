@@ -1,26 +1,34 @@
 
+## Dynamic Assessment CTA Text Across Logged-In Views
 
-## Add Trust Network Section to Profile Page
-
-### Overview
-Add the existing `TrustNetworkPanel` component to the Profile page, below the life area cards. Since this component already reads/writes from the `trusted_contacts` table via the `useTrustedContacts` hook, any changes made here will automatically sync with the EasyVault page -- both use the same data source.
+### Problem
+The Results page shows a hardcoded "Start Assessment" button even when the user has an assessment in progress. This should dynamically reflect the user's actual progress.
 
 ### Changes
 
-**File: `src/pages/Profile.tsx`**
+**File: `src/pages/Results.tsx` (lines ~239-250)**
 
-- Import `TrustNetworkPanel` from `@/components/vault/TrustNetworkPanel`
-- Add the `<TrustNetworkPanel />` component after the life area cards grid (line ~317) and before the Assessment CTA card
-- Only render it when `hasStarted` is true (within the existing started-state block)
+The "no report" fallback currently hardcodes "Start Assessment." We'll use `useAssessmentState` to determine the correct label and description:
 
-That's it -- no new components, hooks, or database changes needed. The `TrustNetworkPanel` is fully self-contained with its own data fetching, add/remove mutations, and invite actions.
+- Import `useAssessmentState` hook
+- Check `assessmentState.status` and `assessmentState.overall_progress`:
+  - `not_started` or progress = 0: "Start Assessment" + "Complete the Life Readiness assessment..."
+  - `in_progress` / `draft` with progress > 0: "Continue Assessment (X%)" + "Continue your Life Readiness assessment..."
+  - `completed`: "View Report" (though this path is unlikely here since no report exists)
+- The description text will also update to match (e.g., "Continue your assessment to receive your personalized report")
 
-### Technical Details
+**File: `src/components/dashboard/AssessmentCTA.tsx` (already dynamic)**
 
-| Area | Detail |
-|------|--------|
-| File modified | `src/pages/Profile.tsx` |
-| Import added | `TrustNetworkPanel` from `@/components/vault/TrustNetworkPanel` |
-| Placement | Between the life cards grid and the Assessment CTA card |
-| Data sync | Automatic -- both Profile and EasyVault use `useTrustedContacts` hook querying the same `trusted_contacts` table |
-| Auth required | Yes -- the hook calls `supabase.auth.getUser()` and RLS enforces `auth.uid() = user_id` |
+This component already handles all states correctly -- no changes needed.
+
+**File: `src/pages/Profile.tsx` (lines ~323-340)**
+
+The Profile page CTA already shows "Continue" vs "Review" based on status. No changes needed here either.
+
+**File: `src/components/remy/RemyGuestChat.tsx`**
+
+The "Start assessment" action here is for unauthenticated guest users, so it's correct as-is. No change needed.
+
+### Summary
+
+Only `src/pages/Results.tsx` needs updating. We'll import the `useAssessmentState` hook and make the no-report fallback button and description text dynamic based on actual assessment progress.
