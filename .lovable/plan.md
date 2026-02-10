@@ -1,51 +1,26 @@
 
 
-## Redesign "Our Solution" Section to Horizontal Layout
+## Add Trust Network Section to Profile Page
 
 ### Overview
-Convert the current vertical stacked card layout into a horizontal three-column pricing grid that feels polished and visually impactful.
+Add the existing `TrustNetworkPanel` component to the Profile page, below the life area cards. Since this component already reads/writes from the `trusted_contacts` table via the `useTrustedContacts` hook, any changes made here will automatically sync with the EasyVault page -- both use the same data source.
 
-### Layout Changes
+### Changes
 
-**Current**: Single-column vertical stack with dashed connector lines between cards, max-width `2xl` (672px).
+**File: `src/pages/Profile.tsx`**
 
-**New**: A responsive three-column grid (`grid-cols-1 lg:grid-cols-3`) spanning the full container width. On mobile, cards stack vertically. On desktop, all three sit side-by-side.
+- Import `TrustNetworkPanel` from `@/components/vault/TrustNetworkPanel`
+- Add the `<TrustNetworkPanel />` component after the life area cards grid (line ~317) and before the Assessment CTA card
+- Only render it when `hasStarted` is true (within the existing started-state block)
 
-### Visual Enhancements
-
-**1. Card styling upgrades**
-- Remove the vertical dashed connector lines between cards
-- The emphasized card (Step 2 - Life Readiness) gets elevated treatment: slightly scaled up (`lg:scale-105`), a `shadow-elevated` shadow, a subtle primary-tinted top border (`border-t-4 border-t-primary`), and a "Most Popular" badge
-- Non-emphasized cards get `shadow-soft` with `hover:shadow-card` transition
-- All cards become `flex flex-col` with the CTA button pushed to the bottom via `mt-auto`, ensuring uniform card heights
-
-**2. Price styling**
-- Larger price text (`text-4xl`) to create visual hierarchy
-- "Free" price gets a green accent color (`text-primary`) to pop
-
-**3. CTA buttons**
-- Step 1 (Free): `variant="outline"` (stays the same)
-- Step 2 (Emphasized): `variant="default"` full-width button with slightly larger padding
-- Step 3 (Pro): `variant="default"` (stays the same)
-- All CTAs become full-width (`w-full`) for consistency in the horizontal layout
-
-**4. Container**
-- Remove `max-w-2xl` constraint
-- Use `max-w-6xl mx-auto` to give the three columns room to breathe
-- Grid gap of `gap-6 lg:gap-4` with the middle card overlapping slightly via scale
+That's it -- no new components, hooks, or database changes needed. The `TrustNetworkPanel` is fully self-contained with its own data fetching, add/remove mutations, and invite actions.
 
 ### Technical Details
 
-**File: `src/components/Solution.tsx`**
-
-| Area | Change |
+| Area | Detail |
 |------|--------|
-| Outer grid | Replace `max-w-2xl flex flex-col` with `max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-4 items-center` |
-| Connector lines | Remove the `{i > 0 && ...}` dashed line dividers |
-| Emphasized card (Step 2) | Add `lg:scale-105 z-10`, `border-t-4 border-t-primary`, `shadow-elevated`, and a "Most Popular" ribbon/badge at top |
-| All cards | Add `h-full flex flex-col` to Card, move CTA into a `mt-auto pt-4` wrapper for bottom-alignment |
-| Price display | Bump to `text-4xl` for the price value |
-| CTA buttons | All become `w-full` to fill the card width uniformly |
-
-No new files or dependencies needed. Only `src/components/Solution.tsx` is modified.
-
+| File modified | `src/pages/Profile.tsx` |
+| Import added | `TrustNetworkPanel` from `@/components/vault/TrustNetworkPanel` |
+| Placement | Between the life cards grid and the Assessment CTA card |
+| Data sync | Automatic -- both Profile and EasyVault use `useTrustedContacts` hook querying the same `trusted_contacts` table |
+| Auth required | Yes -- the hook calls `supabase.auth.getUser()` and RLS enforces `auth.uid() = user_id` |
