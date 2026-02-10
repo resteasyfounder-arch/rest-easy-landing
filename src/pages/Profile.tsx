@@ -11,6 +11,7 @@ import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { CompactLifeCard } from "@/components/profile/CompactLifeCard";
 import TrustNetworkPanel from "@/components/vault/TrustNetworkPanel";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   UserCircle,
   Heart,
@@ -26,14 +27,8 @@ import {
 } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
 const ASSESSMENT_ID = "readiness_v1";
 const SCHEMA_VERSION = "v1";
-
-const STORAGE_KEYS = {
-  subjectId: "rest-easy.readiness.subject_id",
-};
 
 // Profile items configuration
 interface ProfileItem {
@@ -105,7 +100,6 @@ const Profile = () => {
 
   const { profile_answers, status, overall_progress, report_stale } = assessmentState;
   const hasStarted = status !== "not_started";
-  const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
   const {
     payload: remyPayload,
     isLoading: isLoadingRemy,
@@ -113,9 +107,9 @@ const Profile = () => {
     dismissNudge,
     acknowledgeAction,
   } = useRemySurface({
-    subjectId,
+    subjectId: assessmentState.subject_id || null,
     surface: "profile",
-    enabled: Boolean(subjectId),
+    enabled: hasStarted,
   });
 
   // Calculate stats
@@ -134,16 +128,6 @@ const Profile = () => {
   };
 
   const handleProfileUpdate = useCallback(async (questionId: string, value: "yes" | "no") => {
-    const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-    if (!subjectId) {
-      toast({
-        title: "Session not found",
-        description: "Please start the assessment first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const previousProgress = overall_progress;
     const previousStatus = status;
     const wasStale = report_stale;
@@ -154,25 +138,18 @@ const Profile = () => {
       const updatedAnswers = { ...profile_answers, [questionId]: value };
       const profileJson = buildProfileJson(updatedAnswers);
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          subject_id: subjectId,
+      const { error } = await supabase.functions.invoke("agent", {
+        body: {
           assessment_id: ASSESSMENT_ID,
           profile: {
             profile_json: profileJson,
             version: SCHEMA_VERSION,
           },
-        }),
+        },
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to save profile update");
+      if (error) {
+        throw error;
       }
 
       const newState = await refresh();

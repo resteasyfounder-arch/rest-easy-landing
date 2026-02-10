@@ -15,9 +15,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { RoadmapItem } from "@/types/assessment";
-
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
+import { supabase } from "@/integrations/supabase/client";
 
 // Standard answer scoring map
 const ANSWER_SCORES: Record<string, number | null> = {
@@ -32,7 +30,6 @@ interface QuestionEditModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: RoadmapItem | null;
-  subjectId: string;
   onSuccess: () => void;
 }
 
@@ -40,7 +37,6 @@ export function QuestionEditModal({
   open,
   onOpenChange,
   item,
-  subjectId,
   onSuccess,
 }: QuestionEditModalProps) {
   const [selectedValue, setSelectedValue] = useState<string>("");
@@ -66,16 +62,9 @@ export function QuestionEditModal({
 
     setIsSaving(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
+      const { error } = await supabase.functions.invoke("agent", {
+        body: {
           action: "save_answers",
-          subject_id: subjectId,
           assessment_id: "readiness_v1",
           answers: [
             {
@@ -89,11 +78,11 @@ export function QuestionEditModal({
               question_text: item.question_text,
             },
           ],
-        }),
+        },
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to save answer");
+      if (error) {
+        throw error;
       }
 
       toast.success("Answer updated successfully");

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.1";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -10,6 +11,7 @@ const corsHeaders = {
 };
 
 interface SendReportEmailRequest {
+  assessmentId: string;
   recipientEmail: string;
   recipientName: string;
   senderName: string;
@@ -24,6 +26,22 @@ interface SendReportEmailRequest {
     areasRequiringAttention: Array<{ title: string }>;
   };
   personalMessage?: string;
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 const getTierColor = (tier: string): string => {
@@ -69,7 +87,43 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      return new Response(JSON.stringify({ success: false, error: "Missing Supabase configuration" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: "Missing authorization header" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData, error: authError } = await authClient.auth.getUser();
+    if (authError || !authData.user) {
+      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
+    const readiness = serviceClient.schema("readiness_v1");
+
     const {
+      assessmentId,
       recipientEmail,
       recipientName,
       senderName,
@@ -77,8 +131,49 @@ const handler = async (req: Request): Promise<Response> => {
       personalMessage,
     }: SendReportEmailRequest = await req.json();
 
+    if (!assessmentId || !isUuid(assessmentId)) {
+      return new Response(JSON.stringify({ success: false, error: "assessmentId is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const { data: subject, error: subjectError } = await readiness
+      .from("subjects")
+      .select("id")
+      .eq("user_id", authData.user.id)
+      .maybeSingle();
+    if (subjectError || !subject?.id) {
+      return new Response(JSON.stringify({ success: false, error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const { data: ownedAssessment, error: assessmentError } = await readiness
+      .from("assessments")
+      .select("id, report_status, report_data")
+      .eq("id", assessmentId)
+      .eq("subject_id", subject.id)
+      .maybeSingle();
+    if (assessmentError || !ownedAssessment) {
+      return new Response(JSON.stringify({ success: false, error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    if (ownedAssessment.report_status !== "ready" || !ownedAssessment.report_data) {
+      return new Response(JSON.stringify({ success: false, error: "Report is not ready to share" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     console.log("Sending report email to:", recipientEmail);
 
+    const plainSenderName = senderName.replace(/[\r\n]/g, " ").trim();
+    const safeSenderName = escapeHtml(plainSenderName);
+    const safeRecipientName = escapeHtml(recipientName);
     const tierColor = getTierColor(reportSummary.tier);
     const tierLabel = getTierLabel(reportSummary.tier);
     const formattedDate = new Date(reportSummary.generatedAt).toLocaleDateString('en-US', {
@@ -93,8 +188,8 @@ const handler = async (req: Request): Promise<Response> => {
         (action) => `
           <tr>
             <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
-              <strong style="color: #111827;">${action.title}</strong>
-              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">${action.description}</p>
+              <strong style="color: #111827;">${escapeHtml(action.title)}</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">${escapeHtml(action.description)}</p>
             </td>
           </tr>
         `
@@ -104,14 +199,14 @@ const handler = async (req: Request): Promise<Response> => {
     const strengthsHtml = reportSummary.strengths
       .slice(0, 3)
       .map(
-        (s) => `<li style="color: #16a34a; margin-bottom: 4px;">✓ ${s.title}</li>`
+        (s) => `<li style="color: #16a34a; margin-bottom: 4px;">✓ ${escapeHtml(s.title)}</li>`
       )
       .join("");
 
     const attentionHtml = reportSummary.areasRequiringAttention
       .slice(0, 3)
       .map(
-        (a) => `<li style="color: #dc2626; margin-bottom: 4px;">⚠ ${a.title}</li>`
+        (a) => `<li style="color: #dc2626; margin-bottom: 4px;">⚠ ${escapeHtml(a.title)}</li>`
       )
       .join("");
 
@@ -135,7 +230,7 @@ const handler = async (req: Request): Promise<Response> => {
                       Life Readiness Report
                     </h1>
                     <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.8); font-size: 14px;">
-                      Shared by ${senderName}
+                      Shared by ${safeSenderName}
                     </p>
                   </td>
                 </tr>
@@ -145,8 +240,8 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                   <td style="padding: 24px 32px 0 32px;">
                     <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 16px; border-radius: 0 8px 8px 0;">
-                      <p style="margin: 0; color: #0369a1; font-style: italic;">"${personalMessage}"</p>
-                      <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 14px;">— ${senderName}</p>
+                      <p style="margin: 0; color: #0369a1; font-style: italic;">"${escapeHtml(personalMessage)}"</p>
+                      <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 14px;">— ${safeSenderName}</p>
                     </div>
                   </td>
                 </tr>
@@ -156,10 +251,10 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                   <td style="padding: 24px 32px 0 32px;">
                     <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                      Dear ${recipientName},
+                      Dear ${safeRecipientName},
                     </p>
                     <p style="margin: 16px 0 0 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                      ${senderName} has shared their Life Readiness Report with you. This report provides insights into their end-of-life preparedness and may contain important information for you as a family member or trusted advisor.
+                      ${safeSenderName} has shared their Life Readiness Report with you. This report provides insights into their end-of-life preparedness and may contain important information for you as a family member or trusted advisor.
                     </p>
                   </td>
                 </tr>
@@ -191,7 +286,7 @@ const handler = async (req: Request): Promise<Response> => {
                       Executive Summary
                     </h2>
                     <p style="margin: 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
-                      ${reportSummary.executiveSummary}
+                      ${escapeHtml(reportSummary.executiveSummary)}
                     </p>
                   </td>
                 </tr>
@@ -238,7 +333,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                   <td style="padding: 0 32px 32px 32px; text-align: center;">
                     <p style="margin: 0 0 16px 0; color: #6b7280; font-size: 14px;">
-                      This is a summary of the full report. For the complete analysis and action plan, please contact ${senderName}.
+                      This is a summary of the full report. For the complete analysis and action plan, please contact ${safeSenderName}.
                     </p>
                   </td>
                 </tr>
@@ -266,7 +361,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Rest Easy <onboarding@resend.dev>",
       to: [recipientEmail],
-      subject: `${senderName} shared their Life Readiness Report with you`,
+      subject: `${plainSenderName} shared their Life Readiness Report with you`,
       html: emailHtml,
     });
 
@@ -276,10 +371,11 @@ const handler = async (req: Request): Promise<Response> => {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in send-report-email function:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: message }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

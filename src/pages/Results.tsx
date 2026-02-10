@@ -25,15 +25,19 @@ import {
 } from "@/components/results";
 import { ShareReportDialog } from "@/components/results/ShareReportDialog";
 import restEasyLogo from "@/assets/rest-easy-logo.png";
+import { supabase } from "@/integrations/supabase/client";
 
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
-const SUBJECT_ID_KEY = "rest-easy.readiness.subject_id";
+async function callAgent(payload: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("agent", {
+    body: payload,
+  });
+  if (error) throw error;
+  return data as Record<string, unknown>;
+}
 
 const Results = () => {
   const navigate = useNavigate();
   const { assessmentState } = useAssessmentState();
-  const [subjectId] = useState<string | null>(() => localStorage.getItem(SUBJECT_ID_KEY));
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,37 +50,20 @@ const Results = () => {
     dismissNudge,
     acknowledgeAction,
   } = useRemySurface({
-    subjectId,
+    subjectId: assessmentState.subject_id || null,
     surface: "results",
-    enabled: Boolean(subjectId) && !loading && !isGenerating,
+    enabled: !loading && !isGenerating,
   });
 
   useEffect(() => {
     const fetchReport = async () => {
-      if (!subjectId) {
-        console.log("[Results] No subject_id found, cannot fetch report");
-        setLoading(false);
-        return;
-      }
-
       try {
         // First check if report is being generated
         console.log("[Results] Checking report status...");
-        const stateResponse = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            action: "get_state",
-            subject_id: subjectId,
-            assessment_id: "readiness_v1",
-          }),
+        const stateData = await callAgent({
+          action: "get_state",
+          assessment_id: "readiness_v1",
         });
-
-        const stateData = await stateResponse.json();
         const reportStatus = stateData?.assessment_state?.report_status;
         const reportStale = stateData?.assessment_state?.report_stale;
         
@@ -86,29 +73,18 @@ const Results = () => {
           setIsGenerating(true);
           setLoading(false);
           // Poll for report completion
-          pollForReport(subjectId);
+          pollForReport();
           return;
         }
 
         // Report exists or not generating - fetch it directly
         console.log("[Results] Fetching report from server...");
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            action: "get_report",
-            subject_id: subjectId,
-            assessment_id: "readiness_v1",
-          }),
+        const data = await callAgent({
+          action: "get_report",
+          assessment_id: "readiness_v1",
         });
-
-        const data = await response.json();
         
-        if (response.ok && data.report) {
+        if (data.report) {
           console.log("[Results] Report loaded from server");
           setReport(data.report as ReadinessReport);
         } else {
@@ -121,7 +97,7 @@ const Results = () => {
       }
     };
 
-    const pollForReport = async (subjectId: string) => {
+    const pollForReport = async () => {
       const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
       let attempts = 0;
 
@@ -129,43 +105,22 @@ const Results = () => {
         attempts++;
         try {
           // Fetch BOTH report and state to check stale flag
-          const [reportResponse, stateResponse] = await Promise.all([
-            fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                apikey: SUPABASE_ANON_KEY,
-              },
-              body: JSON.stringify({
-                action: "get_report",
-                subject_id: subjectId,
-                assessment_id: "readiness_v1",
-              }),
+          const [reportData, stateData] = await Promise.all([
+            callAgent({
+              action: "get_report",
+              assessment_id: "readiness_v1",
             }),
-            fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                apikey: SUPABASE_ANON_KEY,
-              },
-              body: JSON.stringify({
-                action: "get_state",
-                subject_id: subjectId,
-                assessment_id: "readiness_v1",
-              }),
+            callAgent({
+              action: "get_state",
+              assessment_id: "readiness_v1",
             }),
           ]);
-
-          const reportData = await reportResponse.json();
-          const stateData = await stateResponse.json();
           
           const reportStale = stateData?.assessment_state?.report_stale;
           const reportStatus = stateData?.assessment_state?.report_status;
           
           // Only show report if it exists AND is not stale AND status is ready
-          if (reportResponse.ok && reportData.report && !reportStale && reportStatus === "ready") {
+          if (reportData.report && !reportStale && reportStatus === "ready") {
             console.log("[Results] Report ready after polling (not stale)");
             setReport(reportData.report as ReadinessReport);
             setIsGenerating(false);
@@ -192,7 +147,7 @@ const Results = () => {
     };
 
     fetchReport();
-  }, [subjectId]);
+  }, []);
 
   const handleDownloadPDF = async () => {
     if (!reportRef.current || !report) return;
@@ -282,7 +237,7 @@ const Results = () => {
           </Button>
           <h1 className="font-display font-semibold text-gray-900 text-sm">Life Readiness Report</h1>
           <div className="flex items-center gap-2">
-            <ShareReportDialog report={report} />
+            <ShareReportDialog report={report} assessmentId={assessmentState.assessment_id || null} />
             <Button onClick={handleDownloadPDF} disabled={downloading} size="sm" className="gap-2">
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               <span className="hidden sm:inline">{downloading ? "Generating..." : "Download"}</span>

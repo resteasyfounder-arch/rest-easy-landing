@@ -1,4 +1,4 @@
-import { Home, BarChart3, LogIn, Sparkles, UserCircle, Vault, FileText } from "lucide-react";
+import { Home, BarChart3, LogOut, Sparkles, UserCircle, Vault, FileText } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -19,6 +19,7 @@ import { useAssessmentState } from "@/hooks/useAssessmentState";
 import { useVaultDocuments } from "@/hooks/useVaultDocuments";
 import { totalDocumentCount } from "@/data/vaultDocuments";
 import { TierBadge } from "@/components/dashboard";
+import { useAuth } from "@/context/AuthContext";
 import logo from "@/assets/rest-easy-logo.png";
 
 const navItems = [
@@ -32,6 +33,7 @@ const navItems = [
 const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const { assessmentState, hasStarted, isComplete } = useAssessmentState();
@@ -48,6 +50,15 @@ const AppSidebar = () => {
   const vaultPercentage = vaultApplicable > 0 ? Math.round((vaultCompleted / vaultApplicable) * 100) : 0;
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (_err) {
+      // Keep user on current route if logout fails.
+    }
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -184,12 +195,12 @@ const AppSidebar = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() => navigate("/login")}
-              tooltip="Sign In"
+              onClick={handleLogout}
+              tooltip="Sign Out"
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <LogIn className="h-5 w-5" />
-              <span className="font-body font-medium">Sign In</span>
+              <LogOut className="h-5 w-5" />
+              <span className="font-body font-medium">Sign Out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

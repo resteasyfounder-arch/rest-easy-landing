@@ -15,7 +15,6 @@ type RemyEventType = "remy_impression" | "remy_dismiss_nudge" | "remy_ack_action
 
 type RemyRequest = {
   action?: "get_surface_payload" | "dismiss_nudge" | "ack_action";
-  subject_id?: string;
   assessment_id?: string;
   surface?: RemySurface;
   section_id?: string;
@@ -32,13 +31,6 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function isUuid(value: string | undefined): value is string {
-  return Boolean(value && UUID_PATTERN.test(value));
-}
 
 function sanitizeText(value: string | undefined, maxLen = 200): string | null {
   if (!value) return null;
@@ -187,6 +179,23 @@ async function buildSurfacePayload(
   };
 }
 
+async function ensureUserSubject(
+  readiness: ReadinessClient,
+  userId: string,
+): Promise<{ id?: string; error?: string }> {
+  const { data: upserted, error } = await readiness
+    .from("subjects")
+    .upsert({ kind: "user", user_id: userId }, { onConflict: "user_id" })
+    .select("id")
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { id: upserted.id as string };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -198,15 +207,39 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
     return jsonResponse({ error: "Missing Supabase environment configuration" }, 500);
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return jsonResponse({ error: "Missing authorization header" }, 401);
+  }
+
+  const authClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: authData, error: authError } = await authClient.auth.getUser();
+  if (authError || !authData.user) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
   const readiness = supabase.schema("readiness_v1");
+
+  const subjectResult = await ensureUserSubject(readiness, authData.user.id);
+  if (!subjectResult.id) {
+    return jsonResponse(
+      { error: "Unable to resolve subject", detail: subjectResult.error ?? "unknown" },
+      500,
+    );
+  }
+  const subjectId = subjectResult.id;
 
   let payload: RemyRequest;
   try {
@@ -219,8 +252,8 @@ serve(async (req) => {
   const assessmentKey = payload.assessment_id || "readiness_v1";
 
   if (action === "dismiss_nudge") {
-    if (!isUuid(payload.subject_id) || !payload.nudge_id) {
-      return jsonResponse({ error: "subject_id and nudge_id are required" }, 400);
+    if (!payload.nudge_id) {
+      return jsonResponse({ error: "nudge_id is required" }, 400);
     }
     const nudgeId = sanitizeText(payload.nudge_id, 160);
     if (!nudgeId) {
@@ -229,14 +262,14 @@ serve(async (req) => {
 
     const ttlHours = Math.max(1, Math.min(Number(payload.ttl_hours || 24), 24 * 30));
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString();
-    const currentMap = await loadDismissedMap(readiness, payload.subject_id);
+    const currentMap = await loadDismissedMap(readiness, subjectId);
     const nextMap = { ...currentMap, [nudgeId]: expiresAt };
 
     const { error } = await readiness
       .from("remy_preferences")
       .upsert(
         {
-          subject_id: payload.subject_id,
+          subject_id: subjectId,
           dismissed_nudges: nextMap,
         },
         { onConflict: "subject_id" },
@@ -247,9 +280,9 @@ serve(async (req) => {
       return jsonResponse({ error: "Failed to dismiss nudge" }, 500);
     }
 
-    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
     const dismissEventError = await insertRemyEvent(readiness, {
-      subjectId: payload.subject_id,
+      subjectId,
       assessmentDbId: assessment?.id || null,
       eventType: "remy_dismiss_nudge",
       payload: {
@@ -267,11 +300,7 @@ serve(async (req) => {
   }
 
   if (action === "ack_action") {
-    if (!isUuid(payload.subject_id)) {
-      return jsonResponse({ error: "subject_id is required" }, 400);
-    }
-
-    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
     const actionId = sanitizeText(payload.action_id, 160);
     const targetHref = sanitizeInternalPath(payload.target_href);
     const eventPayload = {
@@ -282,7 +311,7 @@ serve(async (req) => {
     };
 
     const error = await insertRemyEvent(readiness, {
-      subjectId: payload.subject_id,
+      subjectId,
       assessmentDbId: assessment?.id || null,
       eventType: "remy_ack_action",
       payload: eventPayload,
@@ -296,24 +325,17 @@ serve(async (req) => {
     return jsonResponse({ success: true });
   }
 
-  if (!payload.subject_id) {
-    return jsonResponse(emptySurfacePayload(payload.surface || "dashboard"));
-  }
-  if (!isUuid(payload.subject_id)) {
-    return jsonResponse({ error: "subject_id is invalid" }, 400);
-  }
-
   const surface = payload.surface || "dashboard";
   const { payload: response, assessmentDbId } = await buildSurfacePayload(
     readiness,
-    payload.subject_id,
+    subjectId,
     assessmentKey,
     surface,
     payload.section_id,
   );
 
   const impressionEventError = await insertRemyEvent(readiness, {
-    subjectId: payload.subject_id,
+    subjectId,
     assessmentDbId,
     eventType: "remy_impression",
     payload: {

@@ -1,5 +1,7 @@
 # Guest Mode Strategy
 
+> Status (February 10, 2026): Guest mode is deprecated. The app now runs in authenticated mode for readiness surfaces. Keep this document for historical context only. For rollout and verification, use `docs/LOGIN_AUTH_ROLLOUT_RUNBOOK.md`.
+
 ## Overview
 
 This document outlines the guest mode implementation strategy for the Rest Easy assessment flow, enabling rapid development and testing before authentication is enabled.

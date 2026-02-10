@@ -12,9 +12,6 @@ import { getSafeRemyPath } from "@/lib/remyNavigation";
 import { cn } from "@/lib/utils";
 import type { RemySurface } from "@/types/remy";
 
-const STORAGE_KEYS = {
-  subjectId: "rest-easy.readiness.subject_id",
-};
 const REMY_OPEN_LAUNCHER_EVENT = "remy:open-launcher";
 
 function getRouteSurface(pathname: string): RemySurface | null {
@@ -43,11 +40,10 @@ export function RemyGlobalLauncher() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
-  const [subjectId, setSubjectId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.subjectId));
 
   const surface = useMemo(() => getRouteSurface(location.pathname), [location.pathname]);
   const routeLabel = useMemo(() => getRouteLabel(location.pathname), [location.pathname]);
-  const personalizedEnabled = Boolean(surface && subjectId && isAuthenticated);
+  const personalizedEnabled = Boolean(surface && isAuthenticated);
   const isGuestSurface = !personalizedEnabled;
 
   const {
@@ -58,14 +54,13 @@ export function RemyGlobalLauncher() {
     acknowledgeAction,
     refresh,
   } = useRemySurface({
-    subjectId,
+    subjectId: null,
     surface: surface || "dashboard",
     enabled: personalizedEnabled,
   });
 
   useEffect(() => {
     setOpen(false);
-    setSubjectId(localStorage.getItem(STORAGE_KEYS.subjectId));
   }, [location.pathname]);
 
   useEffect(() => {

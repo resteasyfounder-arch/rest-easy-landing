@@ -24,6 +24,7 @@ import {
 } from "@/components/assessment/journey";
 import SectionSummary from "@/components/assessment/SectionSummary";
 import SectionAnswerList from "@/components/assessment/SectionAnswerList";
+import { supabase } from "@/integrations/supabase/client";
 
 type FlowPhase = "intro" | "profile" | "profile-review" | "assessment" | "section-summary" | "section-edit" | "review" | "complete";
 
@@ -94,9 +95,6 @@ const STORAGE_KEYS = {
   subjectId: "rest-easy.readiness.subject_id",
 };
 
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
-
 const evaluateCondition = (
   expression: string | undefined,
   profile: Record<string, unknown>,
@@ -113,7 +111,6 @@ const evaluateCondition = (
   });
 
   try {
-    // eslint-disable-next-line no-new-func
     const fn = new Function("profile", "answers", `return (${jsExpression});`);
     return Boolean(fn(profile, answers));
   } catch (_err) {
@@ -139,25 +136,13 @@ const setNestedValue = (
   return next;
 };
 
-const getAgentUrl = () => {
-  return `${SUPABASE_URL}/functions/v1/agent`;
-};
-
 const callAgent = async (payload: Record<string, unknown>) => {
-  const response = await fetch(getAgentUrl(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(payload),
+  const { data, error } = await supabase.functions.invoke("agent", {
+    body: payload,
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    const message = typeof data?.error === "string" ? data.error : "Request failed.";
-    throw new Error(message);
+  if (error) {
+    throw error;
   }
   return data;
 };
@@ -270,8 +255,6 @@ const Readiness = () => {
     setLoading(true);
     setFatalError(null);
     try {
-      const storedSubjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-      
       const [schemaResponse, sessionResponse] = await Promise.all([
         callAgent({
           action: "get_schema",
@@ -280,7 +263,6 @@ const Readiness = () => {
         }),
         callAgent({
           action: "get_state",
-          subject_id: storedSubjectId ?? undefined,
           assessment_id: ASSESSMENT_ID,
         }),
       ]);
@@ -809,7 +791,6 @@ const Readiness = () => {
 
         // Always save to server - agent will create subject if needed
         const response = await callAgent({
-          subject_id: subjectId ?? undefined,
           assessment_id: ASSESSMENT_ID,
           profile: {
             profile_json: nextProfile,
@@ -859,7 +840,6 @@ const Readiness = () => {
 
         // Always save to server - agent will create subject if needed
         const response = await callAgent({
-          subject_id: subjectId ?? undefined,
           assessment_id: ASSESSMENT_ID,
           answers: [answerRecord],
         });
@@ -1014,7 +994,7 @@ const Readiness = () => {
 
   // Handle saving edited answers (batch mode)
   const handleSaveEditedAnswers = async (updatedAnswers: AnswerRecord[]) => {
-    if (!subjectId || updatedAnswers.length === 0) return;
+    if (updatedAnswers.length === 0) return;
 
     setSaving(true);
     setSaveError(null);
@@ -1029,7 +1009,6 @@ const Readiness = () => {
 
       // Persist to backend (backend will mark report as stale automatically)
       await callAgent({
-        subject_id: subjectId,
         assessment_id: ASSESSMENT_ID,
         answers: updatedAnswers,
       });
@@ -1166,11 +1145,10 @@ const Readiness = () => {
 
   // Persist score when complete
   useEffect(() => {
-    if (flowPhase !== "complete" || !results || !subjectId || scoreSaved) return;
+    if (flowPhase !== "complete" || !results || scoreSaved) return;
     const persistScore = async () => {
       try {
         await callAgent({
-          subject_id: subjectId,
           assessment_id: ASSESSMENT_ID,
           assessment: {
             overall_score: results.overallScore,
@@ -1183,7 +1161,7 @@ const Readiness = () => {
       }
     };
     persistScore();
-  }, [flowPhase, results, subjectId, scoreSaved]);
+  }, [flowPhase, results, scoreSaved]);
 
   // Report generation is now handled server-side in the agent edge function
   // when the assessment is first completed or when answers are updated.

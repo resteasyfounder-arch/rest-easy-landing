@@ -1,13 +1,10 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { User, Settings, HelpCircle, FileText, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/layout/AppLayout";
 import { useRemySurface } from "@/hooks/useRemySurface";
 import { RemyInlineNudge } from "@/components/remy/RemyInlineNudge";
-
-const STORAGE_KEYS = {
-  subjectId: "rest-easy.readiness.subject_id",
-};
+import { useAuth } from "@/context/AuthContext";
 
 const menuItems = [
   { icon: User, label: "Account", description: "Manage your profile" },
@@ -17,7 +14,8 @@ const menuItems = [
 ];
 
 const MenuPage = () => {
-  const [subjectId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.subjectId));
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const {
     payload: remyPayload,
     isLoading: isLoadingRemy,
@@ -25,10 +23,19 @@ const MenuPage = () => {
     dismissNudge,
     acknowledgeAction,
   } = useRemySurface({
-    subjectId,
+    subjectId: null,
     surface: "menu",
-    enabled: Boolean(subjectId),
+    enabled: true,
   });
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (_err) {
+      // no-op: keep user on page if logout fails
+    }
+  };
 
   return (
     <AppLayout>
@@ -74,6 +81,7 @@ const MenuPage = () => {
             <Button
               variant="ghost"
               className="w-full justify-start gap-4 text-destructive hover:text-destructive hover:bg-destructive/10 press-effect"
+              onClick={handleLogout}
             >
               <LogOut className="h-5 w-5" />
               <span className="font-body">Sign Out</span>

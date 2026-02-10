@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,13 +37,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-
-const STORAGE_KEYS = {
-  subjectId: "rest-easy.readiness.subject_id",
-};
+import { getUserFirstName } from "@/lib/userDisplayName";
 
 const Dashboard = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [isStartingFresh, setIsStartingFresh] = useState(false);
   const {
@@ -62,22 +59,6 @@ const Dashboard = () => {
     includeReportPreview: true,
   });
 
-  // Get subject_id from localStorage for the improvement items hook
-  const [subjectId, setSubjectId] = useState<string | null>(null);
-  
-  useEffect(() => {
-    const storedSubjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-    setSubjectId(storedSubjectId);
-  }, []);
-
-  // Backfill subject id from server state if localStorage wasn't populated yet
-  useEffect(() => {
-    if (!subjectId && assessmentState.subject_id) {
-      setSubjectId(assessmentState.subject_id);
-      localStorage.setItem(STORAGE_KEYS.subjectId, assessmentState.subject_id);
-    }
-  }, [subjectId, assessmentState.subject_id]);
-
   const {
     payload: remyPayload,
     isLoading: isLoadingRemy,
@@ -86,7 +67,7 @@ const Dashboard = () => {
     acknowledgeAction,
     refresh: refreshRemy,
   } = useRemySurface({
-    subjectId: subjectId || assessmentState.subject_id || null,
+    subjectId: assessmentState.subject_id || null,
     surface: "dashboard",
     enabled: hasStarted,
   });
@@ -98,13 +79,14 @@ const Dashboard = () => {
     isLoading: isLoadingRoadmap,
     refresh: refreshRoadmap,
   } = useImprovementItems({
-    subjectId,
+    subjectId: assessmentState.subject_id || null,
     enabled: isComplete && isReportReady,
   });
 
   // Question edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<import("@/types/assessment").RoadmapItem | null>(null);
+  const authenticatedName = useMemo(() => getUserFirstName(user), [user]);
 
   const handleEditQuestion = (item: import("@/types/assessment").RoadmapItem) => {
     setEditingItem(item);
@@ -117,9 +99,13 @@ const Dashboard = () => {
     refreshRoadmap();
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (_err) {
+      toast.error("Failed to log out. Please try again.");
+    }
   };
 
   const handleStartFresh = async () => {
@@ -194,7 +180,7 @@ const Dashboard = () => {
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <WelcomeHeader
-            userName={reportPreview?.userName}
+            userName={reportPreview?.userName || authenticatedName || undefined}
             assessedDate={reportPreview?.generatedAt}
             hasStarted={hasStarted}
             isComplete={isComplete}
@@ -272,7 +258,6 @@ const Dashboard = () => {
               open={editModalOpen}
               onOpenChange={setEditModalOpen}
               item={editingItem}
-              subjectId={subjectId || ""}
               onSuccess={handleEditSuccess}
             />
           </div>
@@ -404,7 +389,7 @@ const Dashboard = () => {
 
                 <div className="space-y-3">
                   <h3 className="font-display text-2xl font-semibold text-foreground">
-                    Welcome to Rest Easy
+                    {authenticatedName ? `Welcome to Rest Easy, ${authenticatedName}` : "Welcome to Rest Easy"}
                   </h3>
                   <p className="text-muted-foreground font-body leading-relaxed">
                     Take a few moments to understand your readiness. Our gentle assessment will help

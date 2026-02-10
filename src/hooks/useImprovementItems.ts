@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { RoadmapItem, CompletedItem, ImprovementItemsResponse } from "@/types/assessment";
-
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseImprovementItemsOptions {
   subjectId: string | null;
@@ -33,7 +31,7 @@ export function useImprovementItems({
   const lastFetchRef = useRef<number>(0);
 
   const fetchItems = useCallback(async (silent = false) => {
-    if (!subjectId || !enabled) {
+    if (!enabled) {
       setItems([]);
       setCompletedItems([]);
       return;
@@ -52,30 +50,31 @@ export function useImprovementItems({
     setError(null);
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          action: "get_improvement_items",
-          subject_id: subjectId,
-        }),
+      const payload: Record<string, unknown> = {
+        action: "get_improvement_items",
+      };
+      if (subjectId) {
+        payload.subject_id = subjectId;
+      }
+
+      const { data, error: invokeError } = await supabase.functions.invoke("agent", {
+        body: payload,
       });
 
-      if (!response.ok) {
+      if (invokeError) {
+        throw invokeError;
+      }
+
+      const parsedData = data as ImprovementItemsResponse | null;
+      if (!parsedData) {
         throw new Error("Failed to fetch improvement items");
       }
 
-      const data: ImprovementItemsResponse = await response.json();
-      
       if (mountedRef.current) {
-        setItems(data.items || []);
-        setCompletedItems(data.completed_items || []);
-        setTotalApplicable(data.total_applicable || 0);
-        setTotalAnswered(data.total_answered || 0);
+        setItems(parsedData.items || []);
+        setCompletedItems(parsedData.completed_items || []);
+        setTotalApplicable(parsedData.total_applicable || 0);
+        setTotalAnswered(parsedData.total_answered || 0);
       }
     } catch (err) {
       console.error("[useImprovementItems] Error:", err);
@@ -95,13 +94,13 @@ export function useImprovementItems({
     fetchItems();
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && enabled && subjectId) {
+      if (document.visibilityState === "visible" && enabled) {
         fetchItems(true);
       }
     };
 
     const handleFocus = () => {
-      if (enabled && subjectId) {
+      if (enabled) {
         fetchItems(true);
       }
     };
@@ -114,7 +113,7 @@ export function useImprovementItems({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [fetchItems, enabled, subjectId]);
+  }, [fetchItems, enabled]);
 
   return {
     items,

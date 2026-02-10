@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import { ProtectedRoute, GuestOnlyRoute } from "@/components/auth/RouteGuards";
 import { RemyGlobalLauncher } from "@/components/remy/RemyGlobalLauncher";
 import Index from "./pages/Index";
 import Assessment from "./pages/Assessment";
@@ -32,13 +33,17 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/assessment" element={<Assessment />} />
-            <Route path="/results" element={<Results />} />
-            <Route path="/menu" element={<MenuPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/readiness" element={<Readiness />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/vault" element={<EasyVault />} />
+            <Route element={<GuestOnlyRoute />}>
+              <Route path="/login" element={<Login />} />
+            </Route>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/results" element={<Results />} />
+              <Route path="/menu" element={<MenuPage />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/readiness" element={<Readiness />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/vault" element={<EasyVault />} />
+            </Route>
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />

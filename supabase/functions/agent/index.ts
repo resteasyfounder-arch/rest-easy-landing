@@ -75,7 +75,6 @@ type AgentAnswerInput = {
 type AgentRequest = {
   action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report" | "get_improvement_items";
   subject_id?: string;
-  user_id?: string;
   assessment_id?: string;
   schema_version?: string;
   profile?: {
@@ -108,6 +107,25 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function getUserDisplayName(
+  user: {
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+  } | null,
+): string {
+  if (!user) return "Friend";
+  const metadata = user.user_metadata ?? {};
+  const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+  const firstName = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
+  const givenName = typeof metadata.given_name === "string" ? metadata.given_name.trim() : "";
+
+  if (firstName) return firstName;
+  if (givenName) return givenName;
+  if (fullName) return fullName.split(/\s+/)[0];
+  if (user.email) return user.email.split("@")[0];
+  return "Friend";
+}
+
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void;
@@ -128,7 +146,8 @@ async function triggerReportRegeneration(
   readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
   assessmentDbId: string,
   subjectId: string,
-  assessmentKey: string
+  assessmentKey: string,
+  userName: string,
 ): Promise<void> {
   console.log(`[agent] Starting background report regeneration for ${assessmentDbId}`);
   
@@ -185,7 +204,7 @@ async function triggerReportRegeneration(
         "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
       },
       body: JSON.stringify({
-        userName: "Friend",
+        userName,
         profile: assessmentState.profile_data,
         overallScore: assessmentState.overall_score,
         tier: assessmentState.tier,
@@ -638,9 +657,24 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
     return jsonResponse({ error: "Missing Supabase environment configuration" }, 500);
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return jsonResponse({ error: "Missing authorization header" }, 401);
+  }
+
+  const authClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: authData, error: authError } = await authClient.auth.getUser();
+  if (authError || !authData.user) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
   let payload: AgentRequest;
@@ -655,17 +689,23 @@ serve(async (req) => {
   });
   const readiness = supabase.schema("readiness_v1");
   const assessmentKey = payload.assessment_id ?? "readiness_v1";
+  const userDisplayName = getUserDisplayName(authData.user);
+
+  const subjectResult = await ensureUserSubject(readiness, authData.user.id);
+  if (!subjectResult.id) {
+    return jsonResponse(
+      { error: "Unable to resolve subject", detail: subjectResult.error ?? "unknown" },
+      500,
+    );
+  }
+  const subjectId = subjectResult.id;
 
   // Handle get_improvement_items action - returns improvable questions for the roadmap
   if (payload.action === "get_improvement_items") {
-    if (!payload.subject_id) {
-      return jsonResponse({ error: "subject_id required for get_improvement_items" }, 400);
-    }
-
-    console.log(`[get_improvement_items] Fetching for subject ${payload.subject_id}`);
+    console.log(`[get_improvement_items] Fetching for subject ${subjectId}`);
 
     // Find active assessment
-    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
     if (!assessment) {
       return jsonResponse({ items: [], completed_items: [] });
     }
@@ -687,7 +727,7 @@ serve(async (req) => {
     const { data: profileData } = await readiness
       .from("profile_intake")
       .select("profile_json")
-      .eq("subject_id", payload.subject_id)
+      .eq("subject_id", subjectId)
       .maybeSingle();
     const profile = (profileData?.profile_json as Record<string, unknown>) || {};
 
@@ -866,6 +906,16 @@ serve(async (req) => {
       return jsonResponse({ error: "report_data required for save_report" }, 400);
     }
 
+    const { data: ownedAssessment, error: ownershipError } = await readiness
+      .from("assessments")
+      .select("id")
+      .eq("id", assessmentDbId)
+      .eq("subject_id", subjectId)
+      .maybeSingle();
+    if (ownershipError || !ownedAssessment) {
+      return jsonResponse({ error: "Forbidden" }, 403);
+    }
+
     console.log(`[save_report] Saving report for assessment ${assessmentDbId}`);
 
     const { error: updateError } = await readiness
@@ -889,14 +939,10 @@ serve(async (req) => {
 
   // Handle get_report action - use unified findActiveAssessment
   if (payload.action === "get_report") {
-    if (!payload.subject_id) {
-      return jsonResponse({ error: "subject_id required for get_report" }, 400);
-    }
-
-    console.log(`[get_report] Fetching report for subject ${payload.subject_id}`);
+    console.log(`[get_report] Fetching report for subject ${subjectId}`);
 
     // Use the unified helper - guaranteed to get the same assessment as get_state
-    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
 
     if (!assessment) {
       console.log(`[get_report] No active assessment found`);
@@ -926,49 +972,16 @@ serve(async (req) => {
 
   // Handle get_state action - use unified findActiveAssessment
   if (payload.action === "get_state") {
-    // If no subject_id provided, return empty state for new user
-    if (!payload.subject_id) {
-      console.log(`[get_state] No subject_id provided - returning empty state for new user`);
-      return jsonResponse({
-        subject_id: null,
-        assessment_id: null,
-        assessment_state: {
-          subject_id: "",
-          assessment_id: "",
-          status: "not_started",
-          overall_score: 0,
-          overall_progress: 0,
-          tier: "Getting Started",
-          profile_progress: 0,
-          profile_complete: false,
-          sections: [],
-          current_section_id: null,
-          current_question_id: null,
-          next_question_id: null,
-          report_status: "not_started",
-          report_url: null,
-          report_stale: false,
-          last_activity_at: new Date().toISOString(),
-          last_answer_at: null,
-          updated_at: new Date().toISOString(),
-          profile_data: {},
-          profile_answers: {},
-          answers: {},
-          flow_phase: "intro",
-        },
-      });
-    }
-
     // Use the unified helper
-    const assessment = await findActiveAssessment(readiness, payload.subject_id, assessmentKey);
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
 
     if (!assessment) {
-      console.log(`[get_state] No active assessment for subject ${payload.subject_id}`);
+      console.log(`[get_state] No active assessment for subject ${subjectId}`);
       return jsonResponse({
-        subject_id: payload.subject_id,
+        subject_id: subjectId,
         assessment_id: null,
         assessment_state: {
-          subject_id: payload.subject_id,
+          subject_id: subjectId,
           assessment_id: "",
           status: "not_started",
           overall_score: 0,
@@ -998,13 +1011,13 @@ serve(async (req) => {
 
     const assessmentState = await computeAssessmentState(
       readiness,
-      payload.subject_id,
+      subjectId,
       assessment.id,
       assessmentKey
     );
 
     return jsonResponse({
-      subject_id: payload.subject_id,
+      subject_id: subjectId,
       assessment_id: assessment.id,
       assessment_state: assessmentState,
     });
@@ -1012,17 +1025,13 @@ serve(async (req) => {
 
   // Handle start_fresh action - archive old assessment and create new one
   if (payload.action === "start_fresh") {
-    if (!payload.subject_id) {
-      return jsonResponse({ error: "subject_id required for start_fresh" }, 400);
-    }
-
-    console.log(`[start_fresh] Archiving assessment for subject ${payload.subject_id}`);
+    console.log(`[start_fresh] Archiving assessment for subject ${subjectId}`);
 
     // Archive the current active assessment (unique constraint ensures only one)
     const { error: archiveError } = await readiness
       .from("assessments")
       .update({ status: "archived" })
-      .eq("subject_id", payload.subject_id)
+      .eq("subject_id", subjectId)
       .eq("assessment_id", assessmentKey)
       .neq("status", "archived");
 
@@ -1035,7 +1044,7 @@ serve(async (req) => {
     const { data: newAssessment, error: createError } = await readiness
       .from("assessments")
       .insert({
-        subject_id: payload.subject_id,
+        subject_id: subjectId,
         assessment_id: assessmentKey,
         schema_version: "v1",
         status: "draft",
@@ -1054,13 +1063,13 @@ serve(async (req) => {
 
     const assessmentState = await computeAssessmentState(
       readiness,
-      payload.subject_id,
+      subjectId,
       newAssessment.id,
       assessmentKey
     );
 
     return jsonResponse({
-      subject_id: payload.subject_id,
+      subject_id: subjectId,
       assessment_id: newAssessment.id,
       assessment_state: assessmentState,
       message: "Started fresh assessment. Previous data has been archived.",
@@ -1068,17 +1077,9 @@ serve(async (req) => {
   }
 
   // Default behavior - upsert flow
-  const subjectResult = await ensureSubject(readiness, payload);
-  if (!subjectResult.id) {
-    return jsonResponse(
-      { error: "Unable to resolve subject", detail: subjectResult.error ?? "unknown" },
-      500
-    );
-  }
-
   const assessmentResult = await ensureAssessment(
     readiness,
-    subjectResult.id,
+    subjectId,
     payload.assessment_id
   );
   if (!assessmentResult.id) {
@@ -1090,7 +1091,7 @@ serve(async (req) => {
 
   if (payload.profile) {
     const profileRow = {
-      subject_id: subjectResult.id,
+      subject_id: subjectId,
       profile_json: payload.profile.profile_json ?? {},
       confidence_json: payload.profile.confidence_json ?? {},
       version: payload.profile.version ?? "v1",
@@ -1129,8 +1130,9 @@ serve(async (req) => {
         triggerReportRegeneration(
           readiness,
           assessmentResult.id,
-          subjectResult.id,
-          assessmentKey
+          subjectId,
+          assessmentKey,
+          userDisplayName
         )
       );
     }
@@ -1139,7 +1141,7 @@ serve(async (req) => {
   if (payload.answers && payload.answers.length > 0) {
     const answerRows = payload.answers.map((answer) => ({
       assessment_id: assessmentResult.id,
-      subject_id: subjectResult.id,
+      subject_id: subjectId,
       question_id: answer.question_id,
       item_id: answer.item_id,
       section_id: answer.section_id,
@@ -1178,7 +1180,7 @@ serve(async (req) => {
     // Check if this answer completes the assessment (for first-time report generation)
     const assessmentStateAfterAnswer = await computeAssessmentState(
       readiness,
-      subjectResult.id,
+      subjectId,
       assessmentResult.id,
       assessmentKey
     );
@@ -1204,8 +1206,9 @@ serve(async (req) => {
         triggerReportRegeneration(
           readiness,
           assessmentResult.id,
-          subjectResult.id,
-          assessmentKey
+          subjectId,
+          assessmentKey,
+          userDisplayName
         )
       );
     } else if (isNowComplete && !hasExistingReport && !isAlreadyGenerating) {
@@ -1226,8 +1229,9 @@ serve(async (req) => {
         triggerReportRegeneration(
           readiness,
           assessmentResult.id,
-          subjectResult.id,
-          assessmentKey
+          subjectId,
+          assessmentKey,
+          userDisplayName
         )
       );
     }
@@ -1266,13 +1270,13 @@ serve(async (req) => {
   // Compute and return updated assessment state
   const assessmentState = await computeAssessmentState(
     readiness,
-    subjectResult.id,
+    subjectId,
     assessmentResult.id,
     assessmentKey
   );
 
   return jsonResponse({
-    subject_id: subjectResult.id,
+    subject_id: subjectId,
     assessment_id: assessmentResult.id,
     assessment_state: assessmentState,
     assistant_message: "Thanks. Your readiness progress is saved.",
@@ -1282,51 +1286,21 @@ serve(async (req) => {
   });
 });
 
-async function ensureSubject(
+async function ensureUserSubject(
   readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
-  payload: AgentRequest
+  userId: string
 ): Promise<{ id?: string; error?: string }> {
-  if (payload.subject_id) {
-    const { data: existing, error } = await readiness
-      .from("subjects")
-      .select("id")
-      .eq("id", payload.subject_id)
-      .maybeSingle();
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    if (existing?.id) {
-      return { id: existing.id };
-    }
-  }
-
-  if (payload.user_id) {
-    const { data: upserted, error } = await readiness
-      .from("subjects")
-      .upsert({ kind: "user", user_id: payload.user_id }, { onConflict: "user_id" })
-      .select("id")
-      .single();
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    return { id: upserted.id };
-  }
-
-  const { data: created, error: createError } = await readiness
+  const { data: upserted, error } = await readiness
     .from("subjects")
-    .insert({ kind: "guest" })
+    .upsert({ kind: "user", user_id: userId }, { onConflict: "user_id" })
     .select("id")
     .single();
 
-  if (createError) {
-    return { error: createError.message };
+  if (error) {
+    return { error: error.message };
   }
 
-  return { id: created.id };
+  return { id: upserted.id };
 }
 
 // ============================================================================

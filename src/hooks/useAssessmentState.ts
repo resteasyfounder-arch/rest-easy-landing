@@ -6,9 +6,7 @@ import type {
   ScoreTier,
 } from "@/types/assessment";
 import type { ReadinessReport } from "@/types/report";
-
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
+import { supabase } from "@/integrations/supabase/client";
 
 // Only keep subject_id in localStorage for session continuity
 const STORAGE_KEYS = {
@@ -16,6 +14,16 @@ const STORAGE_KEYS = {
 };
 
 const ASSESSMENT_ID = "readiness_v1";
+
+async function callAgent(payload: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("agent", {
+    body: payload,
+  });
+  if (error) {
+    throw error;
+  }
+  return data as Record<string, unknown>;
+}
 
 // Tier thresholds
 function getTierFromScore(score: number): ScoreTier {
@@ -71,56 +79,35 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   
   const [isLoading, setIsLoading] = useState(true);
+  const isLoadingRef = useRef(true);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
 
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
   // Fetch current state from server
   const fetchState = useCallback(async (silent = false) => {
-    const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-    
-    if (!subjectId) {
-      // No existing session - return empty state
-      const emptyState = createEmptyState();
-      setState({
-        serverState: emptyState,
-        syncStatus: "synced",
-        lastSyncAt: new Date(),
-        error: null,
-      });
-      setIsLoading(false);
-      return emptyState;
-    }
-
     // Only show syncing indicator for non-silent fetches AND not initial load
     // This prevents constant spinner flicker during background auto-refreshes
-    if (!silent && !isLoading) {
+    if (!silent && !isLoadingRef.current) {
       setState((prev) => ({ ...prev, syncStatus: "syncing" }));
     }
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          action: "get_state",
-          subject_id: subjectId,
-          assessment_id: ASSESSMENT_ID,
-        }),
+      const data = await callAgent({
+        action: "get_state",
+        assessment_id: ASSESSMENT_ID,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch assessment state");
+      if (typeof data.subject_id === "string" && data.subject_id.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.subjectId, data.subject_id);
       }
-
-      const data = await response.json();
       
       if (!mountedRef.current) return null;
 
-      const serverState = data.assessment_state || createEmptyState();
+      const serverState = (data.assessment_state as AssessmentState | null) || createEmptyState();
 
       setState({
         serverState,
@@ -136,12 +123,12 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
       // On error, show error state (no localStorage fallback)
       const emptyState = createEmptyState();
       
-      setState({
+      setState((prev) => ({
         serverState: emptyState,
         syncStatus: "error",
-        lastSyncAt: state.lastSyncAt,
+        lastSyncAt: prev.lastSyncAt,
         error: error instanceof Error ? error.message : "Unknown error",
-      });
+      }));
       
       return emptyState;
     } finally {
@@ -149,7 +136,7 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
         setIsLoading(false);
       }
     }
-  }, [state.lastSyncAt]);
+  }, []);
 
   // Initialize on mount
   useEffect(() => {
@@ -204,32 +191,17 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
 
   // Fetch report preview when assessment is complete and report is ready
   const fetchReportPreview = useCallback(async () => {
-    const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-    if (!subjectId || !includeReportPreview) return;
+    if (!includeReportPreview) return;
     
     setIsLoadingReport(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          action: "get_report",
-          subject_id: subjectId,
-          assessment_id: ASSESSMENT_ID,
-        }),
+      const data = await callAgent({
+        action: "get_report",
+        assessment_id: ASSESSMENT_ID,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch report");
-      }
-
-      const data = await response.json();
       if (mountedRef.current && data.report) {
-        setReportPreview(data.report);
+        setReportPreview(data.report as ReadinessReport);
       }
     } catch (error) {
       console.error("Error fetching report preview:", error);
@@ -254,43 +226,24 @@ export function useAssessmentState(options: UseAssessmentStateOptions = {}) {
 
   // Start fresh - archive old assessments and create new one
   const startFresh = useCallback(async () => {
-    const subjectId = localStorage.getItem(STORAGE_KEYS.subjectId);
-    
-    if (!subjectId) {
-      // No existing session - just clear local state
-      clearState();
-      return;
-    }
-
     setState((prev) => ({ ...prev, syncStatus: "syncing" }));
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/agent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          action: "start_fresh",
-          subject_id: subjectId,
-          assessment_id: ASSESSMENT_ID,
-        }),
+      const data = await callAgent({
+        action: "start_fresh",
+        assessment_id: ASSESSMENT_ID,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to start fresh assessment");
+      if (typeof data.subject_id === "string" && data.subject_id.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.subjectId, data.subject_id);
       }
-
-      const data = await response.json();
       
       if (!mountedRef.current) return;
 
       // Clear report preview when starting fresh
       setReportPreview(null);
 
-      const serverState = data.assessment_state || createEmptyState();
+      const serverState = (data.assessment_state as AssessmentState | null) || createEmptyState();
       
       setState({
         serverState,

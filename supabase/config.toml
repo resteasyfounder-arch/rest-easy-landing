@@ -73,7 +73,7 @@ refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
 enable_manual_linking = false
-minimum_password_length = 6
+minimum_password_length = 10
 password_requirements = ""
 
 [auth.rate_limit]
@@ -88,9 +88,9 @@ web3 = 30
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
-enable_confirmations = false
-secure_password_change = false
-max_frequency = "1s"
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "60s"
 otp_length = 6
 otp_expiry = 3600
 
@@ -168,22 +168,25 @@ s3_access_key = "env(S3_ACCESS_KEY)"
 s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.agent]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-report]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-report-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.remy]
 verify_jwt = true
 
 [functions.vault-upload]
-verify_jwt = false
+verify_jwt = true
 
 [functions.vault-download]
-verify_jwt = false
+verify_jwt = true
+
+[functions.generate-section-summary]
+verify_jwt = true
 
 [functions.generate-findability-summary]
 verify_jwt = false

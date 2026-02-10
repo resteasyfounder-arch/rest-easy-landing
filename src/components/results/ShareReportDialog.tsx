@@ -19,6 +19,7 @@ import type { ReadinessReport } from "@/types/report";
 
 interface ShareReportDialogProps {
   report: ReadinessReport;
+  assessmentId: string | null;
 }
 
 interface Recipient {
@@ -26,7 +27,7 @@ interface Recipient {
   name: string;
 }
 
-export function ShareReportDialog({ report }: ShareReportDialogProps) {
+export function ShareReportDialog({ report, assessmentId }: ShareReportDialogProps) {
   const [open, setOpen] = useState(false);
   const [recipients, setRecipients] = useState<Recipient[]>([
     { email: "", name: "" },
@@ -72,6 +73,15 @@ export function ShareReportDialog({ report }: ShareReportDialogProps) {
       return;
     }
 
+    if (!assessmentId) {
+      toast({
+        title: "Unable to Share",
+        description: "We couldn't verify the assessment for this report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const invalidEmails = validRecipients.filter(
@@ -110,6 +120,7 @@ export function ShareReportDialog({ report }: ShareReportDialogProps) {
         validRecipients.map((recipient) =>
           supabase.functions.invoke("send-report-email", {
             body: {
+              assessmentId,
               recipientEmail: recipient.email,
               recipientName: recipient.name,
               senderName: report.userName,
@@ -138,12 +149,12 @@ export function ShareReportDialog({ report }: ShareReportDialogProps) {
         setRecipients([{ email: "", name: "" }]);
         setPersonalMessage("");
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error sending report:", error);
+      const message = error instanceof Error ? error.message : "There was an error sending the report. Please try again.";
       toast({
         title: "Failed to Send",
-        description:
-          error.message || "There was an error sending the report. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {

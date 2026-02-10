@@ -12,6 +12,26 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function getJwtRole(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice("Bearer ".length);
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  try {
+    const base64Payload = parts[1].replaceAll("-", "+").replaceAll("_", "/");
+    const paddedPayload =
+      base64Payload + "=".repeat((4 - (base64Payload.length % 4)) % 4);
+    const payload = JSON.parse(
+      atob(paddedPayload),
+    ) as { role?: string };
+    return payload.role ?? null;
+  } catch (_err) {
+    return null;
+  }
+}
+
 interface ReportRequest {
   userName: string;
   profile: Record<string, unknown>;
@@ -359,6 +379,11 @@ serve(async (req) => {
 
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  const tokenRole = getJwtRole(req);
+  if (tokenRole !== "service_role") {
+    return jsonResponse({ error: "Forbidden" }, 403);
   }
 
   const openaiApiKey = Deno.env.get("OPENAI_API_KEY");

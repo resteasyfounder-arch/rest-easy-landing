@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle2, ChevronRight, Edit3, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 type AnswerRecord = {
   question_id: string;
@@ -32,9 +33,6 @@ interface SectionSummaryProps {
   showContinueButton?: boolean;
   isAssessmentComplete?: boolean;
 }
-
-const SUPABASE_URL = "https://ltldbteqkpxqohbwqvrn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0bGRidGVxa3B4cW9oYndxdnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5OTY0MjUsImV4cCI6MjA4MzU3MjQyNX0.zSWhg_zFbrDhIA9egmaRsGsRiQg7Pd9fgHyTp39v3CE";
 
 export function SectionSummary({
   sectionId,
@@ -84,14 +82,8 @@ export function SectionSummary({
       setAiLoading(true);
       setAiError(false);
       try {
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-section-summary`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
+        const { data, error } = await supabase.functions.invoke("generate-section-summary", {
+          body: {
             sectionId,
             sectionLabel,
             answers: sectionAnswers.map((a) => ({
@@ -99,15 +91,18 @@ export function SectionSummary({
               answer_value: a.answer_value,
               answer_label: a.answer_label,
             })),
-          }),
+          },
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.insight) {
-            setAiInsight(data.insight);
-            localStorage.setItem(cacheKey, data.insight);
-          }
+        if (error) {
+          setAiError(true);
+          return;
+        }
+
+        const insight = typeof data?.insight === "string" ? data.insight : null;
+        if (insight) {
+          setAiInsight(insight);
+          localStorage.setItem(cacheKey, insight);
         } else {
           setAiError(true);
         }
