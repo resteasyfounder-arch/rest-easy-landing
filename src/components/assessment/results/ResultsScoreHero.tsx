@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getScoreTier } from "@/data/findabilityQuestions";
+import { ClipboardList, FolderLock, Users } from "lucide-react";
 
 interface ResultsScoreHeroProps {
   score: number;
@@ -49,7 +50,7 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
   }, [score]);
 
   return (
-    <div className="bg-card rounded-2xl border border-border p-6 md:p-8 space-y-5">
+    <div className="bg-primary/[0.03] rounded-2xl border border-primary/10 p-6 md:p-8 space-y-5">
       {/* Score circle centered */}
       <div className="flex flex-col items-center gap-2">
         <div
@@ -94,6 +95,22 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
             ? "Many people don't even know where to start. The fact that you're here means you're already ahead."
             : "Most families aren't prepared for the unexpected. Taking this assessment is the first real step toward changing that."}
         </p>
+      </div>
+
+      {/* Feature highlights */}
+      <div className="space-y-3 pt-2">
+        {[
+          { icon: ClipboardList, text: "Up to 72 questions tailored to your life needs" },
+          { icon: FolderLock, text: "Track and store your documents with EasyVault" },
+          { icon: Users, text: "Add your loved ones to your Trust Network, keeping them in the loop as your Life Readiness journey progresses" },
+        ].map(({ icon: Icon, text }) => (
+          <div key={text} className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 text-primary" />
+            </div>
+            <p className="font-body text-sm text-foreground/80 leading-relaxed">{text}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
