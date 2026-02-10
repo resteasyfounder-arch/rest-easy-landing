@@ -1290,17 +1290,32 @@ async function ensureUserSubject(
   readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
   userId: string
 ): Promise<{ id?: string; error?: string }> {
-  const { data: upserted, error } = await readiness
+  // Partial unique index prevents upsert via PostgREST; use select-then-insert
+  const { data: existing, error: fetchError } = await readiness
     .from("subjects")
-    .upsert({ kind: "user", user_id: userId }, { onConflict: "user_id" })
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { error: fetchError.message };
+  }
+
+  if (existing?.id) {
+    return { id: existing.id };
+  }
+
+  const { data: created, error: insertError } = await readiness
+    .from("subjects")
+    .insert({ kind: "user", user_id: userId })
     .select("id")
     .single();
 
-  if (error) {
-    return { error: error.message };
+  if (insertError) {
+    return { error: insertError.message };
   }
 
-  return { id: upserted.id };
+  return { id: created.id };
 }
 
 // ============================================================================

@@ -183,17 +183,31 @@ async function ensureUserSubject(
   readiness: ReadinessClient,
   userId: string,
 ): Promise<{ id?: string; error?: string }> {
-  const { data: upserted, error } = await readiness
+  const { data: existing, error: fetchError } = await readiness
     .from("subjects")
-    .upsert({ kind: "user", user_id: userId }, { onConflict: "user_id" })
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { error: fetchError.message };
+  }
+
+  if (existing?.id) {
+    return { id: existing.id as string };
+  }
+
+  const { data: created, error: insertError } = await readiness
+    .from("subjects")
+    .insert({ kind: "user", user_id: userId })
     .select("id")
     .single();
 
-  if (error) {
-    return { error: error.message };
+  if (insertError) {
+    return { error: insertError.message };
   }
 
-  return { id: upserted.id as string };
+  return { id: created.id as string };
 }
 
 serve(async (req) => {
