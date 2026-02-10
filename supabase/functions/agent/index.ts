@@ -73,7 +73,7 @@ type AgentAnswerInput = {
 };
 
 type AgentRequest = {
-  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report" | "get_improvement_items" | "retry_report";
+  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report" | "get_improvement_items" | "retry_report" | "ensure_report";
   subject_id?: string;
   assessment_id?: string;
   schema_version?: string;
@@ -205,6 +205,7 @@ async function triggerReportRegeneration(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
       },
       body: JSON.stringify({
@@ -273,6 +274,97 @@ async function triggerReportRegeneration(
   }
 }
 
+type ReadinessClient = ReturnType<ReturnType<typeof createClient>["schema"]>;
+
+async function enqueueReportGenerationIfNeeded(
+  readiness: ReadinessClient,
+  assessmentDbId: string,
+  subjectId: string,
+  assessmentKey: string,
+  userName: string,
+  options?: { force?: boolean; reason?: string },
+): Promise<{
+  started: boolean;
+  report_status: ReportStatus;
+  reason: "started" | "already_generating" | "already_ready" | "assessment_incomplete" | "assessment_missing";
+}> {
+  const { data: currentAssessment, error: currentAssessmentError } = await readiness
+    .from("assessments")
+    .select("report_status, report_data, report_stale")
+    .eq("id", assessmentDbId)
+    .maybeSingle();
+
+  if (currentAssessmentError || !currentAssessment) {
+    console.error("[agent] Unable to load assessment for report generation", currentAssessmentError);
+    return {
+      started: false,
+      report_status: "not_started",
+      reason: "assessment_missing",
+    };
+  }
+
+  const assessmentState = await computeAssessmentState(
+    readiness,
+    subjectId,
+    assessmentDbId,
+    assessmentKey,
+  );
+
+  if (assessmentState.status !== "completed") {
+    return {
+      started: false,
+      report_status: (currentAssessment.report_status as ReportStatus) || "not_started",
+      reason: "assessment_incomplete",
+    };
+  }
+
+  const hasExistingReport = !!currentAssessment.report_data;
+  const isAlreadyGenerating = currentAssessment.report_status === "generating";
+  const isAlreadyReady =
+    currentAssessment.report_status === "ready" &&
+    hasExistingReport &&
+    currentAssessment.report_stale !== true;
+
+  if (isAlreadyGenerating) {
+    return {
+      started: false,
+      report_status: "generating",
+      reason: "already_generating",
+    };
+  }
+
+  if (!options?.force && isAlreadyReady) {
+    return {
+      started: false,
+      report_status: "ready",
+      reason: "already_ready",
+    };
+  }
+
+  await readiness
+    .from("assessments")
+    .update({
+      report_status: "generating",
+      report_stale: hasExistingReport,
+    })
+    .eq("id", assessmentDbId);
+
+  console.log(
+    `[agent] Queuing report generation for ${assessmentDbId}` +
+      (options?.reason ? ` (${options.reason})` : ""),
+  );
+
+  EdgeRuntime.waitUntil(
+    triggerReportRegeneration(assessmentDbId, subjectId, assessmentKey, userName),
+  );
+
+  return {
+    started: true,
+    report_status: "generating",
+    reason: "started",
+  };
+}
+
 function evaluateCondition(
   expression: string | undefined,
   profile: Record<string, unknown>,
@@ -339,7 +431,7 @@ interface Schema {
 // This helper is used by all actions to ensure consistent selection.
 // ============================================================================
 async function findActiveAssessment(
-  readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
+  readiness: ReadinessClient,
   subjectId: string,
   assessmentKey: string
 ): Promise<{
@@ -371,7 +463,7 @@ async function findActiveAssessment(
 }
 
 async function computeAssessmentState(
-  readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
+  readiness: ReadinessClient,
   subjectId: string,
   assessmentDbId: string,
   assessmentKey: string
@@ -1002,26 +1094,46 @@ serve(async (req) => {
       return jsonResponse({ error: `Cannot retry from status: ${assessment.report_status}` }, 400);
     }
 
-    // Reset to generating
-    await readiness
-      .from("assessments")
-      .update({
-        report_status: "generating",
-        report_stale: false,
-      })
-      .eq("id", assessment.id);
-
-    // Trigger background regeneration
-    EdgeRuntime.waitUntil(
-      triggerReportRegeneration(
-        assessment.id,
-        subjectId,
-        assessmentKey,
-        userDisplayName
-      )
+    const queueResult = await enqueueReportGenerationIfNeeded(
+      readiness,
+      assessment.id,
+      subjectId,
+      assessmentKey,
+      userDisplayName,
+      { force: true, reason: "retry_report" },
     );
 
-    return jsonResponse({ ok: true, report_status: "generating" });
+    return jsonResponse({
+      ok: true,
+      report_status: queueResult.report_status,
+      started: queueResult.started,
+      reason: queueResult.reason,
+    });
+  }
+
+  if (payload.action === "ensure_report") {
+    console.log(`[ensure_report] Ensuring report for subject ${subjectId}`);
+
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
+    if (!assessment) {
+      return jsonResponse({ error: "No active assessment found" }, 404);
+    }
+
+    const queueResult = await enqueueReportGenerationIfNeeded(
+      readiness,
+      assessment.id,
+      subjectId,
+      assessmentKey,
+      userDisplayName,
+      { reason: "ensure_report" },
+    );
+
+    return jsonResponse({
+      ok: true,
+      report_status: queueResult.report_status,
+      started: queueResult.started,
+      reason: queueResult.reason,
+    });
   }
 
   // Handle get_state action - use unified findActiveAssessment
@@ -1315,6 +1427,17 @@ serve(async (req) => {
       if (assessmentError) {
         return jsonResponse({ error: "Failed to update assessment" }, 500);
       }
+    }
+
+    if (payload.assessment.status === "completed") {
+      await enqueueReportGenerationIfNeeded(
+        readiness,
+        assessmentResult.id,
+        subjectId,
+        assessmentKey,
+        userDisplayName,
+        { reason: "assessment_completed_update" },
+      );
     }
   }
 

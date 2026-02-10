@@ -53,6 +53,60 @@ const Results = () => {
     enabled: !loading && !isGenerating,
   });
 
+  const startPollingForReport = () => {
+    const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+    let attempts = 0;
+
+    const poll = async () => {
+      attempts++;
+      try {
+        const [reportData, stateData] = await Promise.all([
+          callAgent({
+            action: "get_report",
+            assessment_id: "readiness_v1",
+          }),
+          callAgent({
+            action: "get_state",
+            assessment_id: "readiness_v1",
+          }),
+        ]);
+
+        const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
+        const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
+
+        if (reportData.report && !reportStale && reportStatus === "ready") {
+          console.log("[Results] Report ready after polling (not stale)");
+          setReport(reportData.report as ReadinessReport);
+          setReportFailed(false);
+          setIsGenerating(false);
+          return;
+        }
+
+        if (reportStatus === "failed") {
+          setIsGenerating(false);
+          setReportFailed(true);
+          return;
+        }
+
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000);
+        } else {
+          console.log("[Results] Polling timed out");
+          setIsGenerating(false);
+        }
+      } catch (err) {
+        console.error("[Results] Polling error:", err);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000);
+        } else {
+          setIsGenerating(false);
+        }
+      }
+    };
+
+    poll();
+  };
+
   useEffect(() => {
     const fetchReport = async () => {
       try {
@@ -76,10 +130,10 @@ const Results = () => {
         // If generating OR stale, show loading and poll
         if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
           console.log("[Results] Report is generating or stale, showing progress UI");
+          setReportFailed(false);
           setIsGenerating(true);
           setLoading(false);
-          // Poll for report completion
-          pollForReport();
+          startPollingForReport();
           return;
         }
 
@@ -92,64 +146,48 @@ const Results = () => {
         
         if (data.report) {
           console.log("[Results] Report loaded from server");
+          setReportFailed(false);
           setReport(data.report as ReadinessReport);
         } else {
           console.log("[Results] No report found on server");
+          const assessmentStatus = (stateData?.assessment_state as Record<string, unknown>)?.status;
+          if (assessmentStatus === "completed") {
+            console.log("[Results] Completed assessment has no report, requesting generation");
+            const ensureData = await callAgent({
+              action: "ensure_report",
+              assessment_id: "readiness_v1",
+            });
+            const ensuredStatus = ensureData?.report_status as string | undefined;
+
+            if (ensuredStatus === "failed") {
+              setReportFailed(true);
+              return;
+            }
+
+            if (ensuredStatus === "generating") {
+              setReportFailed(false);
+              setIsGenerating(true);
+              startPollingForReport();
+              return;
+            }
+
+            if (ensuredStatus === "ready") {
+              const refreshed = await callAgent({
+                action: "get_report",
+                assessment_id: "readiness_v1",
+              });
+              if (refreshed.report) {
+                setReportFailed(false);
+                setReport(refreshed.report as ReadinessReport);
+              }
+            }
+          }
         }
       } catch (err) {
         console.error("[Results] Failed to fetch report:", err);
       } finally {
         setLoading(false);
       }
-    };
-
-    const pollForReport = async () => {
-      const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
-      let attempts = 0;
-
-      const poll = async () => {
-        attempts++;
-        try {
-          // Fetch BOTH report and state to check stale flag
-          const [reportData, stateData] = await Promise.all([
-            callAgent({
-              action: "get_report",
-              assessment_id: "readiness_v1",
-            }),
-            callAgent({
-              action: "get_state",
-              assessment_id: "readiness_v1",
-            }),
-          ]);
-          
-          const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
-          const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
-          
-          // Only show report if it exists AND is not stale AND status is ready
-          if (reportData.report && !reportStale && reportStatus === "ready") {
-            console.log("[Results] Report ready after polling (not stale)");
-            setReport(reportData.report as ReadinessReport);
-            setIsGenerating(false);
-            return;
-          }
-
-          if (attempts < maxAttempts) {
-            setTimeout(poll, 2000);
-          } else {
-            console.log("[Results] Polling timed out");
-            setIsGenerating(false);
-          }
-        } catch (err) {
-          console.error("[Results] Polling error:", err);
-          if (attempts < maxAttempts) {
-            setTimeout(poll, 2000);
-          } else {
-            setIsGenerating(false);
-          }
-        }
-      };
-
-      poll();
     };
 
     fetchReport();
@@ -197,41 +235,10 @@ const Results = () => {
           action: "retry_report",
           assessment_id: "readiness_v1",
         });
+        setRetrying(false);
         setReportFailed(false);
         setIsGenerating(true);
-        // Start polling
-        const pollForRetry = async () => {
-          const maxAttempts = 60;
-          let attempts = 0;
-          const poll = async () => {
-            attempts++;
-            try {
-              const [reportData, stateData] = await Promise.all([
-                callAgent({ action: "get_report", assessment_id: "readiness_v1" }),
-                callAgent({ action: "get_state", assessment_id: "readiness_v1" }),
-              ]);
-              const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
-              const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
-              if (reportData.report && !reportStale && reportStatus === "ready") {
-                setReport(reportData.report as ReadinessReport);
-                setIsGenerating(false);
-                return;
-              }
-              if (reportStatus === "failed") {
-                setIsGenerating(false);
-                setReportFailed(true);
-                return;
-              }
-              if (attempts < maxAttempts) setTimeout(poll, 2000);
-              else setIsGenerating(false);
-            } catch {
-              if (attempts < maxAttempts) setTimeout(poll, 2000);
-              else setIsGenerating(false);
-            }
-          };
-          poll();
-        };
-        pollForRetry();
+        startPollingForReport();
       } catch (err) {
         console.error("[Results] Retry failed:", err);
         setRetrying(false);

@@ -16,6 +16,13 @@ function getJwtRole(req: Request): string | null {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice("Bearer ".length);
+
+  // Support newer opaque service role keys used as bearer tokens for internal calls.
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (serviceRoleKey && token === serviceRoleKey) {
+    return "service_role";
+  }
+
   const parts = token.split(".");
   if (parts.length !== 3) return null;
 
