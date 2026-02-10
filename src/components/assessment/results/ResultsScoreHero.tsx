@@ -50,53 +50,50 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
 
   return (
     <div className="bg-card rounded-2xl border border-border p-6 md:p-8 space-y-5">
-      {/* Score + text horizontal on desktop */}
-      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-        {/* Score circle */}
-        <div className="flex flex-col items-center gap-2 flex-shrink-0">
-          <div
-            className={cn(
-              "w-24 h-24 rounded-full flex items-center justify-center border-4 transition-all duration-500",
-              tier.color === "green" && "border-primary bg-primary/10",
-              tier.color === "amber" && "border-amber-500 bg-amber-500/10",
-              tier.color === "red" && "border-muted-foreground/40 bg-muted/40"
-            )}
-          >
-            <span className="font-display text-3xl font-bold text-foreground">
-              {displayScore}
-            </span>
-          </div>
-          <span
-            className={cn(
-              "inline-block px-3 py-1 rounded-full text-xs font-body font-medium",
-              tier.color === "green" && "bg-primary/15 text-primary",
-              tier.color === "amber" && "bg-amber-500/15 text-amber-700",
-              tier.color === "red" && "bg-muted text-muted-foreground"
-            )}
-          >
-            {tierLabels[tierKey]}
+      {/* Score circle centered */}
+      <div className="flex flex-col items-center gap-2">
+        <div
+          className={cn(
+            "w-24 h-24 rounded-full flex items-center justify-center border-4 transition-all duration-500",
+            tier.color === "green" && "border-primary bg-primary/10",
+            tier.color === "amber" && "border-amber-500 bg-amber-500/10",
+            tier.color === "red" && "border-muted-foreground/40 bg-muted/40"
+          )}
+        >
+          <span className="font-display text-3xl font-bold text-foreground">
+            {displayScore}
           </span>
         </div>
+        <span
+          className={cn(
+            "inline-block px-3 py-1 rounded-full text-xs font-body font-medium",
+            tier.color === "green" && "bg-primary/15 text-primary",
+            tier.color === "amber" && "bg-amber-500/15 text-amber-700",
+            tier.color === "red" && "bg-muted text-muted-foreground"
+          )}
+        >
+          {tierLabels[tierKey]}
+        </span>
+      </div>
 
-        {/* Text content */}
-        <div className="space-y-3 text-center sm:text-left flex-1">
-          <h1 className="font-display text-xl md:text-2xl font-semibold text-foreground">
-            {tierHeadlines[tierKey]}
-          </h1>
-          <p className="font-body text-base text-muted-foreground">
-            {tierSubheadlines[tierKey]}
-          </p>
-          <p className="font-body text-sm text-muted-foreground/80 leading-relaxed">
-            Your Findability Score measures whether the right people could find and act on what matters — like important documents, accounts, and wishes — if they ever needed to.
-          </p>
-          <p className="font-body text-sm text-muted-foreground/70 leading-relaxed">
-            {tierKey === "strong"
-              ? "Most people haven't thought about this at all. You're in a strong position — let's make sure it stays that way."
-              : tierKey === "unclear"
-              ? "Many people don't even know where to start. The fact that you're here means you're already ahead."
-              : "Most families aren't prepared for the unexpected. Taking this assessment is the first real step toward changing that."}
-          </p>
-        </div>
+      {/* Text content below score */}
+      <div className="space-y-3 text-center">
+        <h1 className="font-display text-xl md:text-2xl font-semibold text-foreground">
+          {tierHeadlines[tierKey]}
+        </h1>
+        <p className="font-body text-base text-muted-foreground">
+          {tierSubheadlines[tierKey]}
+        </p>
+        <p className="font-body text-sm text-muted-foreground/80 leading-relaxed">
+          Your Findability Score measures whether the right people could find and act on what matters — like important documents, accounts, and wishes — if they ever needed to.
+        </p>
+        <p className="font-body text-sm text-muted-foreground/70 leading-relaxed">
+          {tierKey === "strong"
+            ? "Most people haven't thought about this at all. You're in a strong position — let's make sure it stays that way."
+            : tierKey === "unclear"
+            ? "Many people don't even know where to start. The fact that you're here means you're already ahead."
+            : "Most families aren't prepared for the unexpected. Taking this assessment is the first real step toward changing that."}
+        </p>
       </div>
     </div>
   );
