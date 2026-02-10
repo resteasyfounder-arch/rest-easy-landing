@@ -56,6 +56,7 @@ export function RemyGlobalLauncher() {
     acknowledgeAction,
     trackEvent,
     refresh,
+    chatTurn,
   } = useRemySurface({
     subjectId: null,
     surface: surface || "dashboard",
@@ -151,6 +152,7 @@ export function RemyGlobalLauncher() {
                 onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
                 onRetry={refresh}
                 onTrackEvent={trackEvent}
+                onChatTurn={chatTurn}
                 onNavigateAction={async (actionId, href) => {
                   const safeTarget = getSafeRemyPath(href, "/dashboard");
                   await acknowledgeAction(actionId, safeTarget);

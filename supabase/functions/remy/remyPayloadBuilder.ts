@@ -45,6 +45,7 @@ export type AssessmentRow = {
   report_stale: boolean;
   report_data: unknown;
   last_answer_at: string | null;
+  overall_score?: number | null;
 };
 
 type ImprovementItem = {

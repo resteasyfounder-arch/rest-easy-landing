@@ -1,5 +1,6 @@
 export type RemySurface = "dashboard" | "readiness" | "section_summary" | "results" | "profile" | "menu";
 export type RemyPriority = "HIGH" | "MEDIUM" | "LOW";
+export type RemyChatIntent = "clarify" | "prioritize" | "explain_score" | "plan_next" | "reassure" | "unknown";
 
 export interface RemyNudge {
   id: string;
@@ -39,4 +40,45 @@ export interface RemySurfacePayload {
   explanations: RemyExplanation[];
   priorities: RemyPriorityItem[];
   reassurance: RemyReassurance;
+}
+
+export interface RemyChatTurnRequest {
+  action: "chat_turn";
+  assessment_id: string;
+  surface: RemySurface;
+  conversation_id?: string;
+  message: string;
+  context_hint?: string;
+}
+
+export interface RemyChatTurnResponse {
+  conversation_id: string;
+  assistant_message: string;
+  quick_replies: string[];
+  cta?: {
+    id: string;
+    label: string;
+    href: string;
+  };
+  why_this?: {
+    title: string;
+    body: string;
+    source_refs: string[];
+  };
+  intent: RemyChatIntent;
+  confidence: number;
+  safety_flags: string[];
+}
+
+export interface RemyConversationMessage {
+  id: string;
+  role: "user" | "remy";
+  text: string;
+  createdAt: number;
+  actions?: Array<{
+    actionId: string;
+    href: string;
+    label: string;
+  }>;
+  quickReplies?: string[];
 }

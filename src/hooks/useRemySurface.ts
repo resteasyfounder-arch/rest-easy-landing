@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RemySurface, RemySurfacePayload } from "@/types/remy";
-import { parseRemySurfacePayload } from "@/lib/remySchema";
+import type {
+  RemyChatTurnResponse,
+  RemySurface,
+  RemySurfacePayload,
+} from "@/types/remy";
+import { parseRemyChatTurnResponse, parseRemySurfacePayload } from "@/lib/remySchema";
 import { invokeAuthedFunction } from "@/lib/invokeAuthedFunction";
 
 export const REMY_REFRESH_EVENT = "remy:refresh";
@@ -20,6 +24,11 @@ interface UseRemySurfaceReturn {
   dismissNudge: (nudgeId: string, ttlHours?: number) => Promise<void>;
   acknowledgeAction: (actionId: string, targetHref?: string) => Promise<void>;
   trackEvent: (eventId: string, metadata?: Record<string, unknown>) => Promise<void>;
+  chatTurn: (
+    message: string,
+    conversationId?: string,
+    contextHint?: string,
+  ) => Promise<RemyChatTurnResponse>;
 }
 
 export function notifyRemyRefresh() {
@@ -133,6 +142,30 @@ export function useRemySurface({
     [subjectId, surface],
   );
 
+  const chatTurn = useCallback(
+    async (message: string, conversationId?: string, contextHint?: string) => {
+      const requestPayload: Record<string, unknown> = {
+        action: "chat_turn",
+        assessment_id: "readiness_v1",
+        surface,
+        message,
+      };
+      if (conversationId) {
+        requestPayload.conversation_id = conversationId;
+      }
+      if (contextHint) {
+        requestPayload.context_hint = contextHint;
+      }
+      if (subjectId) {
+        requestPayload.subject_id = subjectId;
+      }
+
+      const data = await callRemy(requestPayload);
+      return parseRemyChatTurnResponse(data);
+    },
+    [subjectId, surface],
+  );
+
   useEffect(() => {
     mountedRef.current = true;
     refresh();
@@ -160,6 +193,7 @@ export function useRemySurface({
     dismissNudge,
     acknowledgeAction,
     trackEvent,
+    chatTurn,
   };
 }
 

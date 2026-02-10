@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, SendHorizonal, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { RemySurfacePayload } from "@/types/remy";
-
-type Intent = "first_step" | "why_now" | "top_priorities" | "reassurance";
+import type {
+  RemyChatTurnResponse,
+  RemyConversationMessage,
+  RemySurfacePayload,
+} from "@/types/remy";
 
 type ChatAction = {
   actionId: string;
@@ -13,11 +16,10 @@ type ChatAction = {
   label: string;
 };
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "remy";
+type LocalReply = {
   text: string;
   actions?: ChatAction[];
+  quickReplies?: string[];
 };
 
 interface RemyCompanionChatProps {
@@ -28,99 +30,105 @@ interface RemyCompanionChatProps {
   onDismiss?: (nudgeId: string) => Promise<void> | void;
   onNavigateAction?: (actionId: string, href: string) => Promise<void> | void;
   onTrackEvent?: (eventId: string, metadata?: Record<string, unknown>) => Promise<void> | void;
+  onChatTurn?: (
+    message: string,
+    conversationId?: string,
+    contextHint?: string,
+  ) => Promise<RemyChatTurnResponse>;
   onRetry?: () => Promise<void> | void;
   className?: string;
 }
 
-const QUICK_REPLIES: Array<{ id: Intent; label: string }> = [
-  { id: "first_step", label: "What should I do first?" },
-  { id: "why_now", label: "Why this now?" },
-  { id: "top_priorities", label: "Show top priorities" },
-  { id: "reassurance", label: "Reassure me" },
+const DEFAULT_QUICK_REPLIES = [
+  "What should I do first?",
+  "Why is this prioritized?",
+  "Can you explain my current score?",
 ];
 
-function getFirstMessage(payload: RemySurfacePayload | null, userName?: string | null): ChatMessage {
-  const prefix = userName ? `Hi ${userName},` : "Hi,";
+function buildIntroMessage(payload: RemySurfacePayload | null, userName?: string | null): RemyConversationMessage {
+  const greeting = userName ? `Hi ${userName},` : "Hi,";
   if (!payload) {
     return {
-      id: "intro:empty",
+      id: "remy:intro:empty",
       role: "remy",
-      text: `${prefix} I can guide your next readiness step and keep things simple.`,
+      text: `${greeting} I can guide your next readiness step and keep things simple.`,
+      createdAt: Date.now(),
+      quickReplies: DEFAULT_QUICK_REPLIES,
     };
   }
 
-  if (payload.nudge) {
+  if (payload.nudge?.cta) {
     return {
-      id: "intro:nudge",
+      id: `remy:intro:${payload.nudge.id}`,
       role: "remy",
-      text: `${prefix} here's your highest-impact next step: ${payload.nudge.title}.`,
-      actions: payload.nudge.cta
-        ? [{ actionId: payload.nudge.id, href: payload.nudge.cta.href, label: payload.nudge.cta.label }]
-        : undefined,
+      text: `${greeting} here's the highest-impact next step: ${payload.nudge.title}.`,
+      createdAt: Date.now(),
+      actions: [{ actionId: payload.nudge.id, href: payload.nudge.cta.href, label: payload.nudge.cta.label }],
+      quickReplies: DEFAULT_QUICK_REPLIES,
     };
   }
 
   return {
-    id: "intro:reassurance",
+    id: "remy:intro:reassurance",
     role: "remy",
-    text: `${prefix} ${payload.reassurance.body}`,
+    text: `${greeting} ${payload.reassurance.body}`,
+    createdAt: Date.now(),
+    quickReplies: DEFAULT_QUICK_REPLIES,
   };
 }
 
-function getIntentReply(intent: Intent, payload: RemySurfacePayload | null): Omit<ChatMessage, "id" | "role"> {
+function buildLocalReply(input: string, payload: RemySurfacePayload | null): LocalReply {
   if (!payload) {
     return {
-      text: "I need a little more profile and assessment context before I can personalize your next step.",
+      text: "I need a bit more assessment context before I can personalize this. Continue your readiness flow and I will guide the next step.",
+      quickReplies: DEFAULT_QUICK_REPLIES,
     };
   }
 
-  switch (intent) {
-    case "first_step": {
-      if (payload.nudge?.cta) {
-        return {
-          text: payload.nudge.body,
-          actions: [{ actionId: payload.nudge.id, href: payload.nudge.cta.href, label: payload.nudge.cta.label }],
-        };
-      }
-      const top = payload.priorities[0];
-      if (top) {
-        return {
-          text: `Start with "${top.title}". ${top.why_now}`,
-          actions: [{ actionId: top.id, href: top.target_href, label: "Take me there" }],
-        };
-      }
-      return {
-        text: "You're in a good spot. Keep momentum by reviewing your report and finishing one remaining item this week.",
-      };
+  const normalized = input.toLowerCase();
+  const topPriority = payload.priorities[0];
+  const topExplanation = payload.explanations[0];
+  const topCta = payload.nudge?.cta || (topPriority
+    ? {
+      label: "Open top priority",
+      href: topPriority.target_href,
     }
-    case "why_now": {
-      const explanation = payload.explanations[0];
-      return {
-        text: explanation?.body || "This recommendation is based on your current answers, section weight, and report state.",
-      };
-    }
-    case "top_priorities": {
-      if (payload.priorities.length === 0) {
-        return {
-          text: "You don't have critical priorities right now. Focus on consistency and keeping your details up to date.",
-        };
-      }
-      const topTwo = payload.priorities.slice(0, 2);
-      return {
-        text: topTwo.map((item, index) => `${index + 1}. ${item.title}`).join(" "),
-        actions: topTwo.map((item) => ({
-          actionId: item.id,
-          href: item.target_href,
-          label: item.priority === "HIGH" ? `Open ${item.priority} priority` : `Open ${item.title}`,
-        })),
-      };
-    }
-    case "reassurance":
-    default:
-      return {
-        text: payload.reassurance.body,
-      };
+    : null);
+
+  if (normalized.includes("score") || normalized.includes("why")) {
+    return {
+      text: topExplanation?.body || "Your priorities are based on your latest answers and the section weights.",
+      actions: topCta
+        ? [{ actionId: payload.nudge?.id || topPriority?.id || "priority", href: topCta.href, label: topCta.label }]
+        : undefined,
+      quickReplies: DEFAULT_QUICK_REPLIES,
+    };
   }
+
+  if (normalized.includes("first") || normalized.includes("next") || normalized.includes("priority")) {
+    return {
+      text: topPriority
+        ? `Start with "${topPriority.title}". ${topPriority.why_now}`
+        : "Continue your readiness sections and I will reprioritize once you add more answers.",
+      actions: topCta
+        ? [{ actionId: payload.nudge?.id || topPriority?.id || "priority", href: topCta.href, label: topCta.label }]
+        : undefined,
+      quickReplies: DEFAULT_QUICK_REPLIES,
+    };
+  }
+
+  return {
+    text: payload.reassurance.body,
+    actions: topCta
+      ? [{ actionId: payload.nudge?.id || topPriority?.id || "priority", href: topCta.href, label: topCta.label }]
+      : undefined,
+    quickReplies: DEFAULT_QUICK_REPLIES,
+  };
+}
+
+function toMessageAction(response?: RemyChatTurnResponse): ChatAction[] | undefined {
+  if (!response?.cta) return undefined;
+  return [{ actionId: response.cta.id, href: response.cta.href, label: response.cta.label }];
 }
 
 export function RemyCompanionChat({
@@ -131,15 +139,18 @@ export function RemyCompanionChat({
   onDismiss,
   onNavigateAction,
   onTrackEvent,
+  onChatTurn,
   onRetry,
   className,
 }: RemyCompanionChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<RemyConversationMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const [lastTurnAt, setLastTurnAt] = useState<number>(Date.now());
+  const [draft, setDraft] = useState("");
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [quickReplies, setQuickReplies] = useState<string[]>(DEFAULT_QUICK_REPLIES);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const quickReplies = useMemo(() => QUICK_REPLIES, []);
+  const canSend = useMemo(() => draft.trim().length > 0 && !isThinking, [draft, isThinking]);
 
   const track = (eventId: string, metadata: Record<string, unknown> = {}) => {
     if (!onTrackEvent) return;
@@ -147,41 +158,82 @@ export function RemyCompanionChat({
   };
 
   useEffect(() => {
-    setMessages([getFirstMessage(payload, userName)]);
-  }, [payload?.generated_at, userName]);
+    const intro = buildIntroMessage(payload, userName);
+    setMessages([intro]);
+    setConversationId(undefined);
+    setQuickReplies(intro.quickReplies || DEFAULT_QUICK_REPLIES);
+  }, [payload, userName]);
 
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
-  }, [messages, isThinking, lastTurnAt]);
+  }, [messages, isThinking]);
 
-  const handleIntent = (intent: Intent) => {
-    if (isThinking) return;
-    const prompt = quickReplies.find((item) => item.id === intent)?.label ?? "Tell me more";
-    const nextUserMessage: ChatMessage = {
-      id: `user:${Date.now()}`,
-      role: "user",
-      text: prompt,
-    };
-    setMessages((prev) => [...prev, nextUserMessage]);
+  const appendAssistantMessage = (message: RemyConversationMessage) => {
+    setMessages((prev) => [...prev, message]);
+    if (message.quickReplies && message.quickReplies.length > 0) {
+      setQuickReplies(message.quickReplies.slice(0, 3));
+    }
+  };
+
+  const sendMessage = async (rawText: string, source: "typed" | "quick_reply") => {
+    const text = rawText.trim();
+    if (!text || isThinking) return;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `user:${Date.now()}`,
+        role: "user",
+        text,
+        createdAt: Date.now(),
+      },
+    ]);
+    setDraft("");
     setIsThinking(true);
-    setLastTurnAt(Date.now());
+    track("remy_chat_turn", { source, has_chat_backend: Boolean(onChatTurn) });
 
-    track("remy_chat_turn", { intent });
-
-    window.setTimeout(() => {
-      const reply = getIntentReply(intent, payload);
-      const nextAssistantMessage: ChatMessage = {
-        id: `remy:${Date.now()}`,
+    try {
+      if (onChatTurn) {
+        const response = await onChatTurn(text, conversationId, source === "quick_reply" ? "quick_reply" : undefined);
+        setConversationId(response.conversation_id);
+        appendAssistantMessage({
+          id: `remy:${Date.now()}`,
+          role: "remy",
+          text: response.assistant_message,
+          createdAt: Date.now(),
+          actions: toMessageAction(response),
+          quickReplies: response.quick_replies.length > 0 ? response.quick_replies : DEFAULT_QUICK_REPLIES,
+        });
+      } else {
+        const fallback = buildLocalReply(text, payload);
+        appendAssistantMessage({
+          id: `remy:${Date.now()}`,
+          role: "remy",
+          text: fallback.text,
+          createdAt: Date.now(),
+          actions: fallback.actions,
+          quickReplies: fallback.quickReplies || DEFAULT_QUICK_REPLIES,
+        });
+      }
+    } catch (_error) {
+      appendAssistantMessage({
+        id: `remy:error:${Date.now()}`,
         role: "remy",
-        text: reply.text,
-        actions: reply.actions,
-      };
-      setMessages((prev) => [...prev, nextAssistantMessage]);
+        text: "I had trouble responding just now. Please try again.",
+        createdAt: Date.now(),
+        quickReplies: DEFAULT_QUICK_REPLIES,
+      });
+      track("remy_chat_error", { source });
+    } finally {
       setIsThinking(false);
-      setLastTurnAt(Date.now());
-    }, 180);
+    }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void sendMessage(draft, "typed");
   };
 
   if (isLoading) {
@@ -209,13 +261,13 @@ export function RemyCompanionChat({
     <div className={cn("space-y-3", className)}>
       <div
         ref={scrollRef}
-        className="max-h-[min(55vh,360px)] space-y-2 overflow-y-auto rounded-xl border border-border/50 bg-card/50 p-3"
+        className="max-h-[min(58vh,390px)] space-y-2 overflow-y-auto rounded-xl border border-border/50 bg-card/50 p-3"
       >
-        {messages.slice(-6).map((message) => (
+        {messages.slice(-10).map((message) => (
           <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
             <div
               className={cn(
-                "max-w-[90%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                "max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
                 message.role === "user"
                   ? "rounded-br-md bg-primary/15 text-foreground"
                   : "rounded-bl-md border border-border/60 bg-background text-foreground",
@@ -265,18 +317,30 @@ export function RemyCompanionChat({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {quickReplies.map((item) => (
+        {quickReplies.slice(0, 3).map((item) => (
           <Button
-            key={item.id}
+            key={item}
             size="sm"
             variant="outline"
-            onClick={() => handleIntent(item.id)}
+            onClick={() => void sendMessage(item, "quick_reply")}
             disabled={isThinking}
           >
-            {item.label}
+            {item}
           </Button>
         ))}
       </div>
+
+      <form className="flex items-center gap-2" onSubmit={handleSubmit}>
+        <Input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value.slice(0, 800))}
+          placeholder="Talk to Remy about your readiness plan..."
+          disabled={isThinking}
+        />
+        <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
+          <SendHorizonal className="h-4 w-4" />
+        </Button>
+      </form>
 
       {payload?.nudge && onDismiss && (
         <div className="flex items-center justify-between rounded-lg border border-border/50 bg-background/70 px-3 py-2">

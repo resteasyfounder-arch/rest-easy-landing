@@ -13,8 +13,8 @@ serve(async (req) => {
 
   try {
     const { answers, score, questions } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiApiKey) throw new Error("OPENAI_API_KEY is not configured");
 
     // Build a readable summary of the user's answers for the AI
     const answerSummary = questions
@@ -42,18 +42,18 @@ ${answerSummary}
 
 Generate a personalized summary as Remy.`;
 
-    console.log("Calling AI gateway for findability summary...");
+    console.log("Calling OpenAI for findability summary...");
 
     const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      "https://api.openai.com/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${openaiApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -89,7 +89,7 @@ Generate a personalized summary as Remy.`;
     if (!response.ok) {
       const status = response.status;
       const text = await response.text();
-      console.error("AI gateway error:", status, text);
+      console.error("OpenAI API error:", status, text);
 
       if (status === 429) {
         return new Response(
@@ -97,18 +97,18 @@ Generate a personalized summary as Remy.`;
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (status === 402) {
+      if (status === 401) {
         return new Response(
-          JSON.stringify({ error: "AI credits exhausted." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Invalid API key configuration" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      throw new Error(`AI gateway returned ${status}`);
+      throw new Error(`OpenAI returned ${status}`);
     }
 
     const data = await response.json();
-    console.log("AI gateway response received");
+    console.log("OpenAI response received");
 
     // Extract the tool call result
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
