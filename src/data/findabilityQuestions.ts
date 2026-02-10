@@ -225,7 +225,7 @@ export type AnswerValue = "yes" | "somewhat" | "no";
 
 export const answerScores: Record<AnswerValue, number> = {
   yes: 10,
-  somewhat: 5,
+  somewhat: 7,
   no: 0,
 };
 
