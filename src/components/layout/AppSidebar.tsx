@@ -1,4 +1,4 @@
-import { Home, BarChart3, Settings, LogIn, Sparkles, UserCircle, Vault, FileText } from "lucide-react";
+import { Home, BarChart3, LogIn, Sparkles, UserCircle, Vault, FileText } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -182,17 +182,6 @@ const AppSidebar = () => {
       <SidebarFooter className="p-3">
         <SidebarSeparator className="mb-3" />
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={() => navigate("/menu")}
-              isActive={isActive("/menu")}
-              tooltip="Settings"
-              className="hover:bg-accent"
-            >
-              <Settings className="h-5 w-5" />
-              <span className="font-body">Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => navigate("/login")}
