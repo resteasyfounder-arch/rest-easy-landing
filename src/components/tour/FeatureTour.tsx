@@ -98,7 +98,8 @@ const FeatureTour = ({ tourHook }: FeatureTourProps) => {
 };
 
 function computeCardPosition(rect: SpotlightRect): React.CSSProperties {
-  const cardWidth = 320;
+  const cardWidth = 360;
+  const cardHeight = 520;
   const gap = 12;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -106,18 +107,25 @@ function computeCardPosition(rect: SpotlightRect): React.CSSProperties {
   // Try right of target
   if (rect.left + rect.width + gap + cardWidth < vw) {
     return {
-      top: Math.min(rect.top, vh - 260),
+      top: Math.max(8, Math.min(rect.top, vh - cardHeight)),
       left: rect.left + rect.width + gap,
     };
   }
   // Try left of target
   if (rect.left - gap - cardWidth > 0) {
     return {
-      top: Math.min(rect.top, vh - 260),
+      top: Math.max(8, Math.min(rect.top, vh - cardHeight)),
       left: rect.left - gap - cardWidth,
     };
   }
-  // Fallback: below
+  // Fallback: above target (good for bottom nav on mobile)
+  if (rect.top - gap - cardHeight > 0) {
+    return {
+      top: rect.top - gap - cardHeight,
+      left: Math.max(8, Math.min(rect.left, vw - cardWidth - 8)),
+    };
+  }
+  // Final fallback: below
   return {
     top: rect.top + rect.height + gap,
     left: Math.max(8, Math.min(rect.left, vw - cardWidth - 8)),
