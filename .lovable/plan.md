@@ -1,66 +1,64 @@
 
 
-## Feature Tour / Tutorial Walkthrough
+## Add Page Preview Teasers to Feature Tour
 
 ### Overview
-A guided, step-by-step feature tour that highlights the five key sections of the app. It auto-launches on first login and can be re-triggered anytime via a help button in the navigation. Each step overlays a spotlight on the relevant nav item with a tooltip-style card explaining what the section does and how to use it.
+Enhance the existing feature tour so that each step displays a visual preview/mockup of the corresponding page alongside the text description. As the user clicks through tour steps, the preview updates with a smooth crossfade animation. These are lightweight, static mockup components -- not the actual pages -- designed to give users a taste of what each section looks like.
 
-### Tour Steps
+### What the User Will See
 
-| Step | Target | Title | Description |
-|------|--------|-------|-------------|
-| 1 | Home nav item | Your Home Base | Track your progress while your assessment is underway. Once complete, this becomes your dashboard -- a snapshot of your readiness score, report highlights, and action roadmap. |
-| 2 | My Profile nav item | Your Life Snapshot | Keep your profile up to date as life changes. The questions and sections you see adapt based on what matters to you. You can also manage your Trust Network here -- the people you want to have access when it matters most. |
-| 3 | Life Readiness nav item | Life Readiness Assessment | Personalized questions that adapt to your life. Work through them at your own pace -- your progress is saved automatically. Once complete, your Readiness Report will be generated. |
-| 4 | Report nav item | Your Readiness Report | This is where the value comes together. Get a tailored gap analysis with prioritized next steps so you know exactly where to focus your end-of-life planning efforts. |
-| 5 | EasyVault nav item | EasyVault Document Storage | Keep everything your loved ones will need in one place. Upload important documents, mark what does not apply to your life, and track your progress so nothing gets missed. |
+Each tour step will now show a preview card below (on mobile) or beside (on desktop) the step description. The previews are:
+
+| Step | Preview Content |
+|------|----------------|
+| Home (Dashboard) | A mini progress hero card with a progress bar at 42%, "5 sections away" narrative text, and a journey timeline with 3 nodes (1 complete, 1 current, 1 locked) |
+| My Profile | A compact life snapshot showing toggled life area chips (Family, Pets, Home, Finances) and a mini Trust Network section with 2 sample contact avatars |
+| Life Readiness | A sample question card: "Do you have a current will?" with three answer options (Yes, Partially, No) and a progress indicator "Question 3 of 8" |
+| Readiness Report | A mini report preview with a score circle (78), tier badge "Well Prepared", and section bars (Executive Summary, Key Strengths, Areas to Address) |
+| EasyVault | A compact vault view with 3 document category rows (Legal, Financial, Healthcare) showing progress bars and document counts |
 
 ### Architecture
 
-**New files:**
-- `src/components/tour/FeatureTour.tsx` -- Main tour component with overlay, spotlight, and step cards
-- `src/components/tour/TourStep.tsx` -- Individual step tooltip/card UI
-- `src/hooks/useFeatureTour.ts` -- Hook managing tour state (current step, open/close, localStorage persistence)
+**New file: `src/components/tour/TourPreview.tsx`**
+- A single component that accepts the step `id` and renders the corresponding mockup
+- Uses a `switch` on the step id to render 5 different static mini-UIs
+- All content is hardcoded/decorative (no real data) -- purely illustrative
+- Wraps content in a container with `animate-fade-in` for smooth transitions between steps
+- Uses existing UI primitives (Card, Progress, Badge) and Tailwind for styling
 
-**Modified files:**
-- `src/hooks/useFirstVisit.ts` -- Extend to also track whether the tour has been completed (new key `rest-easy.tour_complete`)
-- `src/components/layout/DesktopLayout.tsx` -- Add a help/tour button in the header bar; render `FeatureTour` component
-- `src/components/layout/BottomNav.tsx` -- Add data attributes to nav items so the tour can target them for spotlight positioning
-- `src/components/layout/AppSidebar.tsx` -- Add data attributes to sidebar nav items for desktop spotlight targeting
-- `src/components/layout/AppLayout.tsx` -- Render `FeatureTour` at the layout level so it works on both mobile and desktop
-- `src/pages/Dashboard.tsx` -- Auto-trigger tour on first visit using `useFirstVisit` hook
+**Modified file: `src/components/tour/TourStep.tsx`**
+- Import and render `TourPreview` between the description and the footer navigation
+- Pass `step.id` to `TourPreview`
+- Increase card width from `w-[320px]` to `w-[360px]` to accommodate the preview content
 
-### How It Works
-
-1. **First login**: When a user lands on `/dashboard` for the first time (`useFirstVisit` returns `isFirstVisit: true`), the tour auto-starts.
-2. **Step progression**: Each step highlights the corresponding nav item (sidebar on desktop, bottom nav on mobile) using a semi-transparent overlay with a spotlight cutout. A card appears next to the highlighted element with the title, description, and Next/Back/Skip controls.
-3. **Completion**: On finishing or skipping, `markVisitComplete()` is called, persisting to localStorage so it does not show again.
-4. **Re-trigger**: A small help icon button (e.g., `HelpCircle` from lucide) is added to the desktop header bar and as a floating button on mobile. Clicking it resets the tour to step 1.
+**Modified file: `src/components/tour/FeatureTour.tsx`**
+- Update `computeCardPosition` to account for the taller card height (approximately 480px instead of 260px)
+- Adjust the `vh - 260` clamp to `vh - 520` so the card stays on screen
 
 ### Technical Details
 
-**`useFeatureTour.ts` hook:**
-```
-State: { isOpen, currentStep, totalSteps }
-Actions: start(), next(), back(), skip(), close()
-Persistence: localStorage key "rest-easy.tour_complete"
-```
+**TourPreview mockup approach:**
+- Each mockup is a self-contained `div` approximately 140-180px tall
+- Uses real Tailwind classes and existing design tokens (rounded-xl, border-border, bg-card, font-display, etc.) to match the app's visual language
+- No animations within the previews (they are static snapshots) -- only the crossfade between them animates
+- A subtle `rounded-lg border border-border/50 bg-muted/20 overflow-hidden` wrapper provides a "screenshot" feel
 
-**Spotlight mechanics:**
-- Each nav item gets a `data-tour="home"`, `data-tour="profile"`, etc. attribute
-- The tour component queries `document.querySelector('[data-tour="..."]')` to get the element's bounding rect
-- A full-screen overlay with `pointer-events-none` is rendered with a CSS clip-path or box-shadow cutout around the target element
-- The step card is absolutely positioned relative to the target
+**Preview content details:**
 
-**Step card UI:**
-- Warm card style consistent with the app (rounded-xl, soft shadow, primary accent)
-- Step indicator dots at the bottom (e.g., "2 of 5")
-- Three buttons: Back (disabled on step 1), Next/Finish, and a subtle Skip link
-- Smooth fade/slide animation between steps using existing `animate-fade-in` / `animate-scale-in`
+1. **Dashboard preview**: A mini card with a progress bar, "42% complete" label, and 3 small circle nodes representing journey sections (green check, blue pulse, gray lock)
 
-**Re-trigger button placement:**
-- Desktop: In the `DesktopLayout` header, next to the sidebar trigger -- a `HelpCircle` icon button with tooltip "Feature Tour"
-- Mobile: In the `BottomNav` area or as a small floating action button; alternatively added to the Menu page as a menu item
+2. **Profile preview**: Horizontal row of pill-shaped chips ("Family", "Pets", "Home") with check icons, plus a "Trust Network" label with 2 overlapping avatar circles and "+3 more"
 
-**No external dependencies required** -- built entirely with existing UI primitives (Card, Button, Portal via React portals) and Tailwind utilities.
+3. **Life Readiness preview**: A question "Do you have a current will?" with 3 styled answer rows (mimicking the AnswerButton style), one highlighted as selected, and a "Question 3 of 8" footer
 
+4. **Report preview**: Score circle (78) with "Well Prepared" badge, followed by 3 section bars with colored dots (green for Strengths, amber for Gaps, blue for Actions) and skeleton text lines
+
+5. **EasyVault preview**: 3 rows showing folder icon + category name + mini progress bar (Legal 2/4, Financial 1/3, Healthcare 0/2) with a lock icon footer "Encrypted storage"
+
+**Crossfade animation:**
+- The preview container uses a `key={step.id}` to trigger React remount
+- CSS class `animate-fade-in` (already exists in the project) handles the entrance animation
+
+**Card positioning adjustments:**
+- The card is now taller (~480px total), so `computeCardPosition` needs to prefer placing the card vertically centered relative to the spotlight target
+- On mobile (bottom nav), the card will appear above the nav with the preview stacked below the text
