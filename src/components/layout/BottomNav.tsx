@@ -3,11 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: "Home", path: "/dashboard" },
-  { icon: Sparkles, label: "Readiness", path: "/readiness" },
-  { icon: Vault, label: "Vault", path: "/vault" },
-  { icon: BarChart3, label: "Report", path: "/results" },
-  { icon: UserCircle, label: "Profile", path: "/profile" },
+  { icon: Home, label: "Home", path: "/dashboard", tourId: "home" },
+  { icon: Sparkles, label: "Readiness", path: "/readiness", tourId: "readiness" },
+  { icon: Vault, label: "Vault", path: "/vault", tourId: "vault" },
+  { icon: BarChart3, label: "Report", path: "/results", tourId: "report" },
+  { icon: UserCircle, label: "Profile", path: "/profile", tourId: "profile" },
 ];
 
 const BottomNav = () => {
@@ -24,6 +24,7 @@ const BottomNav = () => {
           return (
             <button
               key={item.path}
+              data-tour={item.tourId}
               onClick={() => navigate(item.path)}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-1 px-4 py-2 min-w-[64px] touch-target press-effect transition-all duration-200",

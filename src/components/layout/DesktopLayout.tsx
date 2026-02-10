@@ -2,10 +2,13 @@ import { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./AppSidebar";
-import { useNavigate } from "react-router-dom";
+import { HelpCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DesktopLayoutProps {
   children: ReactNode;
+  onStartTour?: () => void;
 }
 
 const routeTitles: Record<string, string> = {
@@ -18,9 +21,8 @@ const routeTitles: Record<string, string> = {
   "/profile": "My Profile",
 };
 
-const DesktopLayout = ({ children }: DesktopLayoutProps) => {
+const DesktopLayout = ({ children, onStartTour }: DesktopLayoutProps) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const currentTitle = routeTitles[location.pathname] || "Rest Easy";
 
   return (
@@ -37,7 +39,16 @@ const DesktopLayout = ({ children }: DesktopLayoutProps) => {
                 {currentTitle}
               </h1>
             </div>
-            {/* Intentionally empty - auth actions handled by sidebar */}
+            {onStartTour && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={onStartTour} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                    <HelpCircle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Feature Tour</TooltipContent>
+              </Tooltip>
+            )}
           </header>
 
           {/* Main Content */}

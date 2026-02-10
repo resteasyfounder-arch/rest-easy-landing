@@ -22,11 +22,11 @@ import { TierBadge } from "@/components/dashboard";
 import logo from "@/assets/rest-easy-logo.png";
 
 const navItems = [
-  { title: "Home", url: "/dashboard", icon: Home },
-  { title: "My Profile", url: "/profile", icon: UserCircle },
-  { title: "Life Readiness", url: "/readiness", icon: Sparkles },
-  { title: "Readiness Report", url: "/results", icon: BarChart3 },
-  { title: "EasyVault", url: "/vault", icon: Vault },
+  { title: "Home", url: "/dashboard", icon: Home, tourId: "home" },
+  { title: "My Profile", url: "/profile", icon: UserCircle, tourId: "profile" },
+  { title: "Life Readiness", url: "/readiness", icon: Sparkles, tourId: "readiness" },
+  { title: "Readiness Report", url: "/results", icon: BarChart3, tourId: "report" },
+  { title: "EasyVault", url: "/vault", icon: Vault, tourId: "vault" },
 ];
 
 const AppSidebar = () => {
@@ -71,6 +71,7 @@ const AppSidebar = () => {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
+                    data-tour={item.tourId}
                     onClick={() => navigate(item.url)}
                     isActive={isActive(item.url)}
                     tooltip={item.title}
