@@ -55,6 +55,19 @@ export function AssessmentCTA({ assessmentState, className }: AssessmentCTAProps
   if (overall_progress >= 100 || status === "completed") {
     const hasReport = report_status === "ready";
     const isGenerating = report_status === "generating";
+    const isFailed = report_status === "failed";
+
+    // Report generation failed - send to results page for retry
+    if (isFailed) {
+      return (
+        <Button asChild size="lg" className={className}>
+          <Link to="/results" className="gap-2">
+            <FileText className="h-4 w-4" />
+            View Report Status
+          </Link>
+        </Button>
+      );
+    }
 
     // Report is generating - show loading state
     if (isGenerating) {

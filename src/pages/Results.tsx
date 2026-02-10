@@ -6,7 +6,7 @@ import type { ReadinessReport } from "@/types/report";
 import { useRemySurface } from "@/hooks/useRemySurface";
 import { useAssessmentState } from "@/hooks/useAssessmentState";
 import { RemyPriorityList } from "@/components/remy/RemyPriorityList";
-import { Download, ArrowLeft, Loader2, Play, ArrowRight } from "lucide-react";
+import { Download, ArrowLeft, Loader2, Play, ArrowRight, RefreshCw, AlertTriangle } from "lucide-react";
 import {
   CoverPage,
   TableOfContents,
@@ -37,6 +37,8 @@ const Results = () => {
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reportFailed, setReportFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const {
@@ -63,6 +65,14 @@ const Results = () => {
         const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
         const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
         
+        // If failed, show retry UI
+        if (reportStatus === "failed") {
+          console.log("[Results] Report generation failed, showing retry UI");
+          setReportFailed(true);
+          setLoading(false);
+          return;
+        }
+
         // If generating OR stale, show loading and poll
         if (reportStatus === "generating" || (reportStatus === "ready" && reportStale)) {
           console.log("[Results] Report is generating or stale, showing progress UI");
@@ -174,6 +184,77 @@ const Results = () => {
     return (
       <AppLayout hideNav>
         <div className="min-h-screen bg-white"><ReportLoading /></div>
+      </AppLayout>
+    );
+  }
+
+  // Show failed UI with retry option
+  if (reportFailed && !report) {
+    const handleRetry = async () => {
+      setRetrying(true);
+      try {
+        await callAgent({
+          action: "retry_report",
+          assessment_id: "readiness_v1",
+        });
+        setReportFailed(false);
+        setIsGenerating(true);
+        // Start polling
+        const pollForRetry = async () => {
+          const maxAttempts = 60;
+          let attempts = 0;
+          const poll = async () => {
+            attempts++;
+            try {
+              const [reportData, stateData] = await Promise.all([
+                callAgent({ action: "get_report", assessment_id: "readiness_v1" }),
+                callAgent({ action: "get_state", assessment_id: "readiness_v1" }),
+              ]);
+              const reportStale = (stateData?.assessment_state as Record<string, unknown>)?.report_stale;
+              const reportStatus = (stateData?.assessment_state as Record<string, unknown>)?.report_status;
+              if (reportData.report && !reportStale && reportStatus === "ready") {
+                setReport(reportData.report as ReadinessReport);
+                setIsGenerating(false);
+                return;
+              }
+              if (reportStatus === "failed") {
+                setIsGenerating(false);
+                setReportFailed(true);
+                return;
+              }
+              if (attempts < maxAttempts) setTimeout(poll, 2000);
+              else setIsGenerating(false);
+            } catch {
+              if (attempts < maxAttempts) setTimeout(poll, 2000);
+              else setIsGenerating(false);
+            }
+          };
+          poll();
+        };
+        pollForRetry();
+      } catch (err) {
+        console.error("[Results] Retry failed:", err);
+        setRetrying(false);
+      }
+    };
+
+    return (
+      <AppLayout>
+        <div className="min-h-screen bg-background flex items-center justify-center px-4">
+          <div className="max-w-md text-center py-12">
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+            </div>
+            <h1 className="text-3xl font-display font-semibold text-foreground mb-4">Report Generation Failed</h1>
+            <p className="text-muted-foreground font-body mb-8">
+              Something went wrong while generating your report. This can happen due to temporary service issues. Please try again.
+            </p>
+            <Button onClick={handleRetry} disabled={retrying} className="press-effect gap-2">
+              {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {retrying ? "Retrying..." : "Retry Report Generation"}
+            </Button>
+          </div>
+        </div>
       </AppLayout>
     );
   }
