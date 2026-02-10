@@ -73,7 +73,7 @@ type AgentAnswerInput = {
 };
 
 type AgentRequest = {
-  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report" | "get_improvement_items";
+  action?: "get_schema" | "get_state" | "start_fresh" | "save_report" | "get_report" | "get_improvement_items" | "retry_report";
   subject_id?: string;
   assessment_id?: string;
   schema_version?: string;
@@ -143,7 +143,6 @@ function getTierFromScore(score: number): ScoreTier {
 // Triggers report regeneration as a background task after answer/profile updates
 // ============================================================================
 async function triggerReportRegeneration(
-  readiness: ReturnType<ReturnType<typeof createClient>["schema"]>,
   assessmentDbId: string,
   subjectId: string,
   assessmentKey: string,
@@ -151,6 +150,14 @@ async function triggerReportRegeneration(
 ): Promise<void> {
   console.log(`[agent] Starting background report regeneration for ${assessmentDbId}`);
   
+  // Create a fresh Supabase client so the background task is self-contained
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const freshClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: { persistSession: false },
+  });
+  const readiness = freshClient.schema("readiness_v1");
+
   try {
     // Build report payload from current state
     const assessmentState = await computeAssessmentState(
@@ -191,13 +198,10 @@ async function triggerReportRegeneration(
       score_fraction: answer.score_fraction ?? null,
     }));
     
-    // Call generate-report
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const fetchUrl = `${SUPABASE_URL}/functions/v1/generate-report`;
+    console.log(`[agent] Calling generate-report at ${fetchUrl}`);
     
-    console.log(`[agent] Calling generate-report edge function`);
-    
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-report`, {
+    const response = await fetch(fetchUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -218,9 +222,19 @@ async function triggerReportRegeneration(
       }),
     });
     
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[agent] generate-report returned ${response.status}: ${errorBody}`);
+      await readiness
+        .from("assessments")
+        .update({ report_status: "failed" })
+        .eq("id", assessmentDbId);
+      return;
+    }
+    
     const data = await response.json();
     
-    if (response.ok && data.report) {
+    if (data.report) {
       // Save report and clear stale flag
       await readiness
         .from("assessments")
@@ -236,21 +250,26 @@ async function triggerReportRegeneration(
       // Mark as failed
       await readiness
         .from("assessments")
-        .update({
-          report_status: "failed",
-        })
+        .update({ report_status: "failed" })
         .eq("id", assessmentDbId);
       console.error(`[agent] Background report regeneration failed:`, data.error || "Unknown error");
     }
   } catch (err) {
     console.error(`[agent] Background report regeneration error:`, err);
-    // Mark as failed on exception
-    await readiness
-      .from("assessments")
-      .update({
-        report_status: "failed",
-      })
-      .eq("id", assessmentDbId);
+    // Create a fresh client for the error case too (original readiness may be stale on error)
+    try {
+      const errClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { auth: { persistSession: false } }
+      );
+      await errClient.schema("readiness_v1")
+        .from("assessments")
+        .update({ report_status: "failed" })
+        .eq("id", assessmentDbId);
+    } catch (innerErr) {
+      console.error(`[agent] Failed to mark report as failed:`, innerErr);
+    }
   }
 }
 
@@ -970,6 +989,41 @@ serve(async (req) => {
     });
   }
 
+  // Handle retry_report action - retry failed report generation
+  if (payload.action === "retry_report") {
+    console.log(`[retry_report] Retrying report for subject ${subjectId}`);
+
+    const assessment = await findActiveAssessment(readiness, subjectId, assessmentKey);
+    if (!assessment) {
+      return jsonResponse({ error: "No active assessment found" }, 404);
+    }
+
+    if (assessment.report_status !== "failed" && assessment.report_status !== "ready") {
+      return jsonResponse({ error: `Cannot retry from status: ${assessment.report_status}` }, 400);
+    }
+
+    // Reset to generating
+    await readiness
+      .from("assessments")
+      .update({
+        report_status: "generating",
+        report_stale: false,
+      })
+      .eq("id", assessment.id);
+
+    // Trigger background regeneration
+    EdgeRuntime.waitUntil(
+      triggerReportRegeneration(
+        assessment.id,
+        subjectId,
+        assessmentKey,
+        userDisplayName
+      )
+    );
+
+    return jsonResponse({ ok: true, report_status: "generating" });
+  }
+
   // Handle get_state action - use unified findActiveAssessment
   if (payload.action === "get_state") {
     // Use the unified helper
@@ -1128,7 +1182,6 @@ serve(async (req) => {
       // Use EdgeRuntime.waitUntil for background execution
       EdgeRuntime.waitUntil(
         triggerReportRegeneration(
-          readiness,
           assessmentResult.id,
           subjectId,
           assessmentKey,
@@ -1204,7 +1257,6 @@ serve(async (req) => {
       // Use EdgeRuntime.waitUntil for background execution
       EdgeRuntime.waitUntil(
         triggerReportRegeneration(
-          readiness,
           assessmentResult.id,
           subjectId,
           assessmentKey,
@@ -1227,7 +1279,6 @@ serve(async (req) => {
       // Use EdgeRuntime.waitUntil for background execution
       EdgeRuntime.waitUntil(
         triggerReportRegeneration(
-          readiness,
           assessmentResult.id,
           subjectId,
           assessmentKey,
