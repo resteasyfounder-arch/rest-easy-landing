@@ -1,82 +1,67 @@
-import { Heart, Wallet, Lock, Brain, Shield, Smartphone, Users, Home, FileText, MapPin, Briefcase } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Heart, Wallet, Shield, Smartphone, Users, Home, FileText, MapPin, Briefcase, Brain, Lock } from "lucide-react";
 
 const categories = [
-  { icon: Heart, label: "Healthcare Directives", desc: "Medical proxies, advance directives, and emergency contacts" },
-  { icon: Wallet, label: "Financial Access", desc: "Bills, accounts, and authorized access for your person" },
-  { icon: Shield, label: "Legal Preparedness", desc: "Powers of attorney, wills, and guardianship plans" },
-  { icon: Smartphone, label: "Digital Life", desc: "Device access, online accounts, and digital legacy" },
-  { icon: Users, label: "Family Communication", desc: "Who knows what, and how to coordinate in a crisis" },
-  { icon: Home, label: "Home & Property", desc: "Property access, maintenance, and household management" },
-  { icon: FileText, label: "Insurance Coverage", desc: "Policy details, claims contacts, and beneficiary info" },
-  { icon: MapPin, label: "Emergency Contacts", desc: "Key people to reach in an urgent situation" },
-  { icon: Briefcase, label: "Business Affairs", desc: "Business continuity, partnerships, and succession" },
-  { icon: Brain, label: "Mental Health & Care", desc: "Care preferences, therapist contacts, and support plans" },
-  { icon: Users, label: "Dependents & Pets", desc: "Guardianship plans, pet care, and daily routines" },
+  { icon: Heart, label: "Healthcare Directives", desc: "Medical proxies and emergency contacts" },
+  { icon: Wallet, label: "Financial Access", desc: "Bills, accounts, and authorized access" },
+  { icon: Shield, label: "Legal Preparedness", desc: "Powers of attorney and guardianship" },
+  { icon: Smartphone, label: "Digital Life", desc: "Device access and digital legacy" },
+  { icon: Users, label: "Family Communication", desc: "Who knows what, and coordination plans" },
+  { icon: Home, label: "Home & Property", desc: "Property access and household management" },
+  { icon: FileText, label: "Insurance Coverage", desc: "Policy details and beneficiary info" },
+  { icon: MapPin, label: "Emergency Contacts", desc: "Key people to reach urgently" },
+  { icon: Briefcase, label: "Business Affairs", desc: "Continuity and succession planning" },
+  { icon: Brain, label: "Mental Health & Care", desc: "Care preferences and support plans" },
+  { icon: Users, label: "Dependents & Pets", desc: "Guardianship and daily routines" },
 ];
 
-const previewCount = 4;
+const previewCount = 6;
 
 const LifeReadinessTeaser = () => {
-  const navigate = useNavigate();
   const previewCategories = categories.slice(0, previewCount);
   const lockedCount = categories.length - previewCount;
 
   return (
-    <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Brain className="w-4 h-4 text-primary" />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-display text-base font-semibold text-foreground">
-            Findability is just the beginning
-          </h3>
-          <p className="font-body text-sm text-muted-foreground">
-            Your full Life Readiness Score covers {categories.length} categories — with Remy guiding you through each one
-          </p>
-        </div>
+    <div className="space-y-4 text-center">
+      <div className="space-y-2 max-w-md mx-auto">
+        <h3 className="font-display text-lg font-semibold text-foreground">
+          This is just the beginning
+        </h3>
+        <p className="font-body text-sm text-muted-foreground leading-relaxed">
+          Findability is one of {categories.length} areas in your full Life Readiness Score. Here's what becomes easier once everything is in one place.
+        </p>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
         {previewCategories.map((category, index) => {
           const Icon = category.icon;
           return (
             <div
               key={index}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/30 border border-border/40"
+              className="flex items-start gap-2.5 px-3 py-3 rounded-xl bg-card border border-border text-left"
             >
-              <Icon className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Icon className="w-3.5 h-3.5 text-primary" />
+              </div>
               <div className="flex-1 min-w-0">
-                <span className="font-body text-sm text-foreground/80 font-medium">
+                <span className="font-body text-sm text-foreground font-medium leading-tight block">
                   {category.label}
                 </span>
-                <p className="font-body text-xs text-muted-foreground leading-snug">
+                <p className="font-body text-xs text-muted-foreground leading-snug mt-0.5">
                   {category.desc}
                 </p>
               </div>
             </div>
           );
         })}
-
-        {/* Locked remaining categories */}
-        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-muted/20 border border-dashed border-border/40">
-          <Lock className="w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0" />
-          <p className="font-body text-sm text-muted-foreground">
-            <span className="font-medium">+{lockedCount} more categories</span> unlocked when you create an account
-          </p>
-        </div>
       </div>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => navigate("/login")}
-        className="w-full font-body text-primary border-primary/30 hover:bg-primary/5 gap-1"
-      >
-        See Your Full Score
-      </Button>
+      {/* Locked remaining */}
+      <div className="flex items-center justify-center gap-2 py-2">
+        <Lock className="w-3.5 h-3.5 text-muted-foreground/50" />
+        <p className="font-body text-sm text-muted-foreground">
+          <span className="font-medium">+{lockedCount} more categories</span> — unlocked with a free account
+        </p>
+      </div>
     </div>
   );
 };

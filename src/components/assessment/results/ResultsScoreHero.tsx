@@ -6,22 +6,22 @@ interface ResultsScoreHeroProps {
   score: number;
 }
 
-const tierHeadlines = {
+const tierLabels: Record<string, string> = {
+  strong: "Well Prepared",
+  unclear: "Partially Prepared",
+  fragile: "Just Getting Started",
+};
+
+const tierHeadlines: Record<string, string> = {
   strong: "You're ahead of most.",
   unclear: "You've started something important.",
   fragile: "You're not alone.",
 };
 
-const tierSubheadlines = {
+const tierSubheadlines: Record<string, string> = {
   strong: "Let's make sure nothing slips through the cracks.",
   unclear: "Let's close the gaps together.",
   fragile: "And this is completely fixable.",
-};
-
-const tierDescriptions = {
-  strong: "Things are likely findable — but most people here still discover blind spots when they look closer.",
-  unclear: "Some things may exist, but access or clarity could break down under stress.",
-  fragile: "If something happened, others would likely struggle to find and act on what matters.",
 };
 
 const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
@@ -49,47 +49,53 @@ const ResultsScoreHero = ({ score }: ResultsScoreHeroProps) => {
   }, [score]);
 
   return (
-    <div className="text-center space-y-4 py-6">
-      {/* Score circle + badge inline */}
-      <div className="flex flex-col items-center gap-3">
-        <div
-          className={cn(
-            "w-24 h-24 rounded-full flex items-center justify-center border-4 transition-all duration-500",
-            tier.color === "green" && "border-green-500 bg-green-500/10",
-            tier.color === "amber" && "border-amber-500 bg-amber-500/10",
-            tier.color === "red" && "border-red-400 bg-red-400/10"
-          )}
-        >
-          <span className="font-display text-3xl font-bold text-foreground">
-            {displayScore}
+    <div className="bg-card rounded-2xl border border-border p-6 md:p-8 space-y-5">
+      {/* Step indicator */}
+      <span className="inline-block font-body text-xs text-muted-foreground tracking-wide uppercase">
+        Step 1 of 3
+      </span>
+
+      {/* Score + text horizontal on desktop */}
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+        {/* Score circle */}
+        <div className="flex flex-col items-center gap-2 flex-shrink-0">
+          <div
+            className={cn(
+              "w-24 h-24 rounded-full flex items-center justify-center border-4 transition-all duration-500",
+              tier.color === "green" && "border-primary bg-primary/10",
+              tier.color === "amber" && "border-amber-500 bg-amber-500/10",
+              tier.color === "red" && "border-muted-foreground/40 bg-muted/40"
+            )}
+          >
+            <span className="font-display text-3xl font-bold text-foreground">
+              {displayScore}
+            </span>
+          </div>
+          <span
+            className={cn(
+              "inline-block px-3 py-1 rounded-full text-xs font-body font-medium",
+              tier.color === "green" && "bg-primary/15 text-primary",
+              tier.color === "amber" && "bg-amber-500/15 text-amber-700",
+              tier.color === "red" && "bg-muted text-muted-foreground"
+            )}
+          >
+            {tierLabels[tierKey]}
           </span>
         </div>
-        <span
-          className={cn(
-            "inline-block px-3 py-1 rounded-full text-xs font-body font-medium",
-            tier.color === "green" && "bg-green-500/20 text-green-700",
-            tier.color === "amber" && "bg-amber-500/20 text-amber-700",
-            tier.color === "red" && "bg-red-400/20 text-red-700"
-          )}
-        >
-          {tier.label}
-        </span>
-      </div>
 
-      {/* Personalized headlines */}
-      <div className="space-y-1">
-        <h1 className="font-display text-xl md:text-2xl font-semibold text-foreground">
-          {tierHeadlines[tierKey]}
-        </h1>
-        <p className="font-body text-base text-muted-foreground">
-          {tierSubheadlines[tierKey]}
-        </p>
+        {/* Text content */}
+        <div className="space-y-2 text-center sm:text-left flex-1">
+          <h1 className="font-display text-xl md:text-2xl font-semibold text-foreground">
+            {tierHeadlines[tierKey]}
+          </h1>
+          <p className="font-body text-base text-muted-foreground">
+            {tierSubheadlines[tierKey]}
+          </p>
+          <p className="font-body text-sm text-muted-foreground/80 leading-relaxed">
+            This measures whether the right people could find and act on what matters if they needed to.
+          </p>
+        </div>
       </div>
-
-      {/* Tier description + disclaimer combined */}
-      <p className="font-body text-sm text-muted-foreground max-w-sm mx-auto">
-        {tierDescriptions[tierKey]}
-      </p>
     </div>
   );
 };
