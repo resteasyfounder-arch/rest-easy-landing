@@ -9,6 +9,7 @@ import { RemyInlineNudge } from "@/components/remy/RemyInlineNudge";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { CompactLifeCard } from "@/components/profile/CompactLifeCard";
+import TrustNetworkPanel from "@/components/vault/TrustNetworkPanel";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserCircle,
@@ -315,6 +316,9 @@ const Profile = () => {
                   />
                 ))}
               </div>
+
+              {/* Trust Network */}
+              <TrustNetworkPanel />
 
               {/* Assessment CTA */}
               <Card className="p-3 bg-card/60 backdrop-blur-sm border-border/40 max-w-md mx-auto">
