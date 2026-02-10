@@ -1,23 +1,30 @@
 
 
-## Add Feature Details to Score Hero and Match Remy's Card Styling
+## Add Navigation Bar to Assessment Results Page
 
-### Changes to `src/components/assessment/results/ResultsScoreHero.tsx`
+The assessment page currently uses a full-screen overlay (`fixed inset-0 z-50`) with no persistent navigation. The results view needs a nav bar matching the landing page header style -- logo linking home, plus a "Log In" button.
 
-**1. Match Remy's background color**
-- Change the outer `div` from `bg-card border-border` to `bg-primary/[0.03] border-primary/10` so both cards share the same soft tinted appearance.
+### Changes
 
-**2. Add three feature highlights below the existing text**
-- Add a new section with three rows, each containing an icon and description:
-  - ClipboardList icon + "Up to 72 questions tailored to your life needs"
-  - FolderLock icon + "Track and store your documents with EasyVault"
-  - Users icon + "Add your loved ones to your Trust Network, keeping them in the loop as your Life Readiness journey progresses"
-- Each row: icon in a small circle (`w-8 h-8 rounded-full bg-primary/10`) + text, left-aligned, stacked vertically with `space-y-3`
-- This fills the remaining whitespace and makes both cards roughly the same height
+**File: `src/components/assessment/FindabilityResults.tsx`**
 
-**3. Import icons**
-- Add `ClipboardList`, `FolderLock`, `Users` from `lucide-react`
+Add a sticky header at the top of the results view with:
+- Rest Easy logo on the left, linking to `/` (home)
+- "Log In" button on the right, linking to `/login`
+- Same styling as the landing page header: `fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50`
+- Mobile: logo height `h-8`, header height `h-14`
+- Desktop: logo height `h-10`, header height `h-16`
+- Add top padding to the content area (`pt-16 md:pt-20`) to account for the fixed header
 
-### Visual Result
-Both the Score Hero and Remy's Take cards will have the same soft sage background (`bg-primary/[0.03]`), and the Score Hero will now fill its space with useful feature previews, eliminating the empty whitespace mismatch.
+No section scroll-spy nav items needed since this isn't the landing page -- just the logo and auth actions.
 
+**File: `src/pages/Assessment.tsx`**
+
+In the results step render block (line 228-239), remove the inner header/close button since the new nav bar in `FindabilityResults` handles navigation. The `fixed inset-0` wrapper remains so the results page is full-screen.
+
+### Technical Details
+
+| File | Change |
+|------|--------|
+| `src/components/assessment/FindabilityResults.tsx` | Import logo asset and `Link` from react-router-dom. Add fixed header with logo (links to `/`) and "Log In" button (links to `/login`). Adjust content top padding. |
+| `src/pages/Assessment.tsx` | No changes needed -- the results wrapper already has no competing header. |
