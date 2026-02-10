@@ -8,7 +8,7 @@ import {
   SoftProgress,
   AnswerButton,
   WhyThisMatters,
-  SkipButton,
+  
   AutosaveIndicator,
   ReflectionMoment,
 } from "@/components/assessment/shared";
@@ -162,9 +162,8 @@ const Assessment = () => {
     }
   };
 
-  const handleSkip = () => {
-    advanceToNext();
-  };
+
+
 
   const handleBack = () => {
     if (step === "questions" && currentQuestionIndex > 0) {
@@ -295,8 +294,7 @@ const Assessment = () => {
             ))}
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <SkipButton onClick={handleSkip} />
+          <div className="flex items-center justify-end pt-2">
             <AutosaveIndicator show={lastSaved} />
           </div>
         </div>

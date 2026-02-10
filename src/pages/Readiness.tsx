@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, X, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
 import {
   GentleIntro,
-  SkipButton,
+  
   AutosaveIndicator,
 } from "@/components/assessment/shared";
 import AnswerButton from "@/components/assessment/shared/AnswerButton";
@@ -1062,34 +1062,6 @@ const Readiness = () => {
     navigate("/dashboard");
   };
 
-  const handleSkip = () => {
-    if (!currentStepId || !currentQuestion) return;
-    
-    setStepHistory((prev) => [...prev, currentStepId]);
-    
-    // If focused on a section, skip within that section
-    if (focusedSectionId) {
-      const sectionQuestions = applicableQuestions.filter(q => q.section_id === focusedSectionId);
-      const currentIndex = sectionQuestions.findIndex(q => q.id === currentQuestion.id);
-      const nextInSection = sectionQuestions.slice(currentIndex + 1).find(q => !answers[q.id]);
-      
-      if (nextInSection) {
-        setCurrentStepId(`question:${nextInSection.id}`);
-      } else {
-        // No more unanswered in section - show complete view
-        setViewingCompletedSection(true);
-      }
-      return;
-    }
-    
-    // Global skip
-    const nextStep = getNextStepId(profileAnswers, answers, profile);
-    if (nextStep) {
-      setCurrentStepId(nextStep);
-    } else {
-      setFlowPhase("complete");
-    }
-  };
 
   const handleBack = () => {
     // If viewing completed section, just exit that view
@@ -1648,8 +1620,7 @@ const Readiness = () => {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <SkipButton onClick={handleSkip} />
+              <div className="flex items-center justify-end pt-2">
                 <AutosaveIndicator show={lastSaved} />
               </div>
 
@@ -1812,7 +1783,7 @@ const Readiness = () => {
                         ← Back to Summary
                       </Button>
                     ) : (
-                      <SkipButton onClick={handleSkip} />
+                      <div />
                     )}
                     <AutosaveIndicator show={lastSaved} />
                   </div>
