@@ -37,11 +37,11 @@ const groups: GroupConfig[] = [
   },
   {
     key: "no",
-    title: "Not Yet Covered",
+    title: "Gaps",
     icon: ArrowRight,
-    bgClass: "bg-muted/40 border-border",
-    iconBgClass: "bg-muted",
-    iconColorClass: "text-muted-foreground",
+    bgClass: "bg-red-500/[0.04] border-red-500/10",
+    iconBgClass: "bg-red-500/15",
+    iconColorClass: "text-red-500",
   },
 ];
 
