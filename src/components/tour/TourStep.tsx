@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { TourStep as TourStepType } from "@/hooks/useFeatureTour";
+import TourPreview from "./TourPreview";
 
 interface TourStepProps {
   step: TourStepType;
@@ -26,7 +27,7 @@ const TourStep = ({
 
   return (
     <div
-      className="fixed z-[10001] w-[320px] animate-scale-in"
+      className="fixed z-[10001] w-[360px] animate-scale-in"
       style={style}
     >
       <div className="rounded-xl border border-border bg-card shadow-lg p-5 space-y-3">
@@ -47,6 +48,9 @@ const TourStep = ({
         <p className="text-sm text-muted-foreground font-body leading-relaxed">
           {step.description}
         </p>
+
+        {/* Page Preview */}
+        <TourPreview stepId={step.id} />
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-1">
