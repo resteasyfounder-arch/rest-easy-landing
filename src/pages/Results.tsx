@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/layout/AppLayout";
 import type { ReadinessReport } from "@/types/report";
 import { useRemySurface } from "@/hooks/useRemySurface";
+import { useAssessmentState } from "@/hooks/useAssessmentState";
 import { RemyPriorityList } from "@/components/remy/RemyPriorityList";
-import { Download, ArrowLeft, Loader2 } from "lucide-react";
+import { Download, ArrowLeft, Loader2, Play, ArrowRight } from "lucide-react";
 import {
   CoverPage,
   TableOfContents,
@@ -31,6 +32,7 @@ const SUBJECT_ID_KEY = "rest-easy.readiness.subject_id";
 
 const Results = () => {
   const navigate = useNavigate();
+  const { assessmentState } = useAssessmentState();
   const [subjectId] = useState<string | null>(() => localStorage.getItem(SUBJECT_ID_KEY));
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -237,13 +239,25 @@ const Results = () => {
   }
 
   if (!report) {
+    const hasProgress = assessmentState.status !== "not_started" && assessmentState.overall_progress > 0;
+    const ctaLabel = hasProgress
+      ? `Continue Assessment (${Math.round(assessmentState.overall_progress)}%)`
+      : "Start Assessment";
+    const ctaDescription = hasProgress
+      ? "Continue your Life Readiness assessment to receive your personalized report."
+      : "Complete the Life Readiness assessment to receive your personalized report.";
+    const CtaIcon = hasProgress ? ArrowRight : Play;
+
     return (
       <AppLayout>
         <div className="min-h-screen bg-background flex items-center justify-center px-4">
           <div className="max-w-md text-center py-12">
             <h1 className="text-3xl font-display font-semibold text-foreground mb-4">Your Readiness Report</h1>
-            <p className="text-muted-foreground font-body mb-8">Complete the Life Readiness assessment to receive your personalized report.</p>
-            <Button onClick={() => navigate("/readiness")} className="press-effect">Start Assessment</Button>
+            <p className="text-muted-foreground font-body mb-8">{ctaDescription}</p>
+            <Button onClick={() => navigate("/readiness")} className="press-effect gap-2">
+              <CtaIcon className="h-4 w-4" />
+              {ctaLabel}
+            </Button>
           </div>
         </div>
       </AppLayout>
