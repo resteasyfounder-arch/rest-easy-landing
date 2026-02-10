@@ -137,7 +137,7 @@ const setNestedValue = (
 };
 
 const callAgent = async (payload: Record<string, unknown>) => {
-  return invokeAuthedFunction("agent", payload);
+  return invokeAuthedFunction<Record<string, unknown>>("agent", payload);
 };
 
 // Loading skeleton component
@@ -264,29 +264,26 @@ const Readiness = () => {
       
       // Hydrate ALL state from server response
       if (sessionResponse?.subject_id) {
-        setSubjectId(sessionResponse.subject_id);
-        localStorage.setItem(STORAGE_KEYS.subjectId, sessionResponse.subject_id);
+        setSubjectId(sessionResponse.subject_id as string);
+        localStorage.setItem(STORAGE_KEYS.subjectId, sessionResponse.subject_id as string);
       }
       if (sessionResponse?.assessment_id) {
-        setAssessmentId(sessionResponse.assessment_id);
+        setAssessmentId(sessionResponse.assessment_id as string);
       }
       
       // Hydrate state from server
-      const assessmentState = sessionResponse?.assessment_state;
+      const assessmentState = sessionResponse?.assessment_state as Record<string, unknown> | undefined;
       if (assessmentState) {
-        setProfile(assessmentState.profile_data || {});
-        setProfileAnswers(assessmentState.profile_answers || {});
-        setAnswers(assessmentState.answers || {});
+        setProfile((assessmentState.profile_data as Record<string, unknown>) || {});
+        setProfileAnswers((assessmentState.profile_answers as Record<string, "yes" | "no">) || {});
+        setAnswers((assessmentState.answers as Record<string, AnswerRecord>) || {});
         
-        // IMPORTANT: If assessment is complete, default to "review" mode for navigation
-        // This prevents the "Preparing Report" screen from hijacking on page visits
-        // The actual report generation is now handled server-side when completing the last question
-        const hydratedPhase = assessmentState.flow_phase === "complete" ? "review" : (assessmentState.flow_phase || "intro");
+        const hydratedPhase = assessmentState.flow_phase === "complete" ? "review" : ((assessmentState.flow_phase as FlowPhase) || "intro");
         setFlowPhase(hydratedPhase);
         
         console.log("[Readiness] Hydrated from server:", {
-          profileAnswerCount: Object.keys(assessmentState.profile_answers || {}).length,
-          answerCount: Object.keys(assessmentState.answers || {}).length,
+          profileAnswerCount: Object.keys((assessmentState.profile_answers as Record<string, unknown>) || {}).length,
+          answerCount: Object.keys((assessmentState.answers as Record<string, unknown>) || {}).length,
           serverFlowPhase: assessmentState.flow_phase,
           clientFlowPhase: hydratedPhase,
         });
@@ -793,12 +790,12 @@ const Readiness = () => {
 
         // Store subject_id if we got one back (new user case)
         if (response.subject_id && !subjectId) {
-          setSubjectId(response.subject_id);
-          localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id);
+          setSubjectId(response.subject_id as string);
+          localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id as string);
         }
 
         if (response.assessment_id && !assessmentId) {
-          setAssessmentId(response.assessment_id);
+          setAssessmentId(response.assessment_id as string);
         }
 
         const isProfileNowComplete = schema.profile_questions.every(
@@ -839,11 +836,11 @@ const Readiness = () => {
 
         // Store subject_id if we got one back (new user case)
         if (response.subject_id && !subjectId) {
-          setSubjectId(response.subject_id);
-          localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id);
+          setSubjectId(response.subject_id as string);
+          localStorage.setItem(STORAGE_KEYS.subjectId, response.subject_id as string);
         }
         if (response.assessment_id && !assessmentId) {
-          setAssessmentId(response.assessment_id);
+          setAssessmentId(response.assessment_id as string);
         }
 
         // If coming from dashboard (returnTo is set), navigate back immediately after saving
