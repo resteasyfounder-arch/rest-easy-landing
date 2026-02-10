@@ -22,7 +22,7 @@ const steps = [
     ],
     cta: "Start Free Findability Check",
     href: "/assessment",
-    variant: "outline" as const,
+    variant: "default" as const,
     emphasis: false,
     prerequisite: null,
   },
@@ -84,15 +84,15 @@ const Solution = () => {
         </AnimatedSection>
 
         {/* Steps – horizontal grid */}
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-4 items-center">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           {steps.map((step, i) => (
             <AnimatedItem key={step.step} delay={i * 150} className={cn("h-full", step.emphasis && "lg:scale-105 z-10")}>
               <Card
                 className={cn(
-                  "h-full flex flex-col border-border/50 bg-background overflow-hidden transition-shadow",
+                  "h-full flex flex-col border-border/50 bg-background overflow-hidden transition-all duration-300 hover:shadow-elevated hover:-translate-y-1",
                   step.emphasis
                     ? "border-t-4 border-t-primary shadow-lg"
-                    : "shadow-sm hover:shadow-md"
+                    : "shadow-sm"
                 )}
               >
                 <CardContent className="p-8 flex flex-col h-full">
