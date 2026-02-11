@@ -571,13 +571,13 @@ async function loadConversationHistory(
   }
 
   return (data || [])
-    .map((item) => ({
+    .map((item: { role: string; message_text?: string; created_at?: string }) => ({
       role: item.role === "assistant" ? "assistant" : "user",
       text: String(item.message_text || ""),
       created_at: item.created_at as string,
     }))
     .reverse()
-    .map(({ role, text }) => ({ role, text }));
+    .map(({ role, text }: { role: string; text: string }) => ({ role, text }));
 }
 
 async function assertChatStorageReady(readiness: ReadinessClient): Promise<string | null> {
@@ -1138,7 +1138,7 @@ serve(async (req) => {
     };
 
     const capabilityContext = await loadRemyCapabilityContext({
-      supabase,
+      supabase: supabase as any,
       userId: authData.user.id,
       message,
       surface,

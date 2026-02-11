@@ -5,7 +5,7 @@ import {
   evaluateCondition,
   getScoreBand,
   getPriority,
-} from "./decisionEngine";
+} from "./decisionEngine.ts";
 
 describe("remy decision engine", () => {
   it("evaluates simple conditions against profile and answers", () => {

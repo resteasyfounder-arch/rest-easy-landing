@@ -7,7 +7,7 @@ import {
   mapTimeoutFailure,
   shouldRetryStatus,
   shouldUseResponsesProvider,
-} from "./providerUtils";
+} from "./providerUtils.ts";
 
 describe("providerUtils", () => {
   it("routes by provider mode and canary percent", () => {

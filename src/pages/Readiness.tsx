@@ -843,11 +843,12 @@ const Readiness = () => {
           setAssessmentId(response.assessment_id as string);
         }
 
-        // If coming from dashboard (returnTo is set), navigate back immediately after saving
-        if (returnTo === "dashboard") {
-          console.log("[Readiness] Answer saved, returning to dashboard");
-          setReturnTo(null); // Clear the returnTo state
-          navigate("/dashboard");
+        // If coming from another page (returnTo is set), navigate back immediately after saving
+        if (returnTo) {
+          console.log("[Readiness] Answer saved, returning to", returnTo);
+          const destination = `/${returnTo}`;
+          setReturnTo(null);
+          navigate(destination);
           return;
         }
 
@@ -1783,6 +1784,37 @@ const Readiness = () => {
             completedSections={completedSections}
             onSectionClick={handleSectionClick}
           />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Complete phase - assessment finished, offer navigation
+  if (flowPhase === "complete") {
+    return (
+      <AppLayout hideNav>
+        <div className="min-h-screen flex items-center justify-center px-6 bg-gradient-hero">
+          <Card className="max-w-sm w-full text-center">
+            <CardHeader>
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                <span className="text-3xl">🎉</span>
+              </div>
+              <CardTitle className="font-display text-2xl">Assessment Complete</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground font-body text-sm leading-relaxed">
+                You've answered all the questions. View your personalized report or head back to the dashboard.
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button onClick={() => navigate("/results")} className="w-full">
+                  View My Results
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/dashboard")} className="w-full">
+                  Back to Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </AppLayout>
     );

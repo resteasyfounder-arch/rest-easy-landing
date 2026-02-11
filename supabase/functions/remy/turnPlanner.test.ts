@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyConversationPolicy, classifyTurnGoal, normalizeConversationState } from "./turnPlanner";
-import type { RemyChatContext, RemyChatTurnResponse } from "./chatTurn";
+import { applyConversationPolicy, classifyTurnGoal, normalizeConversationState } from "./turnPlanner.ts";
+import type { RemyChatContext, RemyChatTurnResponse } from "./chatTurn.ts";
 
 const baseContext: RemyChatContext = {
   conversationId: "00000000-0000-0000-0000-000000000001",

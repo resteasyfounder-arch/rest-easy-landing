@@ -172,7 +172,7 @@ function pickNudge(
 
   if (nextUnanswered) {
     const sectionLabel = sectionLabelById.get(nextUnanswered.section_id) || "next section";
-    const nudgeId = `continue:${nextUnanswered.question_id}`;
+    const nudgeId = `continue:${nextUnanswered.id}`;
     if (!isDismissed(dismissed, nudgeId)) {
       return {
         id: nudgeId,
