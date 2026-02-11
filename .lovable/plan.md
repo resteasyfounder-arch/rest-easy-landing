@@ -1,56 +1,61 @@
 
+## Fix Blank Screen After Answer Update + Remy Build Errors
 
-## Fix Report Generation 403 Error
+### Problem 1: Blank Screen After Updating an Answer
 
-### Root Cause
+When Remy or the dashboard navigates you to a specific question (e.g., `/readiness?section=1&question=1.1.B.3&returnTo=vault`), answering that question causes a blank screen. Here is why:
 
-The edge function logs confirm the `generate-report` function returned **403 Forbidden** when the `agent` function called it in the background. This means either:
+1. The `handleAnswer` function only handles `returnTo === "dashboard"` (line 847). For `returnTo=vault` or other values, it falls through.
+2. Since the assessment is already complete, answering the last question in the section sets `viewingCompletedSection = true`, which shows the "Section Complete" screen.
+3. Clicking "Continue to Next Section" calls `handleContinueFromCompletedSection`, which finds no more unanswered questions and sets `flowPhase = "complete"`.
+4. The `"complete"` flow phase has **no rendering** -- it just has a comment saying "fall through." It does not match `"assessment"` or `"review"`, so the component falls to the `LoadingSkeleton` fallback, which looks like a blank screen that never resolves.
 
-1. The `verify_jwt = false` config change hasn't fully propagated for `generate-report` on the deployed infrastructure (the gateway is still checking JWTs before the function code runs), OR
-2. The background task's fetch is failing because the `readiness` Supabase client (passed by reference to `triggerReportRegeneration`) becomes stale after the main request completes
+**Fix**: Two changes in `src/pages/Readiness.tsx`:
 
-Both issues need to be addressed.
+- **Generalize the `returnTo` handling** (line 847): Instead of only handling `returnTo === "dashboard"`, handle any truthy `returnTo` value. Navigate to `/${returnTo}` (e.g., `/vault`, `/dashboard`, `/results`) after saving the answer. This gives users the expected "answer and return" flow.
 
-### Changes
+- **Add a proper `"complete"` phase rendering**: When `flowPhase === "complete"` (and no pending navigation), render a completion card that offers navigation to the Results page or back to the Dashboard, instead of falling through to nothing. This prevents the blank screen even if `returnTo` is not set.
 
-#### 1. Make `triggerReportRegeneration` self-contained (`supabase/functions/agent/index.ts`)
+### Problem 2: Build Errors in Remy Edge Functions
 
-The function currently receives the `readiness` client as a parameter. Since this runs in a background task via `EdgeRuntime.waitUntil`, the original client may be garbage-collected. Refactor to create its own fresh Supabase client internally:
+These are pre-existing TypeScript errors in the `supabase/functions/remy/` directory:
 
-- Remove `readiness` parameter from the function signature
-- Create a fresh `createClient(SUPABASE_URL, SERVICE_ROLE_KEY)` inside the function
-- Derive `.schema("readiness_v1")` from that fresh client
-- Update all 3 call sites (lines ~1129, ~1205, ~1228) to remove the `readiness` argument
+**a) Missing `.ts` extensions in test file imports (5 errors)**
 
-#### 2. Add detailed error logging (`supabase/functions/agent/index.ts`)
+The test files use bare module imports (e.g., `from "./decisionEngine"`) but Deno requires explicit `.ts` extensions. Fix all 5 test files:
+- `chatTurn.test.ts`: `"./chatTurn"` -> `"./chatTurn.ts"`
+- `decisionEngine.test.ts`: `"./decisionEngine"` -> `"./decisionEngine.ts"`
+- `providerUtils.test.ts`: `"./providerUtils"` -> `"./providerUtils.ts"`
+- `remyPayloadBuilder.smoke.test.ts`: `"./remyPayloadBuilder"` -> `"./remyPayloadBuilder.ts"`
+- `turnPlanner.test.ts`: `"./turnPlanner"` -> `"./turnPlanner.ts"`, `"./chatTurn"` -> `"./chatTurn.ts"`
 
-In `triggerReportRegeneration`, after the fetch call to `generate-report`:
+**b) Implicit `any` types in `remy/index.ts` (3 errors)**
 
-- Log the fetch URL being used
-- If the response is not OK, log the HTTP status code and the response body text before attempting `.json()` parse
-- Wrap the entire function body in a try/catch that logs the error and marks the report as failed
+Lines 574 and 580 have `.map()` callbacks without type annotations on parameters. Add explicit types:
+- Line 574: `.map((item: { role: string; message_text?: string; created_at?: string }) => ...)`
+- Line 580: `.map(({ role, text }: { role: string; text: string }) => ...)`
 
-#### 3. Add a `retry_report` action to the agent (`supabase/functions/agent/index.ts`)
+**c) `question_id` does not exist on `SchemaQuestion` (1 error)**
 
-New action handler so users can recover from failed reports:
+In `remyPayloadBuilder.ts` line 175, `nextUnanswered.question_id` is used but `SchemaQuestion` only has `id`. Change to `nextUnanswered.id`.
 
-- Add `"retry_report"` to the `AgentRequest.action` union type
-- Handler: look up the active assessment, verify `report_status` is `"failed"`, reset to `"generating"`, call `triggerReportRegeneration` via `EdgeRuntime.waitUntil`, return `{ ok: true, report_status: "generating" }`
+**d) Supabase client type mismatch in `remyCapabilityContext.ts` (1 error)**
 
-#### 4. Handle "failed" state in the Results page (`src/pages/Results.tsx`)
+Line 1141 in `remy/index.ts` passes the real Supabase client, but `remyCapabilityContext.ts` defines a narrow duck-typed interface that expects `.eq()` to return a `Promise`. The real Supabase client returns a `PostgrestFilterBuilder` (thenable but not a true Promise). Fix by casting the supabase parameter with `as any` at the call site to bypass the structural mismatch.
 
-- Detect `report_status === "failed"` from the `get_state` response
-- Show a "Report Generation Failed" card with a "Retry" button instead of the misleading "Continue Assessment" CTA
-- The retry button calls the agent with `{ action: "retry_report" }`, then switches to the generating/polling UI
+**e) Implicit `any` in smoke test (1 error)**
 
-#### 5. Redeploy the `agent` and `generate-report` edge functions
-
-Redeploy both functions to ensure the `verify_jwt = false` config is fully applied on the gateway.
+In `remyPayloadBuilder.smoke.test.ts` line 168, add type annotation: `.some((item: { id: string }) => ...)`
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/agent/index.ts` | Refactor `triggerReportRegeneration` to create own client; add error logging; add `retry_report` action |
-| `src/pages/Results.tsx` | Handle `"failed"` report status with retry UI |
-
+| `src/pages/Readiness.tsx` | Generalize `returnTo` navigation; add `"complete"` phase rendering |
+| `supabase/functions/remy/chatTurn.test.ts` | Add `.ts` extension to import |
+| `supabase/functions/remy/decisionEngine.test.ts` | Add `.ts` extension to import |
+| `supabase/functions/remy/providerUtils.test.ts` | Add `.ts` extension to import |
+| `supabase/functions/remy/remyPayloadBuilder.smoke.test.ts` | Add `.ts` extension to import; fix implicit `any` |
+| `supabase/functions/remy/turnPlanner.test.ts` | Add `.ts` extensions to imports |
+| `supabase/functions/remy/index.ts` | Add explicit types to map callbacks; cast supabase param |
+| `supabase/functions/remy/remyPayloadBuilder.ts` | Change `nextUnanswered.question_id` to `nextUnanswered.id` |
