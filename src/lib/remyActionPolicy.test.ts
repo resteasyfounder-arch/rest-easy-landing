@@ -18,6 +18,11 @@ describe("remyActionPolicy", () => {
     expect(isExplicitActionRequest("what should I do next?")).toBe(true);
   });
 
+  it("detects navigation and upload intents as explicit action requests", () => {
+    expect(isExplicitActionRequest("where is EasyVault?")).toBe(true);
+    expect(isExplicitActionRequest("how can I upload documents?")).toBe(true);
+  });
+
   it("does not mark informational prompts as explicit action intent", () => {
     expect(isExplicitActionRequest("why is my legal score low?")).toBe(false);
     expect(isExplicitActionRequest("am I on track?")).toBe(false);

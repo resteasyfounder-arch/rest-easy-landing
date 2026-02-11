@@ -145,7 +145,16 @@ function isNextStepRequest(message: string): boolean {
 }
 
 function isNavigationRequest(message: string): boolean {
-  return /\b(open|take me|go to|navigate|show me|bring me)\b/.test(message.toLowerCase());
+  const normalized = message.toLowerCase();
+  return (
+    /\b(open|take me|go to|navigate|show me|bring me|get me to)\b/.test(normalized) ||
+    /\bwhere\s+is\b/.test(normalized) ||
+    /\bwhere\s+can\s+i\b/.test(normalized) ||
+    /\bhow\s+do\s+i\s+find\b/.test(normalized) ||
+    /\bhow\s+can\s+i\s+upload\b/.test(normalized) ||
+    /\b(upload|add|store|save|edit|update)\b.*\b(document|documents|file|files|directive|vault|beneficiar|will)\b/
+      .test(normalized)
+  );
 }
 
 function isExplicitActionRequest(message: string): boolean {
@@ -159,7 +168,11 @@ function applyActionPolicy(response: RemyChatTurnResponse, message: string): Rem
     return { ...response, cta: undefined };
   }
 
-  const label = isQuestionUpdateRequest(message) ? "Update this question" : "Show my next step";
+  const label = isQuestionUpdateRequest(message)
+    ? "Update this question"
+    : isNextStepRequest(message)
+    ? "Show my next step"
+    : response.cta.label;
   return {
     ...response,
     cta: {

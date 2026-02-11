@@ -88,6 +88,8 @@ const ACTION_REQUEST_PATTERNS = [
   /\bupdate\s+this\s+question\b/i,
   /\bupload\b/i,
   /\bwhere\s+can\s+i\b/i,
+  /\bwhere\s+is\b/i,
+  /\bhow\s+can\s+i\s+upload\b/i,
 ];
 
 const REPORT_SUMMARY_PATTERNS = [
@@ -106,13 +108,15 @@ const VAULT_PROGRESS_PATTERNS = [
 ];
 
 const VAULT_UPLOAD_PATTERNS = [
-  /\b(upload|add|store|save|edit|update)\b.*\b(document|file|directive|will|vault|beneficiar)\b/i,
+  /\b(upload|add|store|save|edit|update)\b.*\b(document|documents|file|files|directive|will|vault|beneficiar)\b/i,
+  /\bhow\s+can\s+i\s+upload\b/i,
   /\bwhere\s+can\s+i\s+upload\b/i,
 ];
 
 const WAYFINDING_PATTERNS = [
   /\bi'?m\s+lost\b/i,
   /\bwhere\s+(do|can)\s+i\b/i,
+  /\bwhere\s+is\b/i,
   /\bhow\s+do\s+i\s+find\b/i,
   /\bnavigate\b/i,
   /\btake\s+me\s+to\b/i,
@@ -538,7 +542,8 @@ export function applyConversationPolicy(params: {
     cta = undefined;
     intent = "unknown";
   } else if (goal === "greeting") {
-    assistantMessage = `${scoreIntro} I can guide you to your best next readiness step whenever you're ready.`;
+    assistantMessage =
+      "Hey, I'm here to help. I can guide your next readiness step, help you find the right page, or point you to the exact place to upload a document.";
     cta = undefined;
     intent = "reassure";
   } else if (goal === "score_explain") {
@@ -745,8 +750,8 @@ export function applyConversationPolicy(params: {
     }
   } else {
     assistantMessage = target
-      ? `${scoreIntro} I can guide you through "${target.title}" next, then we can reassess your plan together.`
-      : `${scoreIntro} I can guide you to the exact question to update next.`;
+      ? `I can guide you through "${target.title}" next, or route you to EasyVault or your report if that's what you need.`
+      : "I can guide you to the exact question, report section, or EasyVault document step you want to work on.";
     cta = undefined;
     intent = "clarify";
   }

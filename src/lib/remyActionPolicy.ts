@@ -19,7 +19,15 @@ export function isNextStepRequest(message: string): boolean {
 
 export function isNavigationRequest(message: string): boolean {
   const normalized = message.toLowerCase();
-  return /\b(open|take me|go to|navigate|show me|bring me)\b/.test(normalized);
+  return (
+    /\b(open|take me|go to|navigate|show me|bring me|get me to)\b/.test(normalized) ||
+    /\bwhere\s+is\b/.test(normalized) ||
+    /\bwhere\s+can\s+i\b/.test(normalized) ||
+    /\bhow\s+do\s+i\s+find\b/.test(normalized) ||
+    /\bhow\s+can\s+i\s+upload\b/.test(normalized) ||
+    /\b(upload|add|store|save|edit|update)\b.*\b(document|documents|file|files|directive|vault|beneficiar|will)\b/
+      .test(normalized)
+  );
 }
 
 export function isExplicitActionRequest(message: string): boolean {
