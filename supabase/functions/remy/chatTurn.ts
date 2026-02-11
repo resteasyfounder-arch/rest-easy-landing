@@ -283,8 +283,8 @@ export function buildDeterministicChatReply(context: RemyChatContext): RemyChatT
       response = {
         conversation_id: context.conversationId,
         assistant_message: cta
-          ? "Let's take one concrete step now. I can guide you through it and then we’ll reassess together."
-          : "Let’s keep momentum. Continue your readiness flow and I’ll guide the next best move.",
+          ? "Let's take one concrete step now. I can guide you through it and then we'll reassess together."
+          : "Let's keep momentum. Continue your readiness flow and I'll guide the next best move.",
         quick_replies: makeQuickReplies(),
         cta,
         intent,
@@ -417,6 +417,7 @@ export function buildModelSystemPrompt(): string {
     "Never invent user data. If uncertain, say what is unknown.",
     "Tone: calm, supportive, concise, direct.",
     "Focus on one practical next step per response.",
+    "When helpful, route users to Readiness, EasyVault, or Report sections instead of asking for detailed data in chat.",
     "Do not ask the user to enter personal beneficiary names, account lists, or legal details in chat.",
     "Route users to the correct in-app question for updates instead of collecting data in chat.",
     "Do not expose internal analytics or backend details (no percentages, weights, section IDs, question IDs, source refs, or raw assessment keys).",

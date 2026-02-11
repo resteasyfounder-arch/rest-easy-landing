@@ -72,4 +72,28 @@ describe("parseRemyChatTurnResponse", () => {
     expect(parsed.meta.score_band).toBe("developing_readiness");
     expect(parsed.meta.policy_mode).toBe("app_directed_only");
   });
+
+  it("parses additive capability-routing metadata fields", () => {
+    const parsed = parseRemyChatTurnResponse({
+      conversation_id: "00000000-0000-0000-0000-000000000001",
+      assistant_message: "You can upload that in EasyVault and I can open the exact step.",
+      quick_replies: ["Open EasyVault"],
+      intent: "clarify",
+      confidence: 0.8,
+      safety_flags: [],
+      meta: {
+        trace_id: "trace-capability-1",
+        response_source: "responses_api",
+        goal: "vault_upload_route",
+        capability: "vault",
+        route_type: "vault_upload",
+        grounding_passed: true,
+      },
+    });
+
+    expect(parsed.meta.goal).toBe("vault_upload_route");
+    expect(parsed.meta.capability).toBe("vault");
+    expect(parsed.meta.route_type).toBe("vault_upload");
+    expect(parsed.meta.grounding_passed).toBe(true);
+  });
 });

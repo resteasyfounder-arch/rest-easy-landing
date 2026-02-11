@@ -61,6 +61,8 @@ describe("turnPlanner classifier", () => {
     expect(classifyTurnGoal("tell me about my score")).toBe("score_explain");
     expect(classifyTurnGoal("what should I do next")).toBe("next_step");
     expect(classifyTurnGoal("I don't want that step")).toBe("skip_priority");
+    expect(classifyTurnGoal("where can I upload my health directive")).toBe("vault_upload_route");
+    expect(classifyTurnGoal("summarize my report")).toBe("report_summary");
   });
 });
 
@@ -123,5 +125,85 @@ describe("turnPlanner policy enforcement", () => {
     expect(state.declined_priority_ids).toEqual([]);
     expect(state.turn_count).toBe(0);
     expect(state.last_goal).toBeUndefined();
+  });
+
+  it("builds report strengths guidance from grounded capability context", () => {
+    const result = applyConversationPolicy({
+      context: { ...baseContext, message: "where am I doing well?" },
+      baseResponse,
+      history: [],
+      stateRaw: {},
+      capabilityContext: {
+        vault: {
+          completed_count: 1,
+          applicable_count: 10,
+          progress_percent: 10,
+          missing_high_priority_docs: [],
+        },
+        report: {
+          available: true,
+          stale: false,
+          executive_summary: "Your readiness is improving with focused updates.",
+          strengths: ["Legal planning", "Healthcare directives"],
+          attention_areas: [],
+          action_items: [],
+        },
+        navigation: { section_purposes: [] },
+        route: null,
+      },
+    });
+
+    expect(result.goal).toBe("report_strengths");
+    expect(result.capability).toBe("report");
+    expect(result.response.assistant_message.toLowerCase()).toContain("doing well");
+    expect(result.reportSummaryMode).toBe("strengths");
+  });
+
+  it("returns vault deep-link guidance for upload intents", () => {
+    const result = applyConversationPolicy({
+      context: { ...baseContext, message: "where can I upload my health directive?" },
+      baseResponse,
+      history: [],
+      stateRaw: {},
+      capabilityContext: {
+        vault: {
+          completed_count: 2,
+          applicable_count: 20,
+          progress_percent: 10,
+          missing_high_priority_docs: [
+            {
+              id: "healthcare-directive",
+              name: "Healthcare Directive",
+              category: "healthcare",
+              input_method: "upload",
+            },
+          ],
+        },
+        report: {
+          available: false,
+          stale: false,
+          executive_summary: null,
+          strengths: [],
+          attention_areas: [],
+          action_items: [],
+        },
+        navigation: { section_purposes: [] },
+        route: {
+          routeType: "vault_upload",
+          href: "/vault?doc=healthcare-directive&action=upload",
+          label: "Open Healthcare Directive",
+          targetId: "healthcare-directive",
+          confidence: 0.9,
+          ambiguous: false,
+          alternatives: [],
+          vaultDocTargeted: "healthcare-directive",
+        },
+      },
+    });
+
+    expect(result.goal).toBe("vault_upload_route");
+    expect(result.routeType).toBe("vault_upload");
+    expect(result.response.cta?.href).toBe("/vault?doc=healthcare-directive&action=upload");
+    expect(result.vaultDocTargeted).toBe("healthcare-directive");
   });
 });

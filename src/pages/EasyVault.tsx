@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Info } from "lucide-react";
 import { Accordion } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,9 +22,10 @@ function findDocDef(typeId: string): { doc: VaultDocument; categoryId: string } 
 
 const EasyVault = () => {
   const isPaidUser = true;
+  const location = useLocation();
   const { documents, isLoading, excludedDocIds, upload, saveInline, remove, download, markNotApplicable, unmarkNotApplicable } = useVaultDocuments();
 
-  // Map document_type_id → saved row for fast lookup
+  // Map document_type_id -> saved row for fast lookup
   const savedDocsMap = useMemo(() => {
     const map = new Map<string, (typeof documents)[0]>();
     for (const d of documents) {
@@ -43,6 +45,32 @@ const EasyVault = () => {
   const [inlineTarget, setInlineTarget] = useState<string | null>(null);
   const inlineDef = inlineTarget ? findDocDef(inlineTarget) : null;
   const existingInline = inlineTarget ? savedDocsMap.get(inlineTarget) : undefined;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const targetDocId = searchParams.get("doc");
+    const action = searchParams.get("action");
+    if (!targetDocId || !action) return;
+
+    const resolved = findDocDef(targetDocId);
+    if (!resolved) return;
+
+    if (action === "edit") {
+      setInlineTarget(resolved.doc.id);
+      setUploadTarget(null);
+      return;
+    }
+
+    if (action === "upload") {
+      if (resolved.doc.inputMethod === "inline") {
+        setInlineTarget(resolved.doc.id);
+        setUploadTarget(null);
+      } else {
+        setUploadTarget(resolved.doc.id);
+        setInlineTarget(null);
+      }
+    }
+  }, [location.search]);
 
   const handleUpload = useCallback(
     (file: File, notes?: string) => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { RemyChatTurnResponse, RemySurfacePayload } from "@/types/remy";
 
-const remySurfaceEnum = z.enum(["dashboard", "readiness", "section_summary", "results", "profile", "menu"]);
+const remySurfaceEnum = z.enum(["dashboard", "readiness", "section_summary", "results", "profile", "menu", "vault"]);
 const remyPriorityEnum = z.enum(["HIGH", "MEDIUM", "LOW"]);
 
 const remyNudgeSchema = z.object({
@@ -62,12 +62,29 @@ const remyChatMetaSchema = z.object({
   response_source: z.enum(["responses_api", "chat_completions", "deterministic_fallback"]),
   degraded_reason: z.string().optional(),
   goal: z
-    .enum(["greeting", "score_explain", "next_step", "skip_priority", "route_to_question", "clarification", "out_of_scope"])
+    .enum([
+      "greeting",
+      "score_explain",
+      "next_step",
+      "skip_priority",
+      "route_to_question",
+      "question_lookup",
+      "vault_progress",
+      "vault_upload_route",
+      "report_summary",
+      "report_strengths",
+      "ui_wayfinding",
+      "clarification",
+      "out_of_scope",
+    ])
     .optional(),
   score_band: z
     .enum(["early_readiness", "developing_readiness", "advancing_readiness", "near_full_readiness", "score_unavailable"])
     .optional(),
   policy_mode: z.literal("app_directed_only").optional(),
+  capability: z.enum(["readiness", "vault", "report", "navigation"]).optional(),
+  route_type: z.enum(["readiness_question", "vault_upload", "vault_edit", "app_section"]).optional(),
+  grounding_passed: z.boolean().optional(),
 });
 
 export const remySurfacePayloadSchema = z.object({

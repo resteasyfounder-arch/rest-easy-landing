@@ -6,7 +6,7 @@ import {
 } from "./decisionEngine.ts";
 import type { AnswerValue, Priority } from "./decisionEngine.ts";
 
-export type RemySurface = "dashboard" | "readiness" | "section_summary" | "results" | "profile" | "menu";
+export type RemySurface = "dashboard" | "readiness" | "section_summary" | "results" | "profile" | "menu" | "vault";
 
 export type SchemaSection = {
   id: string;
@@ -91,6 +91,15 @@ type RemyReassurance = {
   body: string;
 };
 
+function resolveReturnTo(surface: RemySurface): string {
+  if (surface === "profile") return "profile";
+  if (surface === "menu") return "menu";
+  if (surface === "vault") return "vault";
+  if (surface === "results") return "results";
+  if (surface === "readiness") return "readiness";
+  return "dashboard";
+}
+
 export type RemySurfacePayload = {
   surface: RemySurface;
   generated_at: string;
@@ -150,12 +159,7 @@ function pickNudge(
           cta: { label: "Review this section", href: `/readiness?section=${topPriority.section_id}` },
         };
       }
-      const returnTo =
-        surface === "profile"
-          ? "profile"
-          : surface === "menu"
-            ? "menu"
-            : "dashboard";
+      const returnTo = resolveReturnTo(surface);
       return {
         ...base,
         cta: {
@@ -332,7 +336,7 @@ export function buildRemySurfacePayload({
     title: item.question_text,
     priority: item.priority,
     why_now: describePriorityReason(item),
-    target_href: `/readiness?section=${item.section_id}&question=${item.question_id}&returnTo=dashboard`,
+    target_href: `/readiness?section=${item.section_id}&question=${item.question_id}&returnTo=${resolveReturnTo(surface)}`,
   }));
 
   const topPriority = scopedImprovements[0] || null;

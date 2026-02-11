@@ -1,4 +1,4 @@
-export type RemySurface = "dashboard" | "readiness" | "section_summary" | "results" | "profile" | "menu";
+export type RemySurface = "dashboard" | "readiness" | "section_summary" | "results" | "profile" | "menu" | "vault";
 export type RemyPriority = "HIGH" | "MEDIUM" | "LOW";
 export type RemyChatIntent = "clarify" | "prioritize" | "explain_score" | "plan_next" | "reassure" | "unknown";
 export type RemyTurnGoal =
@@ -7,6 +7,12 @@ export type RemyTurnGoal =
   | "next_step"
   | "skip_priority"
   | "route_to_question"
+  | "question_lookup"
+  | "vault_progress"
+  | "vault_upload_route"
+  | "report_summary"
+  | "report_strengths"
+  | "ui_wayfinding"
   | "clarification"
   | "out_of_scope";
 export type RemyScoreBand =
@@ -91,6 +97,9 @@ export interface RemyChatTurnResponse {
     goal?: RemyTurnGoal;
     score_band?: RemyScoreBand;
     policy_mode?: "app_directed_only";
+    capability?: "readiness" | "vault" | "report" | "navigation";
+    route_type?: "readiness_question" | "vault_upload" | "vault_edit" | "app_section";
+    grounding_passed?: boolean;
   };
 }
 

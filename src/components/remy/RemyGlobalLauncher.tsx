@@ -18,6 +18,7 @@ function getRouteSurface(pathname: string): RemySurface | null {
   if (pathname.startsWith("/readiness")) return "readiness";
   if (pathname.startsWith("/results")) return "results";
   if (pathname.startsWith("/profile")) return "profile";
+  if (pathname.startsWith("/vault")) return "vault";
   if (pathname.startsWith("/menu")) return "menu";
   return null;
 }
@@ -82,7 +83,8 @@ export function RemyGlobalLauncher() {
     location.pathname.startsWith("/readiness") ||
     location.pathname.startsWith("/results") ||
     location.pathname.startsWith("/menu") ||
-    location.pathname.startsWith("/dashboard")
+    location.pathname.startsWith("/dashboard") ||
+    location.pathname.startsWith("/vault")
   );
 
   return (

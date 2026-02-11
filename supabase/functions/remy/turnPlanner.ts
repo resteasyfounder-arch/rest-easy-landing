@@ -1,5 +1,7 @@
 import { getScoreBand, type RemyScoreBand } from "./decisionEngine.ts";
 import type { RemyChatContext, RemyChatTurnResponse } from "./chatTurn.ts";
+import type { RemyCapabilityContext } from "./remyCapabilityContext.ts";
+import { findNavigationTargetById } from "./remyRouteResolver.ts";
 
 type PriorityItem = RemyChatContext["payload"]["priorities"][number];
 
@@ -11,8 +13,16 @@ export type RemyTurnGoal =
   | "next_step"
   | "skip_priority"
   | "route_to_question"
+  | "question_lookup"
+  | "vault_progress"
+  | "vault_upload_route"
+  | "report_summary"
+  | "report_strengths"
+  | "ui_wayfinding"
   | "clarification"
   | "out_of_scope";
+
+export type RemyPlannerCapability = "readiness" | "vault" | "report" | "navigation";
 
 export type RemyPlannerPolicyMode = "app_directed_only";
 
@@ -21,6 +31,10 @@ export type RemyConversationState = {
   declined_until_by_id: Record<string, string>;
   last_goal?: RemyTurnGoal;
   last_target_question_id?: string;
+  last_capability?: RemyPlannerCapability;
+  last_route?: string;
+  last_report_focus?: "summary" | "strengths";
+  last_vault_doc_id?: string;
   turn_count: number;
   last_reassurance_turn?: number;
 };
@@ -32,6 +46,13 @@ export type RemyPlannerResult = {
   scoreBand: RemyScoreBand;
   policyMode: RemyPlannerPolicyMode;
   repetitionGuardTriggered: boolean;
+  capability?: RemyPlannerCapability;
+  routeType?: string;
+  routeResolved: boolean;
+  ambiguityDetected: boolean;
+  vaultDocTargeted?: string;
+  reportSummaryMode?: "summary" | "strengths";
+  groundingPassed: boolean;
 };
 
 const OUT_OF_DOMAIN_PATTERNS = [
@@ -65,6 +86,36 @@ const ACTION_REQUEST_PATTERNS = [
   /\bgo\s+to\b/i,
   /\bnavigate\b/i,
   /\bupdate\s+this\s+question\b/i,
+  /\bupload\b/i,
+  /\bwhere\s+can\s+i\b/i,
+];
+
+const REPORT_SUMMARY_PATTERNS = [
+  /\b(summarize|summary|overview)\b.*\b(report|results|assessment)\b/i,
+  /\btell\s+me\s+about\s+my\s+report\b/i,
+];
+
+const REPORT_STRENGTH_PATTERNS = [
+  /\b(where|what)\s+.*\b(do(ing)?\s+well|strong|strength)\b/i,
+  /\b(strengths?|what\s+am\s+i\s+doing\s+well)\b/i,
+];
+
+const VAULT_PROGRESS_PATTERNS = [
+  /\b(vault|documents?)\b.*\b(progress|status|complete|completion|missing)\b/i,
+  /\bhow\s+is\s+my\s+vault\b/i,
+];
+
+const VAULT_UPLOAD_PATTERNS = [
+  /\b(upload|add|store|save|edit|update)\b.*\b(document|file|directive|will|vault|beneficiar)\b/i,
+  /\bwhere\s+can\s+i\s+upload\b/i,
+];
+
+const WAYFINDING_PATTERNS = [
+  /\bi'?m\s+lost\b/i,
+  /\bwhere\s+(do|can)\s+i\b/i,
+  /\bhow\s+do\s+i\s+find\b/i,
+  /\bnavigate\b/i,
+  /\btake\s+me\s+to\b/i,
 ];
 
 function normalizeText(value: string): string {
@@ -157,6 +208,12 @@ export function normalizeConversationState(raw: unknown, nowMs = Date.now()): Re
       lastGoal === "next_step" ||
       lastGoal === "skip_priority" ||
       lastGoal === "route_to_question" ||
+      lastGoal === "question_lookup" ||
+      lastGoal === "vault_progress" ||
+      lastGoal === "vault_upload_route" ||
+      lastGoal === "report_summary" ||
+      lastGoal === "report_strengths" ||
+      lastGoal === "ui_wayfinding" ||
       lastGoal === "clarification" ||
       lastGoal === "out_of_scope"
       ? lastGoal
@@ -170,11 +227,30 @@ export function normalizeConversationState(raw: unknown, nowMs = Date.now()): Re
     ? Math.max(0, Math.floor(input.last_reassurance_turn))
     : undefined;
 
+  const rawCapability = typeof input.last_capability === "string" ? input.last_capability : undefined;
+  const lastCapability = rawCapability === "readiness" || rawCapability === "vault" || rawCapability === "report" ||
+      rawCapability === "navigation"
+    ? rawCapability
+    : undefined;
+  const lastRoute = typeof input.last_route === "string" && input.last_route.startsWith("/")
+    ? input.last_route.slice(0, 280)
+    : undefined;
+  const lastReportFocus = input.last_report_focus === "summary" || input.last_report_focus === "strengths"
+    ? input.last_report_focus
+    : undefined;
+  const lastVaultDocId = typeof input.last_vault_doc_id === "string" && input.last_vault_doc_id.trim()
+    ? input.last_vault_doc_id.slice(0, 120)
+    : undefined;
+
   return {
     declined_priority_ids: declinedPriorityIds,
     declined_until_by_id: declinedUntilMap,
     last_goal: safeLastGoal,
     last_target_question_id: lastTargetQuestionId,
+    last_capability: lastCapability,
+    last_route: lastRoute,
+    last_report_focus: lastReportFocus,
+    last_vault_doc_id: lastVaultDocId,
     turn_count: turnCountValue,
     last_reassurance_turn: lastReassuranceTurn,
   };
@@ -192,6 +268,21 @@ export function classifyTurnGoal(message: string): RemyTurnGoal {
   if (!normalized) return "clarification";
   if (isOutOfDomainMessage(message)) return "out_of_scope";
   if (/^(hi|hello|hey|good\s+(morning|afternoon|evening))\b/.test(normalized)) return "greeting";
+  if (REPORT_STRENGTH_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "report_strengths";
+  }
+  if (REPORT_SUMMARY_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "report_summary";
+  }
+  if (VAULT_PROGRESS_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "vault_progress";
+  }
+  if (VAULT_UPLOAD_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "vault_upload_route";
+  }
+  if (WAYFINDING_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "ui_wayfinding";
+  }
   if (/\b(score|rating|grade|why\s+is\s+my\s+score|tell\s+me\s+about\s+my\s+score)\b/.test(normalized)) {
     return "score_explain";
   }
@@ -205,7 +296,7 @@ export function classifyTurnGoal(message: string): RemyTurnGoal {
     /\b(update|change|edit|set\s*up|setting\s+up|beneficiar|trust|will|power\s+of\s+attorney|advance\s+directive)\b/
       .test(normalized)
   ) {
-    return "route_to_question";
+    return /\b(question|answer|response)\b/.test(normalized) ? "route_to_question" : "question_lookup";
   }
   return "clarification";
 }
@@ -333,6 +424,21 @@ function asRouteMessage(
 }
 
 function fallbackRepetitionMessage(goal: RemyTurnGoal, scoreIntro: string, target: PriorityItem | null): string {
+  if (goal === "vault_progress") {
+    return "I can help you focus EasyVault by identifying the highest-priority missing document and opening the exact upload step.";
+  }
+  if (goal === "vault_upload_route") {
+    return "I can route you to the exact EasyVault document step so you can upload or edit it directly in the app.";
+  }
+  if (goal === "report_summary") {
+    return "I can summarize your report in plain language and highlight one practical action to take next.";
+  }
+  if (goal === "report_strengths") {
+    return "You have clear strengths in your report, and I can show where you're doing well plus what to maintain.";
+  }
+  if (goal === "ui_wayfinding" || goal === "question_lookup") {
+    return "I can guide you to the right section in the app and open the exact place to update next.";
+  }
   if (goal === "score_explain") {
     return target
       ? `${scoreIntro} A practical next move is "${target.title}". Updating it in the app will improve your readiness plan clarity.`
@@ -355,13 +461,27 @@ function stripActionDataCollectionLanguage(text: string): string {
     .trim();
 }
 
+function listToSentence(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function summarizeReportSummary(text: string | null): string | null {
+  if (!text) return null;
+  const firstSentence = text.split(/(?<=[.!?])\s+/).find((line) => line.trim().length > 0) || text;
+  return firstSentence.trim().slice(0, 320);
+}
+
 export function applyConversationPolicy(params: {
   context: RemyChatContext;
   baseResponse: RemyChatTurnResponse;
   history: ChatHistoryItem[];
   stateRaw: unknown;
+  capabilityContext?: RemyCapabilityContext | null;
 }): RemyPlannerResult {
-  const { context, baseResponse, history, stateRaw } = params;
+  const { context, baseResponse, history, stateRaw, capabilityContext } = params;
   const nowMs = Date.now();
   const state = normalizeConversationState(stateRaw, nowMs);
   state.turn_count += 1;
@@ -399,11 +519,18 @@ export function applyConversationPolicy(params: {
 
   const explicitAction = ACTION_REQUEST_PATTERNS.some((pattern) => pattern.test(normalizeText(context.message)));
   const fallbackReplies = fallbackQuickReplies(baseResponse);
+  const route = capabilityContext?.route ?? null;
 
   let assistantMessage = stripActionDataCollectionLanguage(baseResponse.assistant_message);
   let cta = baseResponse.cta;
   let intent = baseResponse.intent;
   let repetitionGuardTriggered = false;
+  let capability: RemyPlannerCapability | undefined;
+  let routeType: string | undefined;
+  let routeResolved = false;
+  let ambiguityDetected = false;
+  let reportSummaryMode: "summary" | "strengths" | undefined;
+  let vaultDocTargeted: string | undefined;
 
   if (goal === "out_of_scope") {
     assistantMessage =
@@ -451,11 +578,171 @@ export function applyConversationPolicy(params: {
       cta = undefined;
     }
     intent = "plan_next";
-  } else if (goal === "route_to_question") {
-    const route = asRouteMessage(scoreIntro, target, "Update this question");
-    assistantMessage = route.text;
-    cta = route.cta;
+  } else if (goal === "vault_progress") {
+    capability = "vault";
+    const vault = capabilityContext?.vault;
+    if (vault) {
+      const leadDoc = vault.missing_high_priority_docs[0];
+      const progressLine = `Your EasyVault is ${vault.progress_percent}% complete (${vault.completed_count}/${vault.applicable_count} applicable documents).`;
+      if (leadDoc) {
+        assistantMessage =
+          `${progressLine} A strong next upload is "${leadDoc.name}". I can take you straight to that document step.`;
+        cta = {
+          id: leadDoc.id,
+          label: "Open EasyVault step",
+          href: `/vault?doc=${encodeURIComponent(leadDoc.id)}&action=${
+            leadDoc.input_method === "inline" ? "edit" : "upload"
+          }`,
+        };
+        routeType = leadDoc.input_method === "inline" ? "vault_edit" : "vault_upload";
+        routeResolved = true;
+        vaultDocTargeted = leadDoc.id;
+      } else {
+        assistantMessage = `${progressLine} You're in good shape. You can still review EasyVault for optional updates.`;
+        cta = { id: "vault", label: "Open EasyVault", href: "/vault" };
+        routeType = "app_section";
+        routeResolved = true;
+      }
+    } else {
+      assistantMessage = "I can guide your EasyVault progress once I can load your document context.";
+      cta = undefined;
+    }
     intent = "clarify";
+  } else if (goal === "vault_upload_route") {
+    capability = "vault";
+    if (route?.routeType === "vault_upload" || route?.routeType === "vault_edit") {
+      routeType = route.routeType;
+      routeResolved = true;
+      ambiguityDetected = route.ambiguous;
+      vaultDocTargeted = route.vaultDocTargeted;
+      if (route.ambiguous && route.alternatives.length > 0) {
+        assistantMessage =
+          `I can route you there in EasyVault. Do you mean ${
+            listToSentence(route.alternatives.map((item) => `"${item.label.replace(/^Open\\s+/, "")}"`))
+          }?`;
+        cta = undefined;
+      } else {
+        assistantMessage =
+          "You can do that in EasyVault. I'll open the exact document step so you can upload or edit it directly in the app.";
+        cta = { id: route.targetId, label: "Open EasyVault step", href: route.href };
+      }
+    } else {
+      assistantMessage =
+        "You can upload and manage that in EasyVault. Open EasyVault, choose the document, and I can guide your next step after you update it.";
+      cta = { id: "vault", label: "Open EasyVault", href: "/vault" };
+      routeType = "app_section";
+      routeResolved = true;
+    }
+    intent = "clarify";
+  } else if (goal === "report_summary") {
+    capability = "report";
+    reportSummaryMode = "summary";
+    const report = capabilityContext?.report;
+    if (!report?.available) {
+      assistantMessage =
+        "I don't have a generated readiness report yet. Complete your assessment and I can summarize what stands out right away.";
+      cta = { id: "open-results", label: "Open report", href: "/results" };
+      routeType = "app_section";
+      routeResolved = true;
+    } else {
+      const summary = summarizeReportSummary(report.executive_summary);
+      const action = report.action_items[0];
+      assistantMessage = summary
+        ? `${summary}${action ? ` A good next move is ${action}.` : ""}`
+        : `Your report shows meaningful progress with clear next steps. ${
+          action ? `A good next move is ${action}.` : "I can walk you through the top recommendation."
+        }`;
+      cta = { id: "open-results", label: "Open report", href: "/results" };
+      routeType = "app_section";
+      routeResolved = true;
+    }
+    intent = "clarify";
+  } else if (goal === "report_strengths") {
+    capability = "report";
+    reportSummaryMode = "strengths";
+    const report = capabilityContext?.report;
+    if (!report?.available) {
+      assistantMessage =
+        "Once your report is generated, I can summarize exactly where you're doing well and why.";
+      cta = { id: "open-results", label: "Open report", href: "/results" };
+      routeType = "app_section";
+      routeResolved = true;
+    } else {
+      const strengths = report.strengths.slice(0, 3);
+      assistantMessage = strengths.length > 0
+        ? `You're doing well in ${listToSentence(strengths)}. Keep those areas steady while we improve one remaining gap at a time.`
+        : "You've built momentum across several sections. I can walk through your strongest areas and what to maintain next.";
+      cta = { id: "open-results", label: "Open report", href: "/results" };
+      routeType = "app_section";
+      routeResolved = true;
+    }
+    intent = "clarify";
+  } else if (goal === "ui_wayfinding") {
+    capability = "navigation";
+    if (route) {
+      routeType = route.routeType;
+      routeResolved = true;
+      ambiguityDetected = route.ambiguous;
+      vaultDocTargeted = route.vaultDocTargeted;
+      if (route.ambiguous && route.alternatives.length > 0) {
+        assistantMessage =
+          `I can guide you there. Did you want ${
+            listToSentence(route.alternatives.map((item) => `"${item.label.replace(/^Open\\s+/, "")}"`))
+          }?`;
+        cta = undefined;
+      } else {
+        const navTarget = findNavigationTargetById(route.targetId);
+        if (navTarget) {
+          assistantMessage = `${navTarget.purpose} I can open it for you now.`;
+        } else {
+          assistantMessage = "I can guide you to that section right now.";
+        }
+        cta = { id: route.targetId, label: route.label, href: route.href };
+      }
+    } else {
+      assistantMessage =
+        "I can guide you to Dashboard, Life Readiness, Readiness Report, EasyVault, or Profile. Tell me where you want to go.";
+      cta = undefined;
+    }
+    intent = "clarify";
+  } else if (goal === "question_lookup" || goal === "route_to_question") {
+    capability = "readiness";
+    const readinessRoute = route?.routeType === "readiness_question" ? route : null;
+    if (readinessRoute) {
+      routeType = readinessRoute.routeType;
+      routeResolved = true;
+      ambiguityDetected = readinessRoute.ambiguous;
+      if (readinessRoute.ambiguous && readinessRoute.alternatives.length > 0) {
+        assistantMessage =
+          `I can route you to the right readiness question. Do you mean ${
+            listToSentence(readinessRoute.alternatives.map((item) => `"${item.label}"`))
+          }?`;
+        cta = undefined;
+      } else {
+        assistantMessage =
+          `${scoreIntro} Let's update this directly in your readiness flow so it saves to your plan immediately.`;
+        cta = {
+          id: readinessRoute.targetId,
+          label: "Update this question",
+          href: readinessRoute.href,
+        };
+      }
+      intent = "clarify";
+    } else if (goal === "route_to_question") {
+      const routing = asRouteMessage(scoreIntro, target, "Update this question");
+      assistantMessage = routing.text;
+      cta = routing.cta;
+      routeResolved = Boolean(routing.cta);
+      routeType = routing.cta ? "readiness_question" : undefined;
+      intent = "clarify";
+    } else {
+      const routing = asRouteMessage(scoreIntro, target, "Update this question");
+      assistantMessage = routing.text;
+      cta = routing.cta;
+      routeResolved = Boolean(routing.cta);
+      routeType = routing.cta ? "readiness_question" : undefined;
+      intent = "clarify";
+    }
   } else {
     assistantMessage = target
       ? `${scoreIntro} I can guide you through "${target.title}" next, then we can reassess your plan together.`
@@ -482,12 +769,24 @@ export function applyConversationPolicy(params: {
     state.last_reassurance_turn = state.turn_count;
   }
 
-  if (!explicitAction && goal !== "route_to_question" && goal !== "next_step" && goal !== "skip_priority") {
+  if (
+    !explicitAction &&
+    goal !== "route_to_question" &&
+    goal !== "question_lookup" &&
+    goal !== "next_step" &&
+    goal !== "skip_priority" &&
+    goal !== "vault_upload_route" &&
+    goal !== "ui_wayfinding"
+  ) {
     cta = undefined;
   }
 
   state.last_goal = goal;
   state.last_target_question_id = target?.id;
+  state.last_capability = capability;
+  state.last_route = cta?.href || route?.href || undefined;
+  state.last_report_focus = reportSummaryMode;
+  state.last_vault_doc_id = vaultDocTargeted;
 
   return {
     response: {
@@ -502,5 +801,12 @@ export function applyConversationPolicy(params: {
     scoreBand,
     policyMode: "app_directed_only",
     repetitionGuardTriggered,
+    capability,
+    routeType,
+    routeResolved,
+    ambiguityDetected,
+    vaultDocTargeted,
+    reportSummaryMode,
+    groundingPassed: routeResolved || !capability || capability === "report" || capability === "readiness",
   };
 }

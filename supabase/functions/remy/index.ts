@@ -25,6 +25,7 @@ import {
   normalizeConversationState,
   type RemyConversationState,
 } from "./turnPlanner.ts";
+import { loadRemyCapabilityContext } from "./remyCapabilityContext.ts";
 import {
   computeBackoffDelayMs,
   mapFailureFromStatus,
@@ -354,6 +355,7 @@ async function buildSurfacePayload(
       assessmentDbId: null,
       assessment: null,
       answers: [] as AnswerRow[],
+      schema: null as Schema | null,
     };
   }
 
@@ -377,6 +379,7 @@ async function buildSurfacePayload(
     assessmentDbId: assessment.id,
     assessment,
     answers,
+    schema,
   };
 }
 
@@ -604,6 +607,9 @@ const REMY_CHAT_JSON_SCHEMA = {
       type: "string",
       enum: ["clarify", "prioritize", "explain_score", "plan_next", "reassure", "unknown"],
     },
+    goal: { type: "string" },
+    grounding_summary: { type: "string" },
+    action_rationale: { type: "string" },
     confidence: { type: "number" },
     safety_flags: {
       type: "array",
@@ -707,6 +713,7 @@ async function invokeChatCompletionsProvider(
             type: "function",
             function: { name: "remy_chat_turn" },
           },
+          parallel_tool_calls: false,
           temperature: 0.35,
         }),
       });
@@ -826,6 +833,7 @@ async function invokeResponsesProvider(
               schema: REMY_CHAT_JSON_SCHEMA,
             },
           },
+          parallel_tool_calls: false,
           temperature: 0.35,
         }),
       });
@@ -1085,7 +1093,7 @@ serve(async (req) => {
       return errorResponse(traceId, "CHAT_RATE_LIMITED", "Rate limit exceeded for chat_turn", 429, true);
     }
 
-    const { payload: surfacePayload, assessmentDbId, assessment, answers } = await buildSurfacePayload(
+    const { payload: surfacePayload, assessmentDbId, assessment, answers, schema } = await buildSurfacePayload(
       readiness,
       subjectId,
       assessmentKey,
@@ -1115,6 +1123,16 @@ serve(async (req) => {
       payload: surfacePayload,
       answerCount: answers.length,
     };
+
+    const capabilityContext = await loadRemyCapabilityContext({
+      supabase,
+      userId: authData.user.id,
+      message,
+      surface,
+      schema,
+      assessment,
+      _answers: answers,
+    });
 
     const fallback = buildDeterministicChatReply(chatContext);
     const chatTurnEvent = await insertRemyEvent(readiness, {
@@ -1179,6 +1197,13 @@ serve(async (req) => {
     let plannerGoal: string | undefined;
     let plannerScoreBand: string | undefined;
     let plannerPolicyMode: string | undefined;
+    let plannerCapability: string | undefined;
+    let plannerRouteType: string | undefined;
+    let plannerRouteResolved = false;
+    let plannerAmbiguityDetected = false;
+    let plannerVaultDocTargeted: string | undefined;
+    let plannerReportSummaryMode: string | undefined;
+    let plannerGroundingPassed = true;
     let repetitionGuardTriggered = false;
     let nextConversationState = normalizeConversationState(conversation.state);
 
@@ -1219,12 +1244,20 @@ serve(async (req) => {
         baseResponse: response,
         history,
         stateRaw: conversation.state,
+        capabilityContext,
       });
       response = plannerResult.response;
       nextConversationState = plannerResult.state;
       plannerGoal = plannerResult.goal;
       plannerScoreBand = plannerResult.scoreBand;
       plannerPolicyMode = plannerResult.policyMode;
+      plannerCapability = plannerResult.capability;
+      plannerRouteType = plannerResult.routeType;
+      plannerRouteResolved = plannerResult.routeResolved;
+      plannerAmbiguityDetected = plannerResult.ambiguityDetected;
+      plannerVaultDocTargeted = plannerResult.vaultDocTargeted;
+      plannerReportSummaryMode = plannerResult.reportSummaryMode;
+      plannerGroundingPassed = plannerResult.groundingPassed;
       repetitionGuardTriggered = plannerResult.repetitionGuardTriggered;
     }
 
@@ -1295,6 +1328,13 @@ serve(async (req) => {
         goal: plannerGoal || null,
         score_band: plannerScoreBand || null,
         policy_mode: plannerPolicyMode || null,
+        capability: plannerCapability || null,
+        route_type: plannerRouteType || null,
+        route_resolved: plannerRouteResolved,
+        ambiguity_detected: plannerAmbiguityDetected,
+        vault_doc_targeted: plannerVaultDocTargeted || null,
+        report_summary_mode: plannerReportSummaryMode || null,
+        grounding_passed: plannerGroundingPassed,
         repetition_guard_triggered: repetitionGuardTriggered,
         model_name: fallbackReason ? null : CHAT_MODEL_NAME,
         fallback_reason: fallbackReason || null,
@@ -1325,6 +1365,13 @@ serve(async (req) => {
         turn_goal: plannerGoal || null,
         score_band: plannerScoreBand || null,
         policy_mode: plannerPolicyMode || null,
+        capability: plannerCapability || null,
+        route_type: plannerRouteType || null,
+        route_resolved: plannerRouteResolved,
+        ambiguity_detected: plannerAmbiguityDetected,
+        vault_doc_targeted: plannerVaultDocTargeted || null,
+        report_summary_mode: plannerReportSummaryMode || null,
+        grounding_passed: plannerGroundingPassed,
         cta_shown: Boolean(response.cta),
         declined_priority_count: nextConversationState.declined_priority_ids.length,
         repetition_guard_triggered: repetitionGuardTriggered,
@@ -1345,6 +1392,9 @@ serve(async (req) => {
         goal: plannerGoal,
         score_band: plannerScoreBand,
         policy_mode: plannerPolicyMode,
+        capability: plannerCapability,
+        route_type: plannerRouteType,
+        grounding_passed: plannerGroundingPassed,
       },
     });
   }
