@@ -30,6 +30,7 @@ supabase functions deploy remy
 - `REMY_CHAT_PROVIDER_TIMEOUT_MS` (default `2800`)
 - `REMY_CHAT_PROVIDER_MAX_RETRIES` (default `2`, max `2`)
 - `REMY_CHAT_PROVIDER_BACKOFF_MS` (default `180`)
+- `REMY_CHAT_ACTION_GATING=true|false` (default `true`; only show CTA when user explicitly asks for action)
 - `VITE_REMY_CHAT_UI_V2=true|false` (frontend rollout flag for companion-chat UX v2)
 
 ## Recommended Canary Progression

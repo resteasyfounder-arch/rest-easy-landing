@@ -91,6 +91,7 @@ const CHAT_MODEL_NAME = Deno.env.get("REMY_CHAT_MODEL") ?? "gpt-4o-mini";
 const CHAT_PROVIDER_MODE = sanitizeProviderMode(Deno.env.get("REMY_CHAT_PROVIDER"));
 const RESPONSES_CANARY_PERCENT = Math.max(0, Math.min(100, Number(Deno.env.get("REMY_RESPONSES_CANARY_PERCENT") ?? "0")));
 const RESPONSE_STORE = (Deno.env.get("REMY_RESPONSE_STORE") ?? "false").toLowerCase() === "true";
+const ACTION_GATING_ENABLED = (Deno.env.get("REMY_CHAT_ACTION_GATING") ?? "true").toLowerCase() !== "false";
 const PROVIDER_TIMEOUT_MS = Math.max(1200, Number(Deno.env.get("REMY_CHAT_PROVIDER_TIMEOUT_MS") ?? "2800"));
 const PROVIDER_MAX_RETRIES = Math.max(0, Math.min(2, Number(Deno.env.get("REMY_CHAT_PROVIDER_MAX_RETRIES") ?? "2")));
 const PROVIDER_BACKOFF_BASE_MS = Math.max(60, Number(Deno.env.get("REMY_CHAT_PROVIDER_BACKOFF_MS") ?? "180"));
@@ -113,6 +114,49 @@ function sanitizeMessage(value: string | undefined, maxLen = 800): string | null
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return null;
   return normalized.slice(0, maxLen);
+}
+
+function isQuestionUpdateRequest(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    /\b(update|change|edit|fix|revise|correct)\b/.test(normalized) &&
+    /\b(question|answer|response|section|profile)\b/.test(normalized)
+  ) || /\bupdate this question\b/.test(normalized);
+}
+
+function isNextStepRequest(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    /\b(next step|what should i do next|what should i do first|where do i start|start now|do this now)\b/.test(
+      normalized,
+    ) ||
+    /\b(next|first|start)\b/.test(normalized) && /\b(step|action|move|do)\b/.test(normalized)
+  );
+}
+
+function isNavigationRequest(message: string): boolean {
+  return /\b(open|take me|go to|navigate|show me|bring me)\b/.test(message.toLowerCase());
+}
+
+function isExplicitActionRequest(message: string): boolean {
+  return isQuestionUpdateRequest(message) || isNextStepRequest(message) || isNavigationRequest(message);
+}
+
+function applyActionPolicy(response: RemyChatTurnResponse, message: string): RemyChatTurnResponse {
+  if (!ACTION_GATING_ENABLED) return response;
+  if (!response.cta) return response;
+  if (!isExplicitActionRequest(message)) {
+    return { ...response, cta: undefined };
+  }
+
+  const label = isQuestionUpdateRequest(message) ? "Update this question" : "Show my next step";
+  return {
+    ...response,
+    cta: {
+      ...response.cta,
+      label,
+    },
+  };
 }
 
 function sanitizeConversationId(value: string | undefined): string | null {
@@ -1152,6 +1196,8 @@ serve(async (req) => {
       providerFailureCode = "OPENAI_PROVIDER_ERROR";
       providerFailureDetail = "OPENAI_API_KEY is not configured";
     }
+
+    response = applyActionPolicy(response, message);
 
     if (fallbackReason && fallbackReason !== "deterministic") {
       const chatErrorEvent = await insertRemyEvent(readiness, {

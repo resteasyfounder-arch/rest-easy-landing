@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/context/AuthContext";
 import { useRemySurface } from "@/hooks/useRemySurface";
@@ -23,17 +22,6 @@ function getRouteSurface(pathname: string): RemySurface | null {
   return null;
 }
 
-function getRouteLabel(pathname: string): string {
-  if (pathname.startsWith("/dashboard")) return "Dashboard Guidance";
-  if (pathname.startsWith("/readiness")) return "Readiness Guidance";
-  if (pathname.startsWith("/results")) return "Results Guidance";
-  if (pathname.startsWith("/profile")) return "Profile Guidance";
-  if (pathname.startsWith("/menu")) return "Menu Guidance";
-  if (pathname.startsWith("/assessment")) return "Findability Guidance";
-  if (pathname.startsWith("/login")) return "Sign-in Guidance";
-  return "Guest Guidance";
-}
-
 export function RemyGlobalLauncher() {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
@@ -43,7 +31,6 @@ export function RemyGlobalLauncher() {
   const openTrackedAtRef = useRef(0);
 
   const surface = useMemo(() => getRouteSurface(location.pathname), [location.pathname]);
-  const routeLabel = useMemo(() => getRouteLabel(location.pathname), [location.pathname]);
   const firstName = useMemo(() => getUserFirstName(user), [user]);
   const personalizedEnabled = Boolean(surface && isAuthenticated);
   const isGuestSurface = !personalizedEnabled;
@@ -53,7 +40,6 @@ export function RemyGlobalLauncher() {
     payload,
     isLoading,
     error,
-    dismissNudge,
     acknowledgeAction,
     trackEvent,
     refresh,
@@ -90,7 +76,6 @@ export function RemyGlobalLauncher() {
     }).catch(() => undefined);
   }, [open, isGuestSurface, surface, location.pathname, trackEvent]);
 
-  const hasActionableNudge = !isGuestSurface && Boolean(payload?.nudge);
   const isAppRouteOnMobile = isMobile && (
     location.pathname.startsWith("/profile") ||
     location.pathname.startsWith("/assessment") ||
@@ -108,16 +93,6 @@ export function RemyGlobalLauncher() {
           isAppRouteOnMobile ? "bottom-24" : "bottom-5",
         )}
       >
-        {!open && !isGuestSurface && payload?.nudge && (
-          <button
-            className="max-w-[280px] rounded-full border border-primary/25 bg-background/95 px-3 py-1.5 text-left shadow-lg backdrop-blur"
-            onClick={() => setOpen(true)}
-          >
-            <p className="truncate text-xs text-muted-foreground">Remy tip</p>
-            <p className="truncate text-sm font-medium text-foreground">{payload.nudge.title}</p>
-          </button>
-        )}
-
         <div
           className={cn(
             "flex w-[min(94vw,380px)] h-[min(72vh,620px)] min-h-[430px] flex-col overflow-hidden rounded-2xl border border-primary/30 bg-background/95 shadow-2xl backdrop-blur transition-all",
@@ -127,14 +102,8 @@ export function RemyGlobalLauncher() {
           <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5">
             <div>
               <p className="text-sm font-semibold text-foreground">Remy</p>
-              <p className="text-xs text-muted-foreground">{routeLabel}</p>
             </div>
             <div className="flex items-center gap-1">
-              {!isGuestSurface && (
-                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                  Companion
-                </Badge>
-              )}
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
@@ -153,7 +122,6 @@ export function RemyGlobalLauncher() {
                 userName={firstName}
                 sessionKey={user?.id ?? null}
                 uiV2Enabled={remyUiV2Enabled}
-                onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
                 onRetry={refresh}
                 onTrackEvent={trackEvent}
                 onChatTurn={chatTurn}
@@ -170,14 +138,11 @@ export function RemyGlobalLauncher() {
 
         <Button
           size="lg"
-          className="relative h-12 rounded-full px-4 shadow-xl"
+          className="h-12 rounded-full px-4 shadow-xl"
           onClick={() => setOpen((prev) => !prev)}
         >
           <Sparkles className="mr-2 h-4 w-4" />
           Remy Guide
-          {!open && hasActionableNudge && (
-            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-rose-500" />
-          )}
         </Button>
       </div>
     </>

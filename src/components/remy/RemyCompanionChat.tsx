@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, SendHorizonal, Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, SendHorizonal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isExplicitActionRequest } from "@/lib/remyActionPolicy";
 import {
   clearRemySessionsExcept,
   loadRemySession,
@@ -43,7 +43,6 @@ interface RemyCompanionChatProps {
   userName?: string | null;
   sessionKey?: string | null;
   uiV2Enabled?: boolean;
-  onDismiss?: (nudgeId: string) => Promise<void> | void;
   onNavigateAction?: (actionId: string, href: string) => Promise<void> | void;
   onTrackEvent?: (eventId: string, metadata?: Record<string, unknown>) => Promise<void> | void;
   onChatTurn?: (
@@ -191,7 +190,6 @@ export function RemyCompanionChat({
   userName = null,
   sessionKey = null,
   uiV2Enabled = true,
-  onDismiss,
   onNavigateAction,
   onTrackEvent,
   onChatTurn,
@@ -205,7 +203,6 @@ export function RemyCompanionChat({
   const [quickReplies, setQuickReplies] = useState<string[]>(DEFAULT_QUICK_REPLIES);
   const [lastFailure, setLastFailure] = useState<ChatFailureState | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const initializedRef = useRef(false);
   const isDebugMode = Boolean(import.meta.env.DEV);
 
@@ -367,17 +364,6 @@ export function RemyCompanionChat({
     void sendMessage(draft, "typed");
   };
 
-  const handleSuggestionClick = (value: string) => {
-    if (!uiV2Enabled) {
-      void sendMessage(value, "quick_reply");
-      return;
-    }
-    setDraft(value.slice(0, 800));
-    setLastFailure(null);
-    track("remy_suggestion_selected", { suggestion: value });
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
   if (isLoading) {
     return (
       <div className={cn("space-y-3", className)}>
@@ -399,13 +385,24 @@ export function RemyCompanionChat({
     );
   }
 
+  const visibleMessages = messages.slice(-20);
+
+  const canShowActions = (index: number): boolean => {
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const candidate = visibleMessages[cursor];
+      if (candidate.role !== "user") continue;
+      return isExplicitActionRequest(candidate.text);
+    }
+    return false;
+  };
+
   return (
     <div className={cn("flex h-full min-h-0 flex-col gap-3", className)}>
       <div
         ref={scrollRef}
         className="flex-1 min-h-0 space-y-2 overflow-y-auto rounded-xl border border-border/50 bg-card/50 p-3"
       >
-        {messages.slice(-20).map((message) => (
+        {visibleMessages.map((message, index) => (
           <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
             <div
               className={cn(
@@ -415,19 +412,13 @@ export function RemyCompanionChat({
                   : "rounded-bl-md border border-border/60 bg-background text-foreground",
               )}
             >
-              {message.role === "remy" && (
-                <div className="mb-1 flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Remy</span>
-                </div>
-              )}
               <p>{message.text}</p>
-              {message.statusNote && (
+              {!uiV2Enabled && message.statusNote && (
                 <p className="mt-1 text-[11px] text-muted-foreground">{message.statusNote}</p>
               )}
-              {message.actions && message.actions.length > 0 && (
+              {message.actions && message.actions.length > 0 && canShowActions(index) && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {message.actions.slice(0, 2).map((action) => (
+                  {message.actions.slice(0, 1).map((action) => (
                     <Button
                       key={`${message.id}:${action.actionId}`}
                       size="sm"
@@ -484,24 +475,8 @@ export function RemyCompanionChat({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {quickReplies.slice(0, 3).map((item) => (
-          <Button
-            key={item}
-            size="sm"
-            variant="outline"
-            className="h-8 px-3 text-xs"
-            onClick={() => handleSuggestionClick(item)}
-            disabled={isThinking && !uiV2Enabled}
-          >
-            {item}
-          </Button>
-        ))}
-      </div>
-
       <form className="flex items-center gap-2" onSubmit={handleSubmit}>
         <Input
-          ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value.slice(0, 800))}
           placeholder="Talk to Remy about your readiness plan..."
@@ -510,34 +485,6 @@ export function RemyCompanionChat({
           <SendHorizonal className="h-4 w-4" />
         </Button>
       </form>
-
-      {payload?.nudge && onDismiss && (
-        <div className="flex items-center justify-between rounded-lg border border-border/50 bg-background/70 px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-foreground">{payload.nudge.title}</p>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs"
-            onClick={async () => {
-              track("remy_nudge_dismissed", { nudge_id: payload.nudge?.id });
-              await onDismiss(payload.nudge.id);
-            }}
-          >
-            Not now
-          </Button>
-        </div>
-      )}
-
-      {payload?.priorities?.[0] && (
-        <div className="flex items-center justify-between rounded-lg border border-border/50 bg-background/70 px-3 py-2">
-          <p className="truncate pr-2 text-xs text-muted-foreground">{payload.priorities[0].title}</p>
-          <Badge variant="secondary" className="text-[10px]">
-            {payload.priorities[0].priority}
-          </Badge>
-        </div>
-      )}
     </div>
   );
 }
