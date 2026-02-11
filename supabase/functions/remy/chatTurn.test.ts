@@ -90,6 +90,8 @@ describe("chatTurn fallback responses", () => {
     const reply = buildDeterministicChatReply(baseContext);
     expect(reply.intent).toBe("prioritize");
     expect(reply.assistant_message.toLowerCase()).toContain("start");
+    expect(reply.assistant_message).not.toMatch(/\d+%/);
+    expect(reply.assistant_message.toLowerCase()).not.toContain("weight");
     expect(reply.cta?.href).toBe("/readiness?section=legal");
   });
 });
@@ -115,5 +117,24 @@ describe("chatTurn normalization", () => {
     expect(normalized.cta?.href).toBe(fallback.cta?.href);
     expect(normalized.quick_replies).toHaveLength(3);
     expect(normalized.confidence).toBe(1);
+  });
+
+  it("rewrites backend transparency language into companion wording", () => {
+    const fallback = buildDeterministicChatReply(baseContext);
+    const normalized = normalizeChatTurnResponse(
+      {
+        assistant_message:
+          "Current answer is \"No\". This section carries 25% weight. Use [Do this now](/readiness?section=1&question=1.1.B.3).",
+        quick_replies: ["What should I do first?"],
+        intent: "prioritize",
+        confidence: 0.6,
+      },
+      fallback,
+    );
+
+    expect(normalized.assistant_message.toLowerCase()).not.toContain("current answer is");
+    expect(normalized.assistant_message).not.toMatch(/\d+%/);
+    expect(normalized.assistant_message.toLowerCase()).not.toContain("weight");
+    expect(normalized.assistant_message.toLowerCase()).toContain("step");
   });
 });

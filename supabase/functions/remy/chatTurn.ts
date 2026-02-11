@@ -49,6 +49,17 @@ const OUT_OF_DOMAIN_PATTERNS = [
   /\bfantasy\b/i,
 ];
 
+const TRANSPARENCY_LEAK_PATTERNS = [
+  /\b\d{1,3}\s*%\b/i,
+  /\bweight(ed|ing)?\b/i,
+  /\bcurrent answer is\b/i,
+  /\bsection\s*(id|=|:)\b/i,
+  /\bquestion\s*(id|=|:)\b/i,
+  /\bsource[_\s-]?ref(s)?\b/i,
+  /\bsection=[^&\s]+/i,
+  /\bquestion=[^&\s]+/i,
+];
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -56,6 +67,76 @@ function clamp(value: number, min: number, max: number): number {
 function sanitizeMessage(value: unknown, maxLen: number): string {
   if (typeof value !== "string") return "";
   return value.replace(/\s+/g, " ").trim().slice(0, maxLen);
+}
+
+function stripLinkMarkup(text: string): string {
+  return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1");
+}
+
+function scrubTransparencyLanguage(text: string): string {
+  return text
+    .replace(/\bCurrent answer is\s+"[^"]+"\.?\s*/gi, "")
+    .replace(/\bThis section carries\s+\d{1,3}\s*%?\s+weight\.?\s*/gi, "")
+    .replace(/\bsection\s+weight\b/gi, "priority context")
+    .replace(/\bhighly weighted\b/gi, "high-impact")
+    .replace(/\bweighted\b/gi, "important")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function hasTransparencyLeak(text: string): boolean {
+  return TRANSPARENCY_LEAK_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function buildCompanionRewrite(intent: RemyChatIntent, ctaLabel?: string): string {
+  switch (intent) {
+    case "prioritize":
+      return ctaLabel
+        ? `Let's start with one focused step: ${ctaLabel}. I can help you move through it with confidence.`
+        : "Let's start with one focused step that moves your readiness forward right away.";
+    case "explain_score":
+      return "You're making progress. A few areas still need attention, and I can guide you through them one step at a time.";
+    case "plan_next":
+      return "Let's take one concrete next step now, then we can check what changed and choose the next best move.";
+    case "reassure":
+      return "You're not behind. We'll keep this simple and make steady progress together.";
+    case "clarify":
+      return "I can explain what matters most right now and guide you to the next step in plain language.";
+    case "unknown":
+    default:
+      return "I can help you pick the next best readiness step and keep the process clear and manageable.";
+  }
+}
+
+export function enforceConversationalStyle(response: RemyChatTurnResponse): RemyChatTurnResponse {
+  const cleanedMessage = scrubTransparencyLanguage(stripLinkMarkup(response.assistant_message));
+  const looksFragmented = cleanedMessage.length < 24 || /^use\s+/i.test(cleanedMessage);
+  const assistantMessage = cleanedMessage && !hasTransparencyLeak(cleanedMessage) && !looksFragmented
+    ? cleanedMessage
+    : buildCompanionRewrite(response.intent, response.cta?.label);
+
+  const whyThis = response.why_this
+    ? {
+      ...response.why_this,
+      body: (() => {
+        const cleaned = scrubTransparencyLanguage(stripLinkMarkup(response.why_this!.body));
+        return cleaned && !hasTransparencyLeak(cleaned)
+          ? cleaned
+          : "This step can meaningfully strengthen your readiness progress.";
+      })(),
+    }
+    : undefined;
+
+  const quickReplies = response.quick_replies
+    .map((reply) => scrubTransparencyLanguage(stripLinkMarkup(reply)))
+    .filter((reply) => reply && !hasTransparencyLeak(reply));
+
+  return {
+    ...response,
+    assistant_message: assistantMessage,
+    quick_replies: quickReplies.length > 0 ? quickReplies.slice(0, 3) : makeQuickReplies(),
+    why_this: whyThis,
+  };
 }
 
 export function sanitizeInternalPath(path: string | undefined | null): string | null {
@@ -141,11 +222,8 @@ export function buildOutOfDomainResponse(context: RemyChatContext): RemyChatTurn
 }
 
 function composeContextLine(context: RemyChatContext): string {
-  const score = typeof context.assessment?.overall_score === "number"
-    ? `${Math.round(context.assessment.overall_score)}%`
-    : "not available yet";
   const topPriority = context.payload.priorities[0]?.title ?? "No critical priorities currently";
-  return `Readiness score: ${score}. Top priority: ${topPriority}.`;
+  return `Top focus right now: ${topPriority}.`;
 }
 
 export function buildDeterministicChatReply(context: RemyChatContext): RemyChatTurnResponse {
@@ -158,18 +236,16 @@ export function buildDeterministicChatReply(context: RemyChatContext): RemyChatT
   const topPriority = context.payload.priorities[0];
   const topExplanation = context.payload.explanations[0];
   const reassurance = context.payload.reassurance.body;
-  const score = typeof context.assessment?.overall_score === "number"
-    ? `${Math.round(context.assessment.overall_score)}%`
-    : null;
   const contextLine = composeContextLine(context);
+  let response: RemyChatTurnResponse;
 
   switch (intent) {
     case "prioritize":
-      return {
+      response = {
         conversation_id: context.conversationId,
         assistant_message: topPriority
-          ? `Start with "${topPriority.title}". ${topPriority.why_now}`
-          : `Your best next move is to continue answering readiness questions so I can prioritize with more precision. ${contextLine}`,
+          ? `Start with "${topPriority.title}". It is a strong next step to move your readiness forward.`
+          : `Your best next move is to continue your readiness flow so I can personalize the next step with more confidence. ${contextLine}`,
         quick_replies: makeQuickReplies(),
         cta,
         why_this: topExplanation
@@ -183,12 +259,12 @@ export function buildDeterministicChatReply(context: RemyChatContext): RemyChatT
         confidence: 0.82,
         safety_flags: [],
       };
+      break;
     case "explain_score":
-      return {
+      response = {
         conversation_id: context.conversationId,
-        assistant_message: score
-          ? `Your current readiness score is ${score}. ${topExplanation?.body ?? "Your score is driven most by unanswered or low-confidence sections with higher weight."}`
-          : `You do not have a finalized score yet. I can help you complete the highest-impact questions first so your score reflects your current readiness.`,
+        assistant_message:
+          `You are making progress. ${topExplanation?.body ?? "A few important areas still need attention, and we can tackle them one at a time."}`,
         quick_replies: makeQuickReplies(),
         cta,
         why_this: topExplanation
@@ -202,20 +278,22 @@ export function buildDeterministicChatReply(context: RemyChatContext): RemyChatT
         confidence: 0.85,
         safety_flags: [],
       };
+      break;
     case "plan_next":
-      return {
+      response = {
         conversation_id: context.conversationId,
         assistant_message: cta
-          ? `Let's take one concrete step now. I’ll send you to the highest-impact next action, then we can reassess together.`
-          : `Let’s keep momentum. Continue your readiness flow, then I’ll prioritize the next highest-impact step from your updated answers.`,
+          ? "Let's take one concrete step now. I can guide you through it and then we’ll reassess together."
+          : "Let’s keep momentum. Continue your readiness flow and I’ll guide the next best move.",
         quick_replies: makeQuickReplies(),
         cta,
         intent,
         confidence: 0.8,
         safety_flags: [],
       };
+      break;
     case "reassure":
-      return {
+      response = {
         conversation_id: context.conversationId,
         assistant_message: reassurance,
         quick_replies: makeQuickReplies(),
@@ -224,23 +302,25 @@ export function buildDeterministicChatReply(context: RemyChatContext): RemyChatT
         confidence: 0.86,
         safety_flags: [],
       };
+      break;
     case "clarify":
-      return {
+      response = {
         conversation_id: context.conversationId,
         assistant_message:
-          `Remy focuses on your Rest Easy readiness journey: explain what matters, prioritize the next step, and keep guidance aligned to your latest profile and assessment updates. ${contextLine}`,
+          `Remy keeps your readiness plan clear: explain what matters, guide your next step, and stay aligned to your latest updates. ${contextLine}`,
         quick_replies: makeQuickReplies(),
         cta,
         intent,
         confidence: 0.78,
         safety_flags: [],
       };
+      break;
     case "unknown":
     default:
-      return {
+      response = {
         conversation_id: context.conversationId,
         assistant_message:
-          `I can help you decide the next best readiness action based on your current state. ${contextLine} Ask me what to do first, why something is prioritized, or to explain your score.`,
+          `I can help you choose the next best readiness step and keep it simple. ${contextLine} Ask me what to do first or what to focus on next.`,
         quick_replies: makeQuickReplies(),
         cta,
         intent: "unknown",
@@ -248,6 +328,8 @@ export function buildDeterministicChatReply(context: RemyChatContext): RemyChatT
         safety_flags: [],
       };
   }
+
+  return enforceConversationalStyle(response);
 }
 
 export function normalizeChatTurnResponse(
@@ -315,7 +397,7 @@ export function normalizeChatTurnResponse(
       .filter((value) => Boolean(value))
     : fallback.safety_flags;
 
-  return {
+  return enforceConversationalStyle({
     conversation_id: fallback.conversation_id,
     assistant_message: assistantMessage,
     quick_replies: quickReplies.length > 0 ? quickReplies : fallback.quick_replies,
@@ -324,7 +406,7 @@ export function normalizeChatTurnResponse(
     intent: safeIntent,
     confidence,
     safety_flags: safetyFlags,
-  };
+  });
 }
 
 export function buildModelSystemPrompt(): string {
@@ -335,8 +417,25 @@ export function buildModelSystemPrompt(): string {
     "Never invent user data. If uncertain, say what is unknown.",
     "Tone: calm, supportive, concise, direct.",
     "Focus on one practical next step per response.",
+    "Do not expose internal analytics or backend details (no percentages, weights, section IDs, question IDs, source refs, or raw assessment keys).",
+    "Do not use phrases like 'current answer is' or mention schema/report internals.",
     "Return JSON only that matches the remy_chat_turn function schema.",
   ].join(" ");
+}
+
+function summarizeProgressState(score: number | null | undefined): string {
+  if (typeof score !== "number") return "progress_not_ready";
+  if (score >= 75) return "strong_progress";
+  if (score >= 45) return "building_momentum";
+  return "early_progress";
+}
+
+function modelSafeReason(reason: string): string {
+  const cleaned = scrubTransparencyLanguage(stripLinkMarkup(reason));
+  if (!cleaned || hasTransparencyLeak(cleaned)) {
+    return "This step has meaningful readiness impact right now.";
+  }
+  return cleaned;
 }
 
 export function buildModelUserPrompt(
@@ -345,28 +444,34 @@ export function buildModelUserPrompt(
 ): string {
   const serializedHistory = history
     .slice(-8)
-    .map((item) => `${item.role === "assistant" ? "Remy" : "User"}: ${item.text}`)
+    .map((item) => `${item.role === "assistant" ? "Remy" : "User"}: ${modelSafeReason(item.text)}`)
     .join("\n");
 
   const topPriorities = context.payload.priorities.slice(0, 3).map((item) => ({
-    id: item.id,
     title: item.title,
-    priority: item.priority,
-    why_now: item.why_now,
-    target_href: item.target_href,
+    reason: modelSafeReason(item.why_now),
   }));
 
   const input = {
     surface: context.surface,
     assessment_status: context.assessment?.status ?? "unknown",
     report_status: context.assessment?.report_status ?? "unknown",
-    overall_score: context.assessment?.overall_score ?? null,
+    progress_state: summarizeProgressState(context.assessment?.overall_score),
     top_priorities: topPriorities,
     reassurance: context.payload.reassurance,
-    nudge: context.payload.nudge,
-    explanations: context.payload.explanations.slice(0, 2),
+    nudge: context.payload.nudge
+      ? {
+        title: context.payload.nudge.title,
+        body: modelSafeReason(context.payload.nudge.body),
+        cta_label: context.payload.nudge.cta?.label ?? null,
+      }
+      : null,
+    explanations: context.payload.explanations.slice(0, 2).map((item) => ({
+      title: item.title,
+      body: modelSafeReason(item.body),
+    })),
     answer_count: context.answerCount,
-    latest_user_message: context.message,
+    latest_user_message: modelSafeReason(context.message),
     conversation_history: serializedHistory,
   };
 

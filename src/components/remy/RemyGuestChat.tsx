@@ -103,6 +103,7 @@ export function RemyGuestChat({ className, onNavigate }: RemyGuestChatProps) {
     },
   ]);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const responseTimerRef = useRef<number | null>(null);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !isResponding, [draft, isResponding]);
@@ -154,6 +155,11 @@ export function RemyGuestChat({ className, onNavigate }: RemyGuestChatProps) {
     sendPrompt(draft);
   };
 
+  const applyPromptSuggestion = (value: string) => {
+    setDraft(value.slice(0, 280));
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex flex-wrap gap-2">
@@ -162,7 +168,7 @@ export function RemyGuestChat({ className, onNavigate }: RemyGuestChatProps) {
             key={prompt}
             size="sm"
             variant="outline"
-            onClick={() => sendPrompt(prompt)}
+            onClick={() => applyPromptSuggestion(prompt)}
             disabled={isResponding}
           >
             {prompt}
@@ -222,10 +228,10 @@ export function RemyGuestChat({ className, onNavigate }: RemyGuestChatProps) {
 
       <form className="flex items-center gap-2" onSubmit={handleSubmit}>
         <Input
+          ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value.slice(0, 280))}
           placeholder="Ask Remy about Rest Easy..."
-          disabled={isResponding}
         />
         <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
           <SendHorizonal className="h-4 w-4" />

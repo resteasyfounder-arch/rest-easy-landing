@@ -30,6 +30,7 @@ supabase functions deploy remy
 - `REMY_CHAT_PROVIDER_TIMEOUT_MS` (default `2800`)
 - `REMY_CHAT_PROVIDER_MAX_RETRIES` (default `2`, max `2`)
 - `REMY_CHAT_PROVIDER_BACKOFF_MS` (default `180`)
+- `VITE_REMY_CHAT_UI_V2=true|false` (frontend rollout flag for companion-chat UX v2)
 
 ## Recommended Canary Progression
 
@@ -64,4 +65,3 @@ Track these fields:
    - `REMY_RESPONSES_CANARY_PERCENT=0`
 2. Keep deterministic fallback active.
 3. Investigate failures by `trace_id` and `provider_request_id`.
-

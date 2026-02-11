@@ -3,6 +3,11 @@ import { ArrowRight, SendHorizonal, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  clearRemySessionsExcept,
+  loadRemySession,
+  saveRemySession,
+} from "@/lib/remyChatSession";
 import { cn } from "@/lib/utils";
 import type {
   RemyChatTurnResponse,
@@ -36,6 +41,8 @@ interface RemyCompanionChatProps {
   isLoading?: boolean;
   error?: string | null;
   userName?: string | null;
+  sessionKey?: string | null;
+  uiV2Enabled?: boolean;
   onDismiss?: (nudgeId: string) => Promise<void> | void;
   onNavigateAction?: (actionId: string, href: string) => Promise<void> | void;
   onTrackEvent?: (eventId: string, metadata?: Record<string, unknown>) => Promise<void> | void;
@@ -56,6 +63,8 @@ const DEFAULT_QUICK_REPLIES = [
   "Can you explain my current score?",
 ];
 
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
 function buildIntroMessage(payload: RemySurfacePayload | null, userName?: string | null): RemyConversationMessage {
   const greeting = userName ? `Hi ${userName},` : "Hi,";
   if (!payload) {
@@ -72,7 +81,7 @@ function buildIntroMessage(payload: RemySurfacePayload | null, userName?: string
     return {
       id: `remy:intro:${payload.nudge.id}`,
       role: "remy",
-      text: `${greeting} here's the highest-impact next step: ${payload.nudge.title}.`,
+      text: `${greeting} here's a great next step: ${payload.nudge.title}.`,
       createdAt: Date.now(),
       actions: [{ actionId: payload.nudge.id, href: payload.nudge.cta.href, label: payload.nudge.cta.label }],
       quickReplies: DEFAULT_QUICK_REPLIES,
@@ -91,7 +100,7 @@ function buildIntroMessage(payload: RemySurfacePayload | null, userName?: string
 function buildLocalReply(input: string, payload: RemySurfacePayload | null): LocalReply {
   if (!payload) {
     return {
-      text: "I need a bit more assessment context before I can personalize this. Continue your readiness flow and I will guide the next step.",
+      text: "I need a little more context before I can personalize your next step. Continue your readiness flow and I’ll guide you from there.",
       quickReplies: DEFAULT_QUICK_REPLIES,
     };
   }
@@ -108,7 +117,7 @@ function buildLocalReply(input: string, payload: RemySurfacePayload | null): Loc
 
   if (normalized.includes("score") || normalized.includes("why")) {
     return {
-      text: topExplanation?.body || "Your priorities are based on your latest answers and the section weights.",
+      text: topExplanation?.body || "Your top priorities reflect where focused action can move readiness forward fastest.",
       actions: topCta
         ? [{ actionId: payload.nudge?.id || topPriority?.id || "priority", href: topCta.href, label: topCta.label }]
         : undefined,
@@ -119,8 +128,8 @@ function buildLocalReply(input: string, payload: RemySurfacePayload | null): Loc
   if (normalized.includes("first") || normalized.includes("next") || normalized.includes("priority")) {
     return {
       text: topPriority
-        ? `Start with "${topPriority.title}". ${topPriority.why_now}`
-        : "Continue your readiness sections and I will reprioritize once you add more answers.",
+        ? `Start with "${topPriority.title}". This is a strong next step for your readiness progress.`
+        : "Continue your readiness sections and I’ll reprioritize with your latest answers.",
       actions: topCta
         ? [{ actionId: payload.nudge?.id || topPriority?.id || "priority", href: topCta.href, label: topCta.label }]
         : undefined,
@@ -180,6 +189,8 @@ export function RemyCompanionChat({
   isLoading = false,
   error = null,
   userName = null,
+  sessionKey = null,
+  uiV2Enabled = true,
   onDismiss,
   onNavigateAction,
   onTrackEvent,
@@ -194,6 +205,9 @@ export function RemyCompanionChat({
   const [quickReplies, setQuickReplies] = useState<string[]>(DEFAULT_QUICK_REPLIES);
   const [lastFailure, setLastFailure] = useState<ChatFailureState | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const initializedRef = useRef(false);
+  const isDebugMode = Boolean(import.meta.env.DEV);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !isThinking, [draft, isThinking]);
 
@@ -203,11 +217,45 @@ export function RemyCompanionChat({
   };
 
   useEffect(() => {
+    if (uiV2Enabled && typeof window !== "undefined") {
+      clearRemySessionsExcept(window.localStorage, sessionKey);
+      if (sessionKey) {
+        const restored = loadRemySession(window.localStorage, sessionKey, Date.now(), SESSION_TTL_MS);
+        if (restored) {
+          setMessages(restored.messages);
+          setConversationId(restored.conversationId);
+          setQuickReplies(restored.quickReplies.length > 0 ? restored.quickReplies : DEFAULT_QUICK_REPLIES);
+          initializedRef.current = true;
+          return;
+        }
+      }
+    }
+
     const intro = buildIntroMessage(payload, userName);
     setMessages([intro]);
     setConversationId(undefined);
     setQuickReplies(intro.quickReplies || DEFAULT_QUICK_REPLIES);
+    initializedRef.current = true;
+  }, [sessionKey, uiV2Enabled]);
+
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    if (messages.length !== 1 || !messages[0]?.id.startsWith("remy:intro:")) return;
+    const intro = buildIntroMessage(payload, userName);
+    setMessages([intro]);
+    setQuickReplies(intro.quickReplies || DEFAULT_QUICK_REPLIES);
   }, [payload, userName]);
+
+  useEffect(() => {
+    if (!uiV2Enabled || !sessionKey || typeof window === "undefined") return;
+    if (messages.length === 0) return;
+    saveRemySession(window.localStorage, sessionKey, {
+      conversationId,
+      messages,
+      quickReplies,
+      updatedAt: Date.now(),
+    });
+  }, [conversationId, messages, quickReplies, sessionKey, uiV2Enabled]);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -260,7 +308,7 @@ export function RemyCompanionChat({
           text: response.assistant_message,
           createdAt: Date.now(),
           traceId: response.meta.trace_id,
-          statusNote: response.meta.response_source === "deterministic_fallback"
+          statusNote: !uiV2Enabled && response.meta.response_source === "deterministic_fallback"
             ? "Using backup guidance while live model service recovers."
             : undefined,
           actions: toMessageAction(response),
@@ -292,7 +340,7 @@ export function RemyCompanionChat({
         text: parsedError.message,
         createdAt: Date.now(),
         traceId: parsedError.traceId,
-        statusNote: parsedError.traceId ? `Trace: ${parsedError.traceId}` : undefined,
+        statusNote: isDebugMode && parsedError.traceId ? `Trace: ${parsedError.traceId}` : undefined,
         quickReplies: DEFAULT_QUICK_REPLIES,
       });
       setMessages((prev) => prev.filter((message) => message.id !== userMessageId));
@@ -319,6 +367,17 @@ export function RemyCompanionChat({
     void sendMessage(draft, "typed");
   };
 
+  const handleSuggestionClick = (value: string) => {
+    if (!uiV2Enabled) {
+      void sendMessage(value, "quick_reply");
+      return;
+    }
+    setDraft(value.slice(0, 800));
+    setLastFailure(null);
+    track("remy_suggestion_selected", { suggestion: value });
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   if (isLoading) {
     return (
       <div className={cn("space-y-3", className)}>
@@ -341,12 +400,12 @@ export function RemyCompanionChat({
   }
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col gap-3", className)}>
       <div
         ref={scrollRef}
-        className="max-h-[min(58vh,390px)] space-y-2 overflow-y-auto rounded-xl border border-border/50 bg-card/50 p-3"
+        className="flex-1 min-h-0 space-y-2 overflow-y-auto rounded-xl border border-border/50 bg-card/50 p-3"
       >
-        {messages.slice(-10).map((message) => (
+        {messages.slice(-20).map((message) => (
           <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
             <div
               className={cn(
@@ -372,6 +431,7 @@ export function RemyCompanionChat({
                     <Button
                       key={`${message.id}:${action.actionId}`}
                       size="sm"
+                      variant="outline"
                       className="h-7 gap-1.5 px-2.5 text-xs"
                       onClick={async () => {
                         track("remy_cta_clicked", {
@@ -417,7 +477,7 @@ export function RemyCompanionChat({
                 Retry send
               </Button>
             )}
-            {lastFailure.traceId && (
+            {isDebugMode && lastFailure.traceId && (
               <span className="text-[11px] text-amber-800/90">Trace {lastFailure.traceId}</span>
             )}
           </div>
@@ -430,8 +490,9 @@ export function RemyCompanionChat({
             key={item}
             size="sm"
             variant="outline"
-            onClick={() => void sendMessage(item, "quick_reply")}
-            disabled={isThinking}
+            className="h-8 px-3 text-xs"
+            onClick={() => handleSuggestionClick(item)}
+            disabled={isThinking && !uiV2Enabled}
           >
             {item}
           </Button>
@@ -440,10 +501,10 @@ export function RemyCompanionChat({
 
       <form className="flex items-center gap-2" onSubmit={handleSubmit}>
         <Input
+          ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value.slice(0, 800))}
           placeholder="Talk to Remy about your readiness plan..."
-          disabled={isThinking}
         />
         <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
           <SendHorizonal className="h-4 w-4" />

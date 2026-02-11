@@ -47,6 +47,7 @@ export function RemyGlobalLauncher() {
   const firstName = useMemo(() => getUserFirstName(user), [user]);
   const personalizedEnabled = Boolean(surface && isAuthenticated);
   const isGuestSurface = !personalizedEnabled;
+  const remyUiV2Enabled = (import.meta.env.VITE_REMY_CHAT_UI_V2 ?? "true").toLowerCase() !== "false";
 
   const {
     payload,
@@ -119,7 +120,7 @@ export function RemyGlobalLauncher() {
 
         <div
           className={cn(
-            "w-[min(94vw,360px)] max-h-[min(55vh,520px)] overflow-hidden rounded-2xl border border-primary/30 bg-background/95 shadow-2xl backdrop-blur transition-all",
+            "flex w-[min(94vw,380px)] h-[min(72vh,620px)] min-h-[430px] flex-col overflow-hidden rounded-2xl border border-primary/30 bg-background/95 shadow-2xl backdrop-blur transition-all",
             open ? "pointer-events-auto opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2",
           )}
         >
@@ -140,15 +141,18 @@ export function RemyGlobalLauncher() {
             </div>
           </div>
 
-          <div className="p-3">
+          <div className="flex-1 min-h-0 p-3">
             {isGuestSurface ? (
-              <RemyGuestChat onNavigate={() => setOpen(false)} />
+              <RemyGuestChat className="h-full" onNavigate={() => setOpen(false)} />
             ) : (
               <RemyCompanionChat
+                className="h-full"
                 payload={payload}
                 isLoading={isLoading}
                 error={error}
                 userName={firstName}
+                sessionKey={user?.id ?? null}
+                uiV2Enabled={remyUiV2Enabled}
                 onDismiss={(nudgeId) => dismissNudge(nudgeId, 24)}
                 onRetry={refresh}
                 onTrackEvent={trackEvent}

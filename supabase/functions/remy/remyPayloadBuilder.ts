@@ -217,6 +217,26 @@ function pickNudge(
   };
 }
 
+function describePriorityReason(item: ImprovementItem): string {
+  if (item.priority === "HIGH") {
+    return "Completing this step now can make a meaningful difference in your readiness plan.";
+  }
+  if (item.priority === "MEDIUM") {
+    return "This step can strengthen your readiness and is worth tackling soon.";
+  }
+  return "This step keeps your plan complete and up to date.";
+}
+
+function describeExplanationBody(item: ImprovementItem): string {
+  if (item.priority === "HIGH") {
+    return "This is one of the strongest opportunities to improve your readiness right now.";
+  }
+  if (item.priority === "MEDIUM") {
+    return "This is a useful next step to keep your readiness momentum going.";
+  }
+  return "This item still supports your overall readiness progress.";
+}
+
 type BuildRemySurfacePayloadInput = {
   assessment: AssessmentRow | null;
   schema: Schema | null;
@@ -311,7 +331,7 @@ export function buildRemySurfacePayload({
     id: item.question_id,
     title: item.question_text,
     priority: item.priority,
-    why_now: `Current answer is "${item.current_answer_label}". This section carries ${item.section_weight}% weight.`,
+    why_now: describePriorityReason(item),
     target_href: `/readiness?section=${item.section_id}&question=${item.question_id}&returnTo=dashboard`,
   }));
 
@@ -323,7 +343,7 @@ export function buildRemySurfacePayload({
   const explanations = (scopedImprovements.length > 0 ? scopedImprovements.slice(0, 2) : []).map((item) => ({
     id: `exp:${item.question_id}`,
     title: `Why ${item.section_label} is prioritized`,
-    body: `This item is ranked ${item.priority} because section weight and your current answer indicate meaningful readiness impact.`,
+    body: describeExplanationBody(item),
     source_refs: [
       `section:${item.section_id}`,
       `question:${item.question_id}`,
