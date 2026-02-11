@@ -62,6 +62,7 @@ describe("turnPlanner classifier", () => {
     expect(classifyTurnGoal("what should I do next")).toBe("next_step");
     expect(classifyTurnGoal("I don't want that step")).toBe("skip_priority");
     expect(classifyTurnGoal("where can I upload my health directive")).toBe("vault_upload_route");
+    expect(classifyTurnGoal("where is easyvault?")).toBe("ui_wayfinding");
     expect(classifyTurnGoal("summarize my report")).toBe("report_summary");
   });
 });
@@ -80,6 +81,19 @@ describe("turnPlanner policy enforcement", () => {
     expect(result.response.assistant_message.toLowerCase()).toContain("54/100");
     expect(result.response.assistant_message.toLowerCase()).toContain("developing readiness");
     expect(result.response.assistant_message.toLowerCase()).not.toContain("near full");
+  });
+
+  it("keeps greeting companion-style without repeating score framing", () => {
+    const result = applyConversationPolicy({
+      context: { ...baseContext, message: "hey how's it going" },
+      baseResponse,
+      history: [],
+      stateRaw: {},
+    });
+
+    expect(result.goal).toBe("greeting");
+    expect(result.response.assistant_message.toLowerCase()).toContain("glad you're here");
+    expect(result.response.assistant_message.toLowerCase()).not.toContain("54/100");
   });
 
   it("rewrites personal data collection into app-directed guidance", () => {
@@ -110,6 +124,19 @@ describe("turnPlanner policy enforcement", () => {
 
     expect(result.goal).toBe("skip_priority");
     expect(result.state.declined_priority_ids).toContain("1.1.B.3");
+    expect(result.response.cta?.id).toBe("1.1.B.4");
+  });
+
+  it("moves to a different next step after user says they finished one", () => {
+    const result = applyConversationPolicy({
+      context: { ...baseContext, message: "What's next after I finish the revocable living trust?" },
+      baseResponse,
+      history: [],
+      stateRaw: {},
+    });
+
+    expect(result.goal).toBe("next_step");
+    expect(result.response.assistant_message.toLowerCase()).toContain("great progress");
     expect(result.response.cta?.id).toBe("1.1.B.4");
   });
 
@@ -205,5 +232,44 @@ describe("turnPlanner policy enforcement", () => {
     expect(result.routeType).toBe("vault_upload");
     expect(result.response.cta?.href).toBe("/vault?doc=healthcare-directive&action=upload");
     expect(result.vaultDocTargeted).toBe("healthcare-directive");
+  });
+
+  it("routes wayfinding prompt to EasyVault when requested", () => {
+    const result = applyConversationPolicy({
+      context: { ...baseContext, message: "where is easyvault?" },
+      baseResponse,
+      history: [],
+      stateRaw: {},
+      capabilityContext: {
+        vault: {
+          completed_count: 0,
+          applicable_count: 20,
+          progress_percent: 0,
+          missing_high_priority_docs: [],
+        },
+        report: {
+          available: false,
+          stale: false,
+          executive_summary: null,
+          strengths: [],
+          attention_areas: [],
+          action_items: [],
+        },
+        navigation: { section_purposes: [] },
+        route: {
+          routeType: "app_section",
+          href: "/vault",
+          label: "Open EasyVault",
+          targetId: "vault",
+          confidence: 0.9,
+          ambiguous: false,
+          alternatives: [],
+        },
+      },
+    });
+
+    expect(result.goal).toBe("ui_wayfinding");
+    expect(result.response.cta?.href).toBe("/vault");
+    expect(result.response.assistant_message.toLowerCase()).toContain("open it");
   });
 });

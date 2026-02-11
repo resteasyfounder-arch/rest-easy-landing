@@ -293,6 +293,9 @@ export function classifyTurnGoal(message: string): RemyTurnGoal {
   if (/\b(skip|not\s+ready|don\s*t\s+want|do\s+not\s+want|other\s+options|something\s+else)\b/.test(normalized)) {
     return "skip_priority";
   }
+  if (isCompletionTransitionPrompt(message)) {
+    return "next_step";
+  }
   if (ACTION_REQUEST_PATTERNS.some((pattern) => pattern.test(normalized))) {
     return "next_step";
   }
@@ -378,11 +381,11 @@ function firstEligiblePriority(
 function fallbackQuickReplies(response: RemyChatTurnResponse): string[] {
   return response.quick_replies.length > 0
     ? response.quick_replies.slice(0, 3)
-    : ["What should I do next?", "Explain my score", "Help me update a question"];
+    : ["What should I focus on first?", "Why is my score where it is?", "What's next after this step?"];
 }
 
 function shouldOfferReassurance(goal: RemyTurnGoal): boolean {
-  return goal === "greeting" || goal === "clarification";
+  return goal === "greeting";
 }
 
 function maybeAppendReassurance(
@@ -405,26 +408,47 @@ function isPersonalDataCollectionPrompt(text: string): boolean {
 }
 
 function asRouteMessage(
-  scoreIntro: string,
+  prefix: string | null,
   target: PriorityItem | null,
   fallbackLabel: string,
 ): { text: string; cta: RemyChatTurnResponse["cta"] | undefined } {
+  const prefixText = prefix ? `${prefix} ` : "";
   if (!target) {
     return {
-      text: `${scoreIntro} I can guide you to the exact readiness question you want to update. Tell me which topic you'd like to work on next.`,
+      text: `${prefixText}I can guide you to the exact readiness question you want to update. Tell me which topic you'd like to work on next.`,
       cta: undefined,
     };
   }
 
   return {
     text:
-      `${scoreIntro} Let's update this directly in your readiness flow: "${target.title}". Open the question, make your update there, and I'll guide you on what to do next.`,
+      `${prefixText}Let's update this directly in your readiness flow: "${target.title}". Open the question, make your update there, and I'll guide you on what to do next.`,
     cta: {
       id: target.id,
       label: fallbackLabel,
       href: target.target_href,
     },
   };
+}
+
+function isCompletionTransitionPrompt(message: string): boolean {
+  const normalized = normalizeText(message);
+  return (
+    /\bwhat\s+(s|is)?\s*next\b/.test(normalized) &&
+      /\b(after|once|when)\b/.test(normalized) &&
+      /\b(finish|finished|complete|completed|done)\b/.test(normalized)
+  ) || /\bi\s+finished\b/.test(normalized) || /\bi\s+completed\b/.test(normalized);
+}
+
+function firstAlternativePriority(
+  priorities: PriorityItem[],
+  state: RemyConversationState,
+  nowMs: number,
+  excludedId?: string,
+): PriorityItem | null {
+  return priorities.find((item) => item.id !== excludedId && !isDeclined(item.id, state, nowMs)) ??
+    priorities.find((item) => item.id !== excludedId) ??
+    null;
 }
 
 function fallbackRepetitionMessage(goal: RemyTurnGoal, scoreIntro: string, target: PriorityItem | null): string {
@@ -445,15 +469,15 @@ function fallbackRepetitionMessage(goal: RemyTurnGoal, scoreIntro: string, targe
   }
   if (goal === "score_explain") {
     return target
-      ? `${scoreIntro} A practical next move is "${target.title}". Updating it in the app will improve your readiness plan clarity.`
-      : `${scoreIntro} I can walk you through your next best update in the readiness flow.`;
+      ? `${scoreIntro} The clearest way to improve it is by updating "${target.title}" in your readiness flow.`
+      : `${scoreIntro} I can walk you through the next update that will improve your plan the most.`;
   }
   if (goal === "next_step") {
     return target
-      ? `${scoreIntro} Let's focus on "${target.title}" next. Open that question in the app so your plan updates immediately.`
-      : `${scoreIntro} Let's open your next readiness question and move one step forward.`;
+      ? `Let's focus on "${target.title}" next. Open that step and I'll guide what comes after.`
+      : "Let's open your next readiness question and move one step forward.";
   }
-  return `${scoreIntro} I can point you to the exact step in the app and keep your plan moving forward.`;
+  return "I can point you to the exact step in the app and keep your plan moving forward.";
 }
 
 function stripActionDataCollectionLanguage(text: string): string {
@@ -524,6 +548,9 @@ export function applyConversationPolicy(params: {
   const explicitAction = ACTION_REQUEST_PATTERNS.some((pattern) => pattern.test(normalizeText(context.message)));
   const fallbackReplies = fallbackQuickReplies(baseResponse);
   const route = capabilityContext?.route ?? null;
+  const completionTransition = isCompletionTransitionPrompt(context.message);
+  const mentionedPriority = matchPriorityFromMessage(context.message, priorities);
+  const asksAboutLegalScore = /\blegal\b/.test(normalizeText(context.message));
 
   let assistantMessage = stripActionDataCollectionLanguage(baseResponse.assistant_message);
   let cta = baseResponse.cta;
@@ -543,43 +570,61 @@ export function applyConversationPolicy(params: {
     intent = "unknown";
   } else if (goal === "greeting") {
     assistantMessage =
-      "Hey, I'm here to help. I can guide your next readiness step, help you find the right page, or point you to the exact place to upload a document.";
+      "Hey, glad you're here. I can help you pick the right next step, explain your score, and route you exactly where you need to go.";
     cta = undefined;
     intent = "reassure";
   } else if (goal === "score_explain") {
+    capability = "readiness";
     assistantMessage = target
-      ? `${scoreIntro} A high-impact area to improve now is "${target.title}". I can point you to that question when you want to take action.`
+      ? asksAboutLegalScore
+        ? `${scoreIntro} Your legal readiness is lower mainly because "${target.title}" is still incomplete. I can walk you through your options and open it when you're ready.`
+        : `${scoreIntro} The biggest factor right now is "${target.title}" being incomplete. I can walk you through options and open it when you're ready.`
       : `${scoreIntro} I can walk you through the most impactful step to improve it.`;
     cta = undefined;
+    routeType = target ? "readiness_question" : undefined;
+    routeResolved = Boolean(target);
     intent = "explain_score";
   } else if (goal === "next_step") {
-    if (target) {
+    capability = "readiness";
+    const completedTarget = completionTransition && mentionedPriority ? mentionedPriority : null;
+    const nextStepTarget = completedTarget
+      ? firstAlternativePriority(priorities, state, nowMs, completedTarget.id)
+      : target;
+    if (nextStepTarget) {
       assistantMessage =
-        `${scoreIntro} A practical next step is "${target.title}". Open that question in your readiness flow to update it directly.`;
+        completedTarget
+          ? `Great progress finishing "${completedTarget.title}". Next, focus on "${nextStepTarget.title}" to keep building momentum.`
+          : `Based on your assessment, I'd focus on "${nextStepTarget.title}" first. It's a practical, high-impact step.`;
       cta = {
-        id: target.id,
+        id: nextStepTarget.id,
         label: "Show my next step",
-        href: target.target_href,
+        href: nextStepTarget.target_href,
       };
+      routeType = "readiness_question";
+      routeResolved = true;
+      target = nextStepTarget;
     } else {
-      assistantMessage = `${scoreIntro} Continue your readiness flow and I will guide the next best step.`;
+      assistantMessage = "Continue your readiness flow and I can guide the next best step right away.";
       cta = undefined;
     }
     intent = "plan_next";
   } else if (goal === "skip_priority") {
+    capability = "readiness";
     if (target) {
       const alternativesLine = alternatives.length > 0
         ? ` Other options include ${alternatives.map((item) => `"${item.title}"`).join(" and ")}.`
         : "";
       assistantMessage =
-        `${scoreIntro} No problem, we can skip that for now. Let's move to "${target.title}" instead.${alternativesLine}`;
+        `No problem, we can skip that for now. Let's move to "${target.title}" instead.${alternativesLine}`;
       cta = {
         id: target.id,
         label: "Show my next step",
         href: target.target_href,
       };
+      routeType = "readiness_question";
+      routeResolved = true;
     } else {
-      assistantMessage = `${scoreIntro} No problem, we can skip that item for now and revisit your next best step anytime.`;
+      assistantMessage = "No problem, we can skip that item for now and revisit your next best step anytime.";
       cta = undefined;
     }
     intent = "plan_next";
@@ -725,7 +770,7 @@ export function applyConversationPolicy(params: {
         cta = undefined;
       } else {
         assistantMessage =
-          `${scoreIntro} Let's update this directly in your readiness flow so it saves to your plan immediately.`;
+          "Let's update this directly in your readiness flow so it saves to your plan immediately.";
         cta = {
           id: readinessRoute.targetId,
           label: "Update this question",
@@ -734,14 +779,14 @@ export function applyConversationPolicy(params: {
       }
       intent = "clarify";
     } else if (goal === "route_to_question") {
-      const routing = asRouteMessage(scoreIntro, target, "Update this question");
+      const routing = asRouteMessage(null, target, "Update this question");
       assistantMessage = routing.text;
       cta = routing.cta;
       routeResolved = Boolean(routing.cta);
       routeType = routing.cta ? "readiness_question" : undefined;
       intent = "clarify";
     } else {
-      const routing = asRouteMessage(scoreIntro, target, "Update this question");
+      const routing = asRouteMessage(null, target, "Update this question");
       assistantMessage = routing.text;
       cta = routing.cta;
       routeResolved = Boolean(routing.cta);
@@ -757,7 +802,7 @@ export function applyConversationPolicy(params: {
   }
 
   if (isPersonalDataCollectionPrompt(baseResponse.assistant_message)) {
-    const route = asRouteMessage(scoreIntro, target, "Update this question");
+    const route = asRouteMessage(null, target, "Update this question");
     assistantMessage = route.text;
     cta = route.cta;
     intent = "clarify";
