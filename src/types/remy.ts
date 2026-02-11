@@ -49,6 +49,8 @@ export interface RemyChatTurnRequest {
   conversation_id?: string;
   message: string;
   context_hint?: string;
+  client_turn_id?: string;
+  client_request_id?: string;
 }
 
 export interface RemyChatTurnResponse {
@@ -68,6 +70,11 @@ export interface RemyChatTurnResponse {
   intent: RemyChatIntent;
   confidence: number;
   safety_flags: string[];
+  meta: {
+    trace_id: string;
+    response_source: "responses_api" | "chat_completions" | "deterministic_fallback";
+    degraded_reason?: string;
+  };
 }
 
 export interface RemyConversationMessage {
@@ -75,6 +82,8 @@ export interface RemyConversationMessage {
   role: "user" | "remy";
   text: string;
   createdAt: number;
+  statusNote?: string;
+  traceId?: string;
   actions?: Array<{
     actionId: string;
     href: string;

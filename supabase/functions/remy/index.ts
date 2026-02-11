@@ -20,6 +20,18 @@ import {
   type RemyChatIntent,
   type RemyChatTurnResponse,
 } from "./chatTurn.ts";
+import {
+  computeBackoffDelayMs,
+  mapFailureFromStatus,
+  mapSchemaFailure,
+  mapTimeoutFailure,
+  sanitizeProviderMode,
+  shouldRetryStatus,
+  shouldUseResponsesProvider,
+  type ProviderFailure,
+  type RemyFailureCode,
+  type RemyResponseSource,
+} from "./providerUtils.ts";
 
 type RemyEventType =
   | "remy_impression"
@@ -43,10 +55,32 @@ type RemyRequest = {
   conversation_id?: string;
   message?: string;
   context_hint?: string;
+  client_turn_id?: string;
+  client_request_id?: string;
 };
 
 type ReadinessClient = ReturnType<ReturnType<typeof createClient>["schema"]>;
 type ChatHistoryItem = { role: "user" | "assistant"; text: string };
+type ChatProvider = "chat_completions" | "responses_api";
+type RemyErrorCode =
+  | "CHAT_DISABLED"
+  | "CHAT_MESSAGE_REQUIRED"
+  | "CHAT_RATE_LIMITED"
+  | "CHAT_STORAGE_UNAVAILABLE"
+  | "CHAT_CONVERSATION_INIT_FAILED"
+  | "CHAT_USER_MESSAGE_SAVE_FAILED"
+  | "CHAT_PROVIDER_KEY_MISSING"
+  | RemyFailureCode;
+
+type ProviderInvocationResult = {
+  response: RemyChatTurnResponse | null;
+  provider: ChatProvider;
+  openaiRequestId: string | null;
+  providerResponseId: string | null;
+  latencyMs: number;
+  attempts: number;
+  failure: ProviderFailure | null;
+};
 
 const CHAT_ENABLED = (Deno.env.get("REMY_CHAT_TURN_ENABLED") ?? "true").toLowerCase() !== "false";
 const CHAT_RATE_LIMIT_PER_MIN = Math.min(
@@ -54,6 +88,12 @@ const CHAT_RATE_LIMIT_PER_MIN = Math.min(
   Math.max(3, Number(Deno.env.get("REMY_CHAT_RATE_LIMIT_PER_MIN") ?? "12")),
 );
 const CHAT_MODEL_NAME = Deno.env.get("REMY_CHAT_MODEL") ?? "gpt-4o-mini";
+const CHAT_PROVIDER_MODE = sanitizeProviderMode(Deno.env.get("REMY_CHAT_PROVIDER"));
+const RESPONSES_CANARY_PERCENT = Math.max(0, Math.min(100, Number(Deno.env.get("REMY_RESPONSES_CANARY_PERCENT") ?? "0")));
+const RESPONSE_STORE = (Deno.env.get("REMY_RESPONSE_STORE") ?? "false").toLowerCase() === "true";
+const PROVIDER_TIMEOUT_MS = Math.max(1200, Number(Deno.env.get("REMY_CHAT_PROVIDER_TIMEOUT_MS") ?? "2800"));
+const PROVIDER_MAX_RETRIES = Math.max(0, Math.min(2, Number(Deno.env.get("REMY_CHAT_PROVIDER_MAX_RETRIES") ?? "2")));
+const PROVIDER_BACKOFF_BASE_MS = Math.max(60, Number(Deno.env.get("REMY_CHAT_PROVIDER_BACKOFF_MS") ?? "180"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const corsHeaders: Record<string, string> = {
@@ -113,11 +153,50 @@ function sanitizeMetadata(
   return result;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sanitizeClientTraceId(value: string | undefined): string | null {
+  const cleaned = sanitizeText(value, 120);
+  if (!cleaned) return null;
+  if (/[\r\n]/.test(cleaned)) return null;
+  return cleaned;
+}
+
+function withAbortTimeout(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort("timeout"), timeoutMs);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutHandle),
+  };
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function errorResponse(
+  traceId: string,
+  code: RemyErrorCode,
+  message: string,
+  status: number,
+  retryable: boolean,
+  detail?: string,
+) {
+  return jsonResponse({
+    error: {
+      message,
+      code,
+      retryable,
+      trace_id: traceId,
+      detail: detail || null,
+    },
+  }, status);
 }
 
 async function insertRemyEvent(
@@ -283,12 +362,12 @@ async function resolveConversationId(
   readiness: ReadinessClient,
   subjectId: string,
   conversationId?: string,
-): Promise<{ id?: string; error?: string }> {
+): Promise<{ id?: string; lastResponseId?: string | null; error?: string }> {
   const sanitizedConversationId = sanitizeConversationId(conversationId);
   if (sanitizedConversationId) {
     const { data: existing, error: existingError } = await readiness
       .from("remy_conversations")
-      .select("id")
+      .select("id, openai_last_response_id")
       .eq("id", sanitizedConversationId)
       .eq("subject_id", subjectId)
       .maybeSingle();
@@ -296,7 +375,10 @@ async function resolveConversationId(
       return { error: existingError.message };
     }
     if (existing?.id) {
-      return { id: existing.id as string };
+      return {
+        id: existing.id as string,
+        lastResponseId: (existing as { openai_last_response_id?: string | null }).openai_last_response_id ?? null,
+      };
     }
   }
 
@@ -305,14 +387,34 @@ async function resolveConversationId(
     .insert({
       subject_id: subjectId,
       status: "active",
+      openai_last_response_id: null,
     })
-    .select("id")
+    .select("id, openai_last_response_id")
     .single();
 
   if (error) {
     return { error: error.message };
   }
-  return { id: created.id as string };
+  return {
+    id: created.id as string,
+    lastResponseId: (created as { openai_last_response_id?: string | null }).openai_last_response_id ?? null,
+  };
+}
+
+async function setConversationLastResponseId(
+  readiness: ReadinessClient,
+  params: {
+    conversationId: string;
+    subjectId: string;
+    lastResponseId: string;
+  },
+): Promise<string | null> {
+  const { error } = await readiness
+    .from("remy_conversations")
+    .update({ openai_last_response_id: params.lastResponseId })
+    .eq("id", params.conversationId)
+    .eq("subject_id", params.subjectId);
+  return error ? error.message : null;
 }
 
 async function isRateLimited(
@@ -344,6 +446,8 @@ async function insertConversationMessage(
     messageText: string;
     intent?: RemyChatIntent;
     metadata?: Record<string, unknown>;
+    providerRequestId?: string | null;
+    clientTurnId?: string | null;
   },
 ): Promise<{ id?: string; error?: string }> {
   const { data, error } = await readiness
@@ -355,6 +459,8 @@ async function insertConversationMessage(
       message_text: params.messageText,
       intent: params.intent || null,
       metadata: params.metadata || {},
+      provider_request_id: params.providerRequestId || null,
+      client_turn_id: params.clientTurnId || null,
     })
     .select("id")
     .single();
@@ -394,108 +500,367 @@ async function loadConversationHistory(
     .map(({ role, text }) => ({ role, text }));
 }
 
-async function callChatModel(
+async function assertChatStorageReady(readiness: ReadinessClient): Promise<string | null> {
+  const { error } = await readiness.from("remy_conversations").select("id", { head: true, count: "exact" });
+  return error ? error.message : null;
+}
+
+const REMY_CHAT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    assistant_message: { type: "string" },
+    quick_replies: {
+      type: "array",
+      items: { type: "string" },
+    },
+    cta: {
+      type: ["object", "null"],
+      properties: {
+        id: { type: "string" },
+        label: { type: "string" },
+        href: { type: "string" },
+      },
+      required: ["id", "label", "href"],
+      additionalProperties: false,
+    },
+    why_this: {
+      type: ["object", "null"],
+      properties: {
+        title: { type: "string" },
+        body: { type: "string" },
+        source_refs: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+      required: ["title", "body", "source_refs"],
+      additionalProperties: false,
+    },
+    intent: {
+      type: "string",
+      enum: ["clarify", "prioritize", "explain_score", "plan_next", "reassure", "unknown"],
+    },
+    confidence: { type: "number" },
+    safety_flags: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+  required: [
+    "assistant_message",
+    "quick_replies",
+    "cta",
+    "why_this",
+    "intent",
+    "confidence",
+    "safety_flags",
+  ],
+  additionalProperties: false,
+};
+
+function extractResponsePayload(raw: unknown): unknown | null {
+  if (!raw || typeof raw !== "object") return null;
+  const payload = raw as Record<string, unknown>;
+
+  if (payload.output_parsed && typeof payload.output_parsed === "object") {
+    return payload.output_parsed;
+  }
+
+  if (typeof payload.output_text === "string") {
+    try {
+      return JSON.parse(payload.output_text);
+    } catch {
+      return null;
+    }
+  }
+
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const message = item as Record<string, unknown>;
+    const content = Array.isArray(message.content) ? message.content : [];
+    for (const part of content) {
+      if (!part || typeof part !== "object") continue;
+      const fragment = part as Record<string, unknown>;
+      if (fragment.parsed && typeof fragment.parsed === "object") {
+        return fragment.parsed;
+      }
+      if (typeof fragment.text === "string") {
+        try {
+          return JSON.parse(fragment.text);
+        } catch {
+          continue;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+async function invokeChatCompletionsProvider(
   apiKey: string,
   context: RemyChatContext,
   history: ChatHistoryItem[],
   fallback: RemyChatTurnResponse,
-): Promise<RemyChatTurnResponse | null> {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: CHAT_MODEL_NAME,
-      messages: [
-        { role: "system", content: buildModelSystemPrompt() },
-        { role: "user", content: buildModelUserPrompt(context, history) },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "remy_chat_turn",
-            description: "Create a safe, personalized Remy chat turn for Rest Easy.",
-            parameters: {
-              type: "object",
-              properties: {
-                assistant_message: { type: "string" },
-                quick_replies: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                cta: {
-                  type: "object",
-                  properties: {
-                    id: { type: "string" },
-                    label: { type: "string" },
-                    href: { type: "string" },
-                  },
-                  required: ["id", "label", "href"],
-                  additionalProperties: false,
-                },
-                why_this: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string" },
-                    body: { type: "string" },
-                    source_refs: {
-                      type: "array",
-                      items: { type: "string" },
-                    },
-                  },
-                  required: ["title", "body", "source_refs"],
-                  additionalProperties: false,
-                },
-                intent: {
-                  type: "string",
-                  enum: ["clarify", "prioritize", "explain_score", "plan_next", "reassure", "unknown"],
-                },
-                confidence: { type: "number" },
-                safety_flags: {
-                  type: "array",
-                  items: { type: "string" },
-                },
+  clientRequestId: string,
+): Promise<ProviderInvocationResult> {
+  const startedAt = Date.now();
+  const maxAttempts = PROVIDER_MAX_RETRIES + 1;
+  let attempts = 0;
+  let lastFailure: ProviderFailure | null = null;
+  let lastOpenAiRequestId: string | null = null;
+
+  for (attempts = 1; attempts <= maxAttempts; attempts += 1) {
+    const timeout = withAbortTimeout(PROVIDER_TIMEOUT_MS);
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "X-Client-Request-Id": clientRequestId,
+        },
+        signal: timeout.signal,
+        body: JSON.stringify({
+          model: CHAT_MODEL_NAME,
+          messages: [
+            { role: "system", content: buildModelSystemPrompt() },
+            { role: "user", content: buildModelUserPrompt(context, history) },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "remy_chat_turn",
+                description: "Create a safe, personalized Remy chat turn for Rest Easy.",
+                strict: true,
+                parameters: REMY_CHAT_JSON_SCHEMA,
               },
-              required: ["assistant_message", "quick_replies", "intent", "confidence", "safety_flags"],
-              additionalProperties: false,
+            },
+          ],
+          tool_choice: {
+            type: "function",
+            function: { name: "remy_chat_turn" },
+          },
+          temperature: 0.35,
+        }),
+      });
+      timeout.clear();
+      lastOpenAiRequestId = response.headers.get("x-request-id");
+
+      if (!response.ok) {
+        const details = await response.text();
+        lastFailure = mapFailureFromStatus(response.status, details.slice(0, 500));
+        if (attempts < maxAttempts && shouldRetryStatus(response.status)) {
+          await sleep(computeBackoffDelayMs(attempts, PROVIDER_BACKOFF_BASE_MS));
+          continue;
+        }
+        break;
+      }
+
+      const data = await response.json();
+      const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall?.function?.arguments) {
+        lastFailure = mapSchemaFailure("No tool-call payload in chat completions response");
+        break;
+      }
+
+      try {
+        const modelPayload = JSON.parse(toolCall.function.arguments);
+        return {
+          response: normalizeChatTurnResponse(modelPayload, fallback),
+          provider: "chat_completions",
+          openaiRequestId: lastOpenAiRequestId,
+          providerResponseId: null,
+          latencyMs: Date.now() - startedAt,
+          attempts,
+          failure: null,
+        };
+      } catch {
+        lastFailure = mapSchemaFailure("Unable to parse chat completions function arguments");
+        break;
+      }
+    } catch (error) {
+      timeout.clear();
+      const isAbort = error instanceof Error && error.name === "AbortError";
+      if (isAbort) {
+        lastFailure = mapTimeoutFailure(`Provider timeout after ${PROVIDER_TIMEOUT_MS}ms`);
+      } else {
+        lastFailure = {
+          code: "OPENAI_PROVIDER_ERROR",
+          retryable: true,
+          detail: error instanceof Error ? error.message : "Unknown provider network error",
+        };
+      }
+
+      if (attempts < maxAttempts && lastFailure.retryable) {
+        await sleep(computeBackoffDelayMs(attempts, PROVIDER_BACKOFF_BASE_MS));
+        continue;
+      }
+      break;
+    }
+  }
+
+  return {
+    response: null,
+    provider: "chat_completions",
+    openaiRequestId: lastOpenAiRequestId,
+    providerResponseId: null,
+    latencyMs: Date.now() - startedAt,
+    attempts: attempts || maxAttempts,
+    failure: lastFailure ?? {
+      code: "OPENAI_PROVIDER_ERROR",
+      retryable: false,
+      detail: "Unknown chat completions provider failure",
+    },
+  };
+}
+
+async function invokeResponsesProvider(
+  apiKey: string,
+  context: RemyChatContext,
+  history: ChatHistoryItem[],
+  fallback: RemyChatTurnResponse,
+  clientRequestId: string,
+  previousResponseId: string | null,
+): Promise<ProviderInvocationResult> {
+  const startedAt = Date.now();
+  const maxAttempts = PROVIDER_MAX_RETRIES + 1;
+  let attempts = 0;
+  let lastFailure: ProviderFailure | null = null;
+  let lastOpenAiRequestId: string | null = null;
+  let providerResponseId: string | null = null;
+
+  for (attempts = 1; attempts <= maxAttempts; attempts += 1) {
+    const timeout = withAbortTimeout(PROVIDER_TIMEOUT_MS);
+    try {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "X-Client-Request-Id": clientRequestId,
+        },
+        signal: timeout.signal,
+        body: JSON.stringify({
+          model: CHAT_MODEL_NAME,
+          store: RESPONSE_STORE,
+          previous_response_id: previousResponseId || undefined,
+          instructions: buildModelSystemPrompt(),
+          input: [
+            {
+              role: "user",
+              content: buildModelUserPrompt(context, history),
+            },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name: "remy_chat_turn",
+              strict: true,
+              schema: REMY_CHAT_JSON_SCHEMA,
             },
           },
-        },
-      ],
-      tool_choice: {
-        type: "function",
-        function: { name: "remy_chat_turn" },
-      },
-      temperature: 0.35,
-    }),
-  });
+          temperature: 0.35,
+        }),
+      });
+      timeout.clear();
+      lastOpenAiRequestId = response.headers.get("x-request-id");
 
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("[remy] chat model call failed:", response.status, details);
-    return null;
+      if (!response.ok) {
+        const details = await response.text();
+        lastFailure = mapFailureFromStatus(response.status, details.slice(0, 500));
+        if (attempts < maxAttempts && shouldRetryStatus(response.status)) {
+          await sleep(computeBackoffDelayMs(attempts, PROVIDER_BACKOFF_BASE_MS));
+          continue;
+        }
+        break;
+      }
+
+      const data = await response.json();
+      providerResponseId = typeof data?.id === "string" ? data.id : null;
+      const parsedPayload = extractResponsePayload(data);
+      if (!parsedPayload) {
+        lastFailure = mapSchemaFailure("Unable to parse responses API structured output");
+        break;
+      }
+
+      return {
+        response: normalizeChatTurnResponse(parsedPayload, fallback),
+        provider: "responses_api",
+        openaiRequestId: lastOpenAiRequestId,
+        providerResponseId,
+        latencyMs: Date.now() - startedAt,
+        attempts,
+        failure: null,
+      };
+    } catch (error) {
+      timeout.clear();
+      const isAbort = error instanceof Error && error.name === "AbortError";
+      if (isAbort) {
+        lastFailure = mapTimeoutFailure(`Provider timeout after ${PROVIDER_TIMEOUT_MS}ms`);
+      } else {
+        lastFailure = {
+          code: "OPENAI_PROVIDER_ERROR",
+          retryable: true,
+          detail: error instanceof Error ? error.message : "Unknown provider network error",
+        };
+      }
+      if (attempts < maxAttempts && lastFailure.retryable) {
+        await sleep(computeBackoffDelayMs(attempts, PROVIDER_BACKOFF_BASE_MS));
+        continue;
+      }
+      break;
+    }
   }
 
-  const data = await response.json();
-  const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
-  if (!toolCall?.function?.arguments) {
-    console.error("[remy] chat model returned no tool call");
-    return null;
-  }
+  return {
+    response: null,
+    provider: "responses_api",
+    openaiRequestId: lastOpenAiRequestId,
+    providerResponseId,
+    latencyMs: Date.now() - startedAt,
+    attempts: attempts || maxAttempts,
+    failure: lastFailure ?? {
+      code: "OPENAI_PROVIDER_ERROR",
+      retryable: false,
+      detail: "Unknown responses provider failure",
+    },
+  };
+}
 
-  try {
-    const modelPayload = JSON.parse(toolCall.function.arguments);
-    return normalizeChatTurnResponse(modelPayload, fallback);
-  } catch (error) {
-    console.error("[remy] failed to parse model tool args:", error);
-    return null;
+async function invokeProviderForTurn(
+  apiKey: string,
+  context: RemyChatContext,
+  history: ChatHistoryItem[],
+  fallback: RemyChatTurnResponse,
+  clientRequestId: string,
+  previousResponseId: string | null,
+): Promise<ProviderInvocationResult> {
+  const routingKey = `${context.conversationId}:${context.assessmentKey}:${context.surface}`;
+  const useResponses = shouldUseResponsesProvider(
+    CHAT_PROVIDER_MODE,
+    RESPONSES_CANARY_PERCENT,
+    routingKey,
+  );
+
+  if (useResponses) {
+    return invokeResponsesProvider(
+      apiKey,
+      context,
+      history,
+      fallback,
+      clientRequestId,
+      previousResponseId,
+    );
   }
+  return invokeChatCompletionsProvider(apiKey, context, history, fallback, clientRequestId);
 }
 
 serve(async (req) => {
+  const traceId = sanitizeClientTraceId(req.headers.get("x-client-request-id") ?? undefined) || crypto.randomUUID();
+
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -627,19 +992,33 @@ serve(async (req) => {
 
   if (action === "chat_turn") {
     if (!CHAT_ENABLED) {
-      return jsonResponse({ error: "chat_turn is currently disabled" }, 403);
+      return errorResponse(traceId, "CHAT_DISABLED", "chat_turn is currently disabled", 403, false);
     }
 
     const surface = payload.surface || "dashboard";
     const message = sanitizeMessage(payload.message, 800);
     if (!message) {
-      return jsonResponse({ error: "message is required" }, 400);
+      return errorResponse(traceId, "CHAT_MESSAGE_REQUIRED", "message is required", 400, false);
     }
 
     const contextHint = sanitizeText(payload.context_hint, 160);
+    const clientTurnId = sanitizeText(payload.client_turn_id, 120);
+    const clientRequestId = sanitizeClientTraceId(payload.client_request_id) || traceId;
+    const storageError = await assertChatStorageReady(readiness);
+    if (storageError) {
+      return errorResponse(
+        traceId,
+        "CHAT_STORAGE_UNAVAILABLE",
+        "Remy chat storage is unavailable",
+        500,
+        false,
+        storageError,
+      );
+    }
+
     const isLimited = await isRateLimited(readiness, subjectId);
     if (isLimited) {
-      return jsonResponse({ error: "Rate limit exceeded for chat_turn" }, 429);
+      return errorResponse(traceId, "CHAT_RATE_LIMITED", "Rate limit exceeded for chat_turn", 429, true);
     }
 
     const { payload: surfacePayload, assessmentDbId, assessment, answers } = await buildSurfacePayload(
@@ -653,7 +1032,14 @@ serve(async (req) => {
     const conversation = await resolveConversationId(readiness, subjectId, payload.conversation_id);
     if (!conversation.id) {
       console.error("[remy] unable to resolve conversation:", conversation.error);
-      return jsonResponse({ error: "Unable to initialize Remy conversation" }, 500);
+      return errorResponse(
+        traceId,
+        "CHAT_CONVERSATION_INIT_FAILED",
+        "Unable to initialize Remy conversation",
+        500,
+        true,
+        conversation.error,
+      );
     }
 
     const chatContext: RemyChatContext = {
@@ -673,6 +1059,11 @@ serve(async (req) => {
       eventType: "remy_chat_turn",
       payload: {
         surface,
+        trace_id: traceId,
+        provider_mode: CHAT_PROVIDER_MODE,
+        responses_canary_percent: RESPONSES_CANARY_PERCENT,
+        client_turn_id: clientTurnId || null,
+        client_request_id: clientRequestId,
         conversation_id: conversation.id,
         message_length: message.length,
       },
@@ -686,43 +1077,98 @@ serve(async (req) => {
       subjectId,
       role: "user",
       messageText: message,
-      metadata: { surface, context_hint: contextHint },
+      clientTurnId,
+      metadata: {
+        surface,
+        context_hint: contextHint,
+        trace_id: traceId,
+      },
     });
     if (userMessageInsert.error) {
       console.error("[remy] chat_turn user message insert error:", userMessageInsert.error);
-      return jsonResponse({ error: "Unable to save user message" }, 500);
+      return errorResponse(
+        traceId,
+        "CHAT_USER_MESSAGE_SAVE_FAILED",
+        "Unable to save user message",
+        500,
+        true,
+        userMessageInsert.error,
+      );
     }
 
     let response = fallback;
     let fallbackReason = "deterministic";
-    try {
-      const apiKey = Deno.env.get("OPENAI_API_KEY");
-      if (apiKey) {
-        const history = await loadConversationHistory(readiness, {
-          conversationId: conversation.id,
-          subjectId,
-          limit: 10,
-        });
-        const modelReply = await callChatModel(apiKey, chatContext, history, fallback);
-        if (modelReply) {
-          response = modelReply;
-          fallbackReason = "";
-        } else {
-          fallbackReason = "model_invalid";
+    let providerSource: RemyResponseSource = "deterministic_fallback";
+    let providerName: ChatProvider = "chat_completions";
+    let providerAttempts = 0;
+    let providerLatencyMs = 0;
+    let providerRequestId: string | null = null;
+    let providerResponseId: string | null = null;
+    let providerFailureCode: ProviderFailure["code"] | null = null;
+    let providerFailureDetail: string | null = null;
+
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (apiKey) {
+      const history = await loadConversationHistory(readiness, {
+        conversationId: conversation.id,
+        subjectId,
+        limit: 10,
+      });
+      const providerResult = await invokeProviderForTurn(
+        apiKey,
+        chatContext,
+        history,
+        fallback,
+        clientRequestId,
+        conversation.lastResponseId || null,
+      );
+      providerName = providerResult.provider;
+      providerAttempts = providerResult.attempts;
+      providerLatencyMs = providerResult.latencyMs;
+      providerRequestId = providerResult.openaiRequestId;
+      providerResponseId = providerResult.providerResponseId;
+      providerFailureCode = providerResult.failure?.code || null;
+      providerFailureDetail = providerResult.failure?.detail || null;
+
+      if (providerResult.response) {
+        response = providerResult.response;
+        fallbackReason = "";
+        providerSource = providerResult.provider;
+        if (providerResult.provider === "responses_api" && providerResult.providerResponseId) {
+          const setIdError = await setConversationLastResponseId(readiness, {
+            conversationId: conversation.id,
+            subjectId,
+            lastResponseId: providerResult.providerResponseId,
+          });
+          if (setIdError) {
+            console.error("[remy] setConversationLastResponseId error:", setIdError);
+          }
         }
       } else {
-        fallbackReason = "model_key_missing";
+        fallbackReason = providerResult.failure?.code || "model_invalid";
       }
-    } catch (error) {
-      fallbackReason = "model_error";
-      console.error("[remy] chat_turn model error:", error);
+    } else {
+      fallbackReason = "model_key_missing";
+      providerFailureCode = "OPENAI_PROVIDER_ERROR";
+      providerFailureDetail = "OPENAI_API_KEY is not configured";
+    }
+
+    if (fallbackReason && fallbackReason !== "deterministic") {
       const chatErrorEvent = await insertRemyEvent(readiness, {
         subjectId,
         assessmentDbId,
         eventType: "remy_chat_error",
         payload: {
+          trace_id: traceId,
           conversation_id: conversation.id,
-          message: error instanceof Error ? error.message : "unknown",
+          provider: providerName,
+          code: providerFailureCode || fallbackReason,
+          detail: providerFailureDetail || fallbackReason,
+          retryable: providerFailureCode
+            ? providerFailureCode === "OPENAI_RATE_LIMIT" ||
+              providerFailureCode === "OPENAI_SERVER_ERROR" ||
+              providerFailureCode === "OPENAI_TIMEOUT"
+            : false,
         },
       });
       if (chatErrorEvent) {
@@ -736,7 +1182,17 @@ serve(async (req) => {
       role: "assistant",
       messageText: response.assistant_message,
       intent: response.intent,
+      providerRequestId,
+      clientTurnId,
       metadata: {
+        trace_id: traceId,
+        provider: providerName,
+        openai_request_id: providerRequestId,
+        provider_response_id: providerResponseId,
+        provider_attempt_count: providerAttempts,
+        provider_latency_ms: providerLatencyMs,
+        provider_failure_code: providerFailureCode,
+        provider_failure_detail: providerFailureDetail,
         confidence: response.confidence,
         safety_flags: response.safety_flags,
         cta: response.cta || null,
@@ -756,7 +1212,14 @@ serve(async (req) => {
       assessmentDbId,
       eventType,
       payload: {
+        trace_id: traceId,
         conversation_id: conversation.id,
+        provider: providerName,
+        openai_request_id: providerRequestId,
+        provider_response_id: providerResponseId,
+        provider_attempt_count: providerAttempts,
+        provider_latency_ms: providerLatencyMs,
+        provider_failure_code: providerFailureCode,
         intent: response.intent,
         confidence: response.confidence,
         safety_flags: response.safety_flags,
@@ -768,7 +1231,14 @@ serve(async (req) => {
       console.error(`[remy] ${eventType} insert error:`, eventError);
     }
 
-    return jsonResponse(response);
+    return jsonResponse({
+      ...response,
+      meta: {
+        trace_id: traceId,
+        response_source: providerSource,
+        degraded_reason: fallbackReason || undefined,
+      },
+    });
   }
 
   const surface = payload.surface || "dashboard";

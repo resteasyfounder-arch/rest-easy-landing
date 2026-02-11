@@ -20,6 +20,10 @@ describe("parseRemyChatTurnResponse", () => {
       intent: "prioritize",
       confidence: 0.87,
       safety_flags: [],
+      meta: {
+        trace_id: "trace-123",
+        response_source: "chat_completions",
+      },
     });
 
     expect(parsed.intent).toBe("prioritize");
@@ -40,6 +44,10 @@ describe("parseRemyChatTurnResponse", () => {
         intent: "unknown",
         confidence: 0.5,
         safety_flags: [],
+        meta: {
+          trace_id: "trace-456",
+          response_source: "deterministic_fallback",
+        },
       })).toThrow();
   });
 });

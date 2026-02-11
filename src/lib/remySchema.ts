@@ -57,6 +57,12 @@ const remyWhyThisSchema = z.object({
   source_refs: z.array(z.string()),
 });
 
+const remyChatMetaSchema = z.object({
+  trace_id: z.string().min(1),
+  response_source: z.enum(["responses_api", "chat_completions", "deterministic_fallback"]),
+  degraded_reason: z.string().optional(),
+});
+
 export const remySurfacePayloadSchema = z.object({
   surface: remySurfaceEnum,
   generated_at: z.string(),
@@ -76,6 +82,7 @@ export const remyChatTurnResponseSchema = z.object({
   intent: remyChatIntentEnum,
   confidence: z.number().min(0).max(1),
   safety_flags: z.array(z.string()),
+  meta: remyChatMetaSchema,
 });
 
 export function parseRemySurfacePayload(data: unknown): RemySurfacePayload {

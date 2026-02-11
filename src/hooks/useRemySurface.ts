@@ -28,6 +28,8 @@ interface UseRemySurfaceReturn {
     message: string,
     conversationId?: string,
     contextHint?: string,
+    clientTurnId?: string,
+    clientRequestId?: string,
   ) => Promise<RemyChatTurnResponse>;
 }
 
@@ -39,6 +41,49 @@ export function notifyRemyRefresh() {
 
 async function callRemy(payload: Record<string, unknown>) {
   return invokeAuthedFunction("remy", payload);
+}
+
+type RemyErrorEnvelope = {
+  error?: {
+    message?: string;
+    code?: string;
+    retryable?: boolean;
+    trace_id?: string;
+    detail?: string | null;
+  };
+};
+
+export class RemyChatInvokeError extends Error {
+  code?: string;
+  retryable = false;
+  traceId?: string;
+  detail?: string | null;
+}
+
+async function normalizeRemyChatError(error: unknown): Promise<RemyChatInvokeError> {
+  const normalized = new RemyChatInvokeError(
+    error instanceof Error ? error.message : "Remy chat request failed",
+  );
+
+  if (error && typeof error === "object" && "context" in error) {
+    const context = (error as { context?: Response }).context;
+    if (context instanceof Response) {
+      try {
+        const payload = await context.clone().json() as RemyErrorEnvelope;
+        if (payload?.error) {
+          normalized.message = payload.error.message || normalized.message;
+          normalized.code = payload.error.code;
+          normalized.retryable = Boolean(payload.error.retryable);
+          normalized.traceId = payload.error.trace_id;
+          normalized.detail = payload.error.detail ?? null;
+        }
+      } catch {
+        // no-op, keep fallback error message
+      }
+    }
+  }
+
+  return normalized;
 }
 
 export function useRemySurface({
@@ -143,7 +188,13 @@ export function useRemySurface({
   );
 
   const chatTurn = useCallback(
-    async (message: string, conversationId?: string, contextHint?: string) => {
+    async (
+      message: string,
+      conversationId?: string,
+      contextHint?: string,
+      clientTurnId?: string,
+      clientRequestId?: string,
+    ) => {
       const requestPayload: Record<string, unknown> = {
         action: "chat_turn",
         assessment_id: "readiness_v1",
@@ -156,12 +207,22 @@ export function useRemySurface({
       if (contextHint) {
         requestPayload.context_hint = contextHint;
       }
+      if (clientTurnId) {
+        requestPayload.client_turn_id = clientTurnId;
+      }
+      if (clientRequestId) {
+        requestPayload.client_request_id = clientRequestId;
+      }
       if (subjectId) {
         requestPayload.subject_id = subjectId;
       }
 
-      const data = await callRemy(requestPayload);
-      return parseRemyChatTurnResponse(data);
+      try {
+        const data = await callRemy(requestPayload);
+        return parseRemyChatTurnResponse(data);
+      } catch (error) {
+        throw await normalizeRemyChatError(error);
+      }
     },
     [subjectId, surface],
   );

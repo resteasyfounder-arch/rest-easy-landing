@@ -26,9 +26,18 @@ Do not deploy frontend first. New frontend expects JWT-protected edge functions 
   - `SUPABASE_ANON_KEY`
   - `OPENAI_API_KEY` (for summary/report functions)
   - `RESEND_API_KEY` (for report email)
+  - `REMY_CHAT_PROVIDER` (`chat_completions`, `responses`, or `hybrid`)
+  - `REMY_RESPONSES_CANARY_PERCENT` (`0..100`)
+  - `REMY_RESPONSE_STORE` (`false` recommended)
 - Confirm auth provider email settings are configured for confirmation emails.
 - Confirm current migration head includes:
   - `20260210210500_phase3_readiness_auth_hardening.sql`
+  - `20260210134000_remy_chat_provider_hardening.sql`
+- Run Remy chat preflight:
+
+```bash
+./scripts/preflight-remy-chat.sh
+```
 
 ## Deploy Commands (example)
 

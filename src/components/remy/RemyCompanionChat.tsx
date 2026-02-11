@@ -22,6 +22,15 @@ type LocalReply = {
   quickReplies?: string[];
 };
 
+type ChatFailureState = {
+  text: string;
+  source: "typed" | "quick_reply";
+  retryable: boolean;
+  traceId?: string;
+  code?: string;
+  message: string;
+};
+
 interface RemyCompanionChatProps {
   payload: RemySurfacePayload | null;
   isLoading?: boolean;
@@ -34,6 +43,8 @@ interface RemyCompanionChatProps {
     message: string,
     conversationId?: string,
     contextHint?: string,
+    clientTurnId?: string,
+    clientRequestId?: string,
   ) => Promise<RemyChatTurnResponse>;
   onRetry?: () => Promise<void> | void;
   className?: string;
@@ -131,6 +142,39 @@ function toMessageAction(response?: RemyChatTurnResponse): ChatAction[] | undefi
   return [{ actionId: response.cta.id, href: response.cta.href, label: response.cta.label }];
 }
 
+function buildClientRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function parseChatError(error: unknown): ChatFailureState {
+  const fallback: ChatFailureState = {
+    text: "",
+    source: "typed",
+    retryable: true,
+    message: "I hit a temporary issue while responding. Please try again.",
+  };
+
+  if (!error || typeof error !== "object") return fallback;
+
+  const candidate = error as {
+    message?: string;
+    code?: string;
+    retryable?: boolean;
+    traceId?: string;
+  };
+
+  return {
+    ...fallback,
+    message: candidate.message || fallback.message,
+    code: candidate.code,
+    retryable: typeof candidate.retryable === "boolean" ? candidate.retryable : true,
+    traceId: candidate.traceId,
+  };
+}
+
 export function RemyCompanionChat({
   payload,
   isLoading = false,
@@ -148,6 +192,7 @@ export function RemyCompanionChat({
   const [draft, setDraft] = useState("");
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [quickReplies, setQuickReplies] = useState<string[]>(DEFAULT_QUICK_REPLIES);
+  const [lastFailure, setLastFailure] = useState<ChatFailureState | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !isThinking, [draft, isThinking]);
@@ -181,10 +226,14 @@ export function RemyCompanionChat({
     const text = rawText.trim();
     if (!text || isThinking) return;
 
+    const userMessageId = `user:${Date.now()}`;
+    const clientRequestId = buildClientRequestId();
+    const clientTurnId = `turn-${Date.now()}-${Math.random().toString(16).slice(2, 9)}`;
+
     setMessages((prev) => [
       ...prev,
       {
-        id: `user:${Date.now()}`,
+        id: userMessageId,
         role: "user",
         text,
         createdAt: Date.now(),
@@ -192,20 +241,38 @@ export function RemyCompanionChat({
     ]);
     setDraft("");
     setIsThinking(true);
+    setLastFailure(null);
     track("remy_chat_turn", { source, has_chat_backend: Boolean(onChatTurn) });
 
     try {
       if (onChatTurn) {
-        const response = await onChatTurn(text, conversationId, source === "quick_reply" ? "quick_reply" : undefined);
+        const response = await onChatTurn(
+          text,
+          conversationId,
+          source === "quick_reply" ? "quick_reply" : undefined,
+          clientTurnId,
+          clientRequestId,
+        );
         setConversationId(response.conversation_id);
         appendAssistantMessage({
           id: `remy:${Date.now()}`,
           role: "remy",
           text: response.assistant_message,
           createdAt: Date.now(),
+          traceId: response.meta.trace_id,
+          statusNote: response.meta.response_source === "deterministic_fallback"
+            ? "Using backup guidance while live model service recovers."
+            : undefined,
           actions: toMessageAction(response),
           quickReplies: response.quick_replies.length > 0 ? response.quick_replies : DEFAULT_QUICK_REPLIES,
         });
+        if (response.meta.response_source === "deterministic_fallback") {
+          track("remy_chat_fallback_notice", {
+            source,
+            trace_id: response.meta.trace_id,
+            degraded_reason: response.meta.degraded_reason || null,
+          });
+        }
       } else {
         const fallback = buildLocalReply(text, payload);
         appendAssistantMessage({
@@ -217,15 +284,31 @@ export function RemyCompanionChat({
           quickReplies: fallback.quickReplies || DEFAULT_QUICK_REPLIES,
         });
       }
-    } catch (_error) {
+    } catch (error) {
+      const parsedError = parseChatError(error);
       appendAssistantMessage({
         id: `remy:error:${Date.now()}`,
         role: "remy",
-        text: "I had trouble responding just now. Please try again.",
+        text: parsedError.message,
         createdAt: Date.now(),
+        traceId: parsedError.traceId,
+        statusNote: parsedError.traceId ? `Trace: ${parsedError.traceId}` : undefined,
         quickReplies: DEFAULT_QUICK_REPLIES,
       });
-      track("remy_chat_error", { source });
+      setMessages((prev) => prev.filter((message) => message.id !== userMessageId));
+      if (source === "typed") {
+        setDraft(text);
+      }
+      setLastFailure({
+        ...parsedError,
+        text,
+        source,
+      });
+      track("remy_chat_error", {
+        source,
+        code: parsedError.code || "UNKNOWN",
+        trace_id: parsedError.traceId || null,
+      });
     } finally {
       setIsThinking(false);
     }
@@ -280,6 +363,9 @@ export function RemyCompanionChat({
                 </div>
               )}
               <p>{message.text}</p>
+              {message.statusNote && (
+                <p className="mt-1 text-[11px] text-muted-foreground">{message.statusNote}</p>
+              )}
               {message.actions && message.actions.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {message.actions.slice(0, 2).map((action) => (
@@ -315,6 +401,28 @@ export function RemyCompanionChat({
           </div>
         )}
       </div>
+
+      {lastFailure && (
+        <div className="rounded-lg border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+          <p>{lastFailure.message}</p>
+          <div className="mt-1 flex items-center gap-2">
+            {lastFailure.retryable && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                onClick={() => void sendMessage(lastFailure.text, lastFailure.source)}
+                disabled={isThinking}
+              >
+                Retry send
+              </Button>
+            )}
+            {lastFailure.traceId && (
+              <span className="text-[11px] text-amber-800/90">Trace {lastFailure.traceId}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {quickReplies.slice(0, 3).map((item) => (
