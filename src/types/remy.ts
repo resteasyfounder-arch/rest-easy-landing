@@ -1,6 +1,20 @@
 export type RemySurface = "dashboard" | "readiness" | "section_summary" | "results" | "profile" | "menu";
 export type RemyPriority = "HIGH" | "MEDIUM" | "LOW";
 export type RemyChatIntent = "clarify" | "prioritize" | "explain_score" | "plan_next" | "reassure" | "unknown";
+export type RemyTurnGoal =
+  | "greeting"
+  | "score_explain"
+  | "next_step"
+  | "skip_priority"
+  | "route_to_question"
+  | "clarification"
+  | "out_of_scope";
+export type RemyScoreBand =
+  | "early_readiness"
+  | "developing_readiness"
+  | "advancing_readiness"
+  | "near_full_readiness"
+  | "score_unavailable";
 
 export interface RemyNudge {
   id: string;
@@ -74,6 +88,9 @@ export interface RemyChatTurnResponse {
     trace_id: string;
     response_source: "responses_api" | "chat_completions" | "deterministic_fallback";
     degraded_reason?: string;
+    goal?: RemyTurnGoal;
+    score_band?: RemyScoreBand;
+    policy_mode?: "app_directed_only";
   };
 }
 

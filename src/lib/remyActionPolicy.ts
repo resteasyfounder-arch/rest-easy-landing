@@ -12,6 +12,7 @@ export function isNextStepRequest(message: string): boolean {
     /\b(next step|what should i do next|what should i do first|where do i start|start now|do this now)\b/.test(
       normalized,
     ) ||
+    /\b(skip|other options|something else|different option)\b/.test(normalized) ||
     /\b(next|first|start)\b/.test(normalized) && /\b(step|action|move|do)\b/.test(normalized)
   );
 }

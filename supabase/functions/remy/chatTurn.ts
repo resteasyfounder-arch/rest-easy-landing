@@ -417,6 +417,8 @@ export function buildModelSystemPrompt(): string {
     "Never invent user data. If uncertain, say what is unknown.",
     "Tone: calm, supportive, concise, direct.",
     "Focus on one practical next step per response.",
+    "Do not ask the user to enter personal beneficiary names, account lists, or legal details in chat.",
+    "Route users to the correct in-app question for updates instead of collecting data in chat.",
     "Do not expose internal analytics or backend details (no percentages, weights, section IDs, question IDs, source refs, or raw assessment keys).",
     "Do not use phrases like 'current answer is' or mention schema/report internals.",
     "Return JSON only that matches the remy_chat_turn function schema.",
@@ -447,7 +449,7 @@ export function buildModelUserPrompt(
     .map((item) => `${item.role === "assistant" ? "Remy" : "User"}: ${modelSafeReason(item.text)}`)
     .join("\n");
 
-  const topPriorities = context.payload.priorities.slice(0, 3).map((item) => ({
+  const topPriorities = context.payload.priorities.slice(0, 2).map((item) => ({
     title: item.title,
     reason: modelSafeReason(item.why_now),
   }));
@@ -457,22 +459,19 @@ export function buildModelUserPrompt(
     assessment_status: context.assessment?.status ?? "unknown",
     report_status: context.assessment?.report_status ?? "unknown",
     progress_state: summarizeProgressState(context.assessment?.overall_score),
+    readiness_score: typeof context.assessment?.overall_score === "number" ? context.assessment.overall_score : null,
     top_priorities: topPriorities,
-    reassurance: context.payload.reassurance,
-    nudge: context.payload.nudge
+    primary_nudge: context.payload.nudge
       ? {
         title: context.payload.nudge.title,
-        body: modelSafeReason(context.payload.nudge.body),
-        cta_label: context.payload.nudge.cta?.label ?? null,
+        guidance: modelSafeReason(context.payload.nudge.body),
+        can_navigate: Boolean(context.payload.nudge.cta?.href),
       }
       : null,
-    explanations: context.payload.explanations.slice(0, 2).map((item) => ({
-      title: item.title,
-      body: modelSafeReason(item.body),
-    })),
     answer_count: context.answerCount,
     latest_user_message: modelSafeReason(context.message),
     conversation_history: serializedHistory,
+    response_policy: "app_directed_only",
   };
 
   return `Generate one helpful Remy reply from this context:\n${JSON.stringify(input)}`;

@@ -129,7 +129,7 @@ describe("remy payload smoke tests", () => {
 
     expect(payload.nudge?.id).toBe("report:ready");
     expect(payload.priorities).toHaveLength(0);
-    expect(payload.reassurance.title).toBe("You're close to full readiness");
+    expect(payload.reassurance.title).toBe("You're making strong progress");
   });
 
   it("returns stale-report guidance and stale explanation", () => {

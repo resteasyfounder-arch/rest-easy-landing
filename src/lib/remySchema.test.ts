@@ -50,4 +50,26 @@ describe("parseRemyChatTurnResponse", () => {
         },
       })).toThrow();
   });
+
+  it("parses additive planner metadata fields", () => {
+    const parsed = parseRemyChatTurnResponse({
+      conversation_id: "00000000-0000-0000-0000-000000000001",
+      assistant_message: "Let's open your next step in the readiness flow.",
+      quick_replies: ["Show my next step"],
+      intent: "plan_next",
+      confidence: 0.7,
+      safety_flags: [],
+      meta: {
+        trace_id: "trace-789",
+        response_source: "responses_api",
+        goal: "next_step",
+        score_band: "developing_readiness",
+        policy_mode: "app_directed_only",
+      },
+    });
+
+    expect(parsed.meta.goal).toBe("next_step");
+    expect(parsed.meta.score_band).toBe("developing_readiness");
+    expect(parsed.meta.policy_mode).toBe("app_directed_only");
+  });
 });

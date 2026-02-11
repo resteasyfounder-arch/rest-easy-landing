@@ -3,6 +3,7 @@ import {
   buildPriorityScore,
   buildReassurance,
   evaluateCondition,
+  getScoreBand,
   getPriority,
 } from "./decisionEngine";
 
@@ -41,10 +42,21 @@ describe("remy decision engine", () => {
     expect(noAnswer).toBeGreaterThan(notSure);
   });
 
-  it("returns reassurance copy for progress bands", () => {
-    expect(buildReassurance(0, 0).title).toBe("You can start small");
-    expect(buildReassurance(30, 1).title).toBe("Early progress matters");
-    expect(buildReassurance(60, 4).title).toBe("You're building real coverage");
-    expect(buildReassurance(90, 7).title).toBe("You're close to full readiness");
+  it("maps readiness score bands objectively", () => {
+    expect(getScoreBand(10)).toBe("early_readiness");
+    expect(getScoreBand(54)).toBe("developing_readiness");
+    expect(getScoreBand(72)).toBe("advancing_readiness");
+    expect(getScoreBand(88)).toBe("near_full_readiness");
+  });
+
+  it("does not claim near full readiness for mid-range score", () => {
+    const reassurance = buildReassurance(88, 7, 54, false);
+    expect(reassurance.title).toBe("You're building readiness");
+    expect(reassurance.title.toLowerCase()).not.toContain("near full");
+  });
+
+  it("requires both high score and strong progress for near-full framing", () => {
+    expect(buildReassurance(90, 7, 85, false).title).toBe("You're near full readiness");
+    expect(buildReassurance(60, 5, 85, false).title).toBe("You're advancing your readiness");
   });
 });

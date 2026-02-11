@@ -61,6 +61,13 @@ const remyChatMetaSchema = z.object({
   trace_id: z.string().min(1),
   response_source: z.enum(["responses_api", "chat_completions", "deterministic_fallback"]),
   degraded_reason: z.string().optional(),
+  goal: z
+    .enum(["greeting", "score_explain", "next_step", "skip_priority", "route_to_question", "clarification", "out_of_scope"])
+    .optional(),
+  score_band: z
+    .enum(["early_readiness", "developing_readiness", "advancing_readiness", "near_full_readiness", "score_unavailable"])
+    .optional(),
+  policy_mode: z.literal("app_directed_only").optional(),
 });
 
 export const remySurfacePayloadSchema = z.object({

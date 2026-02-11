@@ -14,6 +14,7 @@ describe("remyActionPolicy", () => {
 
   it("detects explicit next-step intent", () => {
     expect(isNextStepRequest("what should I do next?")).toBe(true);
+    expect(isNextStepRequest("I want other options")).toBe(true);
     expect(isExplicitActionRequest("what should I do next?")).toBe(true);
   });
 

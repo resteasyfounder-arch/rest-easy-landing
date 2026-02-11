@@ -367,6 +367,11 @@ export function buildRemySurfacePayload({
     nudge,
     explanations,
     priorities,
-    reassurance: buildReassurance(progressPercent, completedSections),
+    reassurance: buildReassurance(
+      progressPercent,
+      completedSections,
+      assessment.overall_score ?? null,
+      assessment.report_stale,
+    ),
   };
 }

@@ -21,6 +21,11 @@ import {
   type RemyChatTurnResponse,
 } from "./chatTurn.ts";
 import {
+  applyConversationPolicy,
+  normalizeConversationState,
+  type RemyConversationState,
+} from "./turnPlanner.ts";
+import {
   computeBackoffDelayMs,
   mapFailureFromStatus,
   mapSchemaFailure,
@@ -92,6 +97,9 @@ const CHAT_PROVIDER_MODE = sanitizeProviderMode(Deno.env.get("REMY_CHAT_PROVIDER
 const RESPONSES_CANARY_PERCENT = Math.max(0, Math.min(100, Number(Deno.env.get("REMY_RESPONSES_CANARY_PERCENT") ?? "0")));
 const RESPONSE_STORE = (Deno.env.get("REMY_RESPONSE_STORE") ?? "false").toLowerCase() === "true";
 const ACTION_GATING_ENABLED = (Deno.env.get("REMY_CHAT_ACTION_GATING") ?? "true").toLowerCase() !== "false";
+const APP_DIRECTED_ONLY_ENABLED = (Deno.env.get("REMY_CHAT_APP_DIRECTED_ONLY") ?? "true").toLowerCase() !== "false";
+const OBJECTIVE_SCORE_ENABLED = (Deno.env.get("REMY_CHAT_OBJECTIVE_SCORE") ?? "true").toLowerCase() !== "false";
+const SKIP_MEMORY_ENABLED = (Deno.env.get("REMY_CHAT_SKIP_MEMORY") ?? "true").toLowerCase() !== "false";
 const PROVIDER_TIMEOUT_MS = Math.max(1200, Number(Deno.env.get("REMY_CHAT_PROVIDER_TIMEOUT_MS") ?? "2800"));
 const PROVIDER_MAX_RETRIES = Math.max(0, Math.min(2, Number(Deno.env.get("REMY_CHAT_PROVIDER_MAX_RETRIES") ?? "2")));
 const PROVIDER_BACKOFF_BASE_MS = Math.max(60, Number(Deno.env.get("REMY_CHAT_PROVIDER_BACKOFF_MS") ?? "180"));
@@ -130,6 +138,7 @@ function isNextStepRequest(message: string): boolean {
     /\b(next step|what should i do next|what should i do first|where do i start|start now|do this now)\b/.test(
       normalized,
     ) ||
+    /\b(skip|other options|something else|different option)\b/.test(normalized) ||
     /\b(next|first|start)\b/.test(normalized) && /\b(step|action|move|do)\b/.test(normalized)
   );
 }
@@ -406,12 +415,12 @@ async function resolveConversationId(
   readiness: ReadinessClient,
   subjectId: string,
   conversationId?: string,
-): Promise<{ id?: string; lastResponseId?: string | null; error?: string }> {
+): Promise<{ id?: string; lastResponseId?: string | null; state?: RemyConversationState; error?: string }> {
   const sanitizedConversationId = sanitizeConversationId(conversationId);
   if (sanitizedConversationId) {
     const { data: existing, error: existingError } = await readiness
       .from("remy_conversations")
-      .select("id, openai_last_response_id")
+      .select("id, openai_last_response_id, state")
       .eq("id", sanitizedConversationId)
       .eq("subject_id", subjectId)
       .maybeSingle();
@@ -422,6 +431,7 @@ async function resolveConversationId(
       return {
         id: existing.id as string,
         lastResponseId: (existing as { openai_last_response_id?: string | null }).openai_last_response_id ?? null,
+        state: normalizeConversationState((existing as { state?: unknown }).state),
       };
     }
   }
@@ -432,8 +442,9 @@ async function resolveConversationId(
       subject_id: subjectId,
       status: "active",
       openai_last_response_id: null,
+      state: {},
     })
-    .select("id, openai_last_response_id")
+    .select("id, openai_last_response_id, state")
     .single();
 
   if (error) {
@@ -442,20 +453,29 @@ async function resolveConversationId(
   return {
     id: created.id as string,
     lastResponseId: (created as { openai_last_response_id?: string | null }).openai_last_response_id ?? null,
+    state: normalizeConversationState((created as { state?: unknown }).state),
   };
 }
 
-async function setConversationLastResponseId(
+async function setConversationState(
   readiness: ReadinessClient,
   params: {
     conversationId: string;
     subjectId: string;
-    lastResponseId: string;
+    state: RemyConversationState;
+    lastResponseId?: string | null;
   },
 ): Promise<string | null> {
+  const patch: { state: RemyConversationState; openai_last_response_id?: string } = {
+    state: params.state,
+  };
+  if (params.lastResponseId) {
+    patch.openai_last_response_id = params.lastResponseId;
+  }
+
   const { error } = await readiness
     .from("remy_conversations")
-    .update({ openai_last_response_id: params.lastResponseId })
+    .update(patch)
     .eq("id", params.conversationId)
     .eq("subject_id", params.subjectId);
   return error ? error.message : null;
@@ -1140,6 +1160,12 @@ serve(async (req) => {
       );
     }
 
+    const history = await loadConversationHistory(readiness, {
+      conversationId: conversation.id,
+      subjectId,
+      limit: 10,
+    });
+
     let response = fallback;
     let fallbackReason = "deterministic";
     let providerSource: RemyResponseSource = "deterministic_fallback";
@@ -1150,14 +1176,14 @@ serve(async (req) => {
     let providerResponseId: string | null = null;
     let providerFailureCode: ProviderFailure["code"] | null = null;
     let providerFailureDetail: string | null = null;
+    let plannerGoal: string | undefined;
+    let plannerScoreBand: string | undefined;
+    let plannerPolicyMode: string | undefined;
+    let repetitionGuardTriggered = false;
+    let nextConversationState = normalizeConversationState(conversation.state);
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (apiKey) {
-      const history = await loadConversationHistory(readiness, {
-        conversationId: conversation.id,
-        subjectId,
-        limit: 10,
-      });
       const providerResult = await invokeProviderForTurn(
         apiKey,
         chatContext,
@@ -1178,16 +1204,6 @@ serve(async (req) => {
         response = providerResult.response;
         fallbackReason = "";
         providerSource = providerResult.provider;
-        if (providerResult.provider === "responses_api" && providerResult.providerResponseId) {
-          const setIdError = await setConversationLastResponseId(readiness, {
-            conversationId: conversation.id,
-            subjectId,
-            lastResponseId: providerResult.providerResponseId,
-          });
-          if (setIdError) {
-            console.error("[remy] setConversationLastResponseId error:", setIdError);
-          }
-        }
       } else {
         fallbackReason = providerResult.failure?.code || "model_invalid";
       }
@@ -1197,7 +1213,40 @@ serve(async (req) => {
       providerFailureDetail = "OPENAI_API_KEY is not configured";
     }
 
+    if (APP_DIRECTED_ONLY_ENABLED || OBJECTIVE_SCORE_ENABLED || SKIP_MEMORY_ENABLED) {
+      const plannerResult = applyConversationPolicy({
+        context: chatContext,
+        baseResponse: response,
+        history,
+        stateRaw: conversation.state,
+      });
+      response = plannerResult.response;
+      nextConversationState = plannerResult.state;
+      plannerGoal = plannerResult.goal;
+      plannerScoreBand = plannerResult.scoreBand;
+      plannerPolicyMode = plannerResult.policyMode;
+      repetitionGuardTriggered = plannerResult.repetitionGuardTriggered;
+    }
+
+    if (!SKIP_MEMORY_ENABLED) {
+      nextConversationState = {
+        ...nextConversationState,
+        declined_priority_ids: [],
+        declined_until_by_id: {},
+      };
+    }
+
     response = applyActionPolicy(response, message);
+
+    const stateUpdateError = await setConversationState(readiness, {
+      conversationId: conversation.id,
+      subjectId,
+      state: nextConversationState,
+      lastResponseId: providerName === "responses_api" ? providerResponseId : null,
+    });
+    if (stateUpdateError) {
+      console.error("[remy] setConversationState error:", stateUpdateError);
+    }
 
     if (fallbackReason && fallbackReason !== "deterministic") {
       const chatErrorEvent = await insertRemyEvent(readiness, {
@@ -1243,6 +1292,10 @@ serve(async (req) => {
         safety_flags: response.safety_flags,
         cta: response.cta || null,
         why_this: response.why_this || null,
+        goal: plannerGoal || null,
+        score_band: plannerScoreBand || null,
+        policy_mode: plannerPolicyMode || null,
+        repetition_guard_triggered: repetitionGuardTriggered,
         model_name: fallbackReason ? null : CHAT_MODEL_NAME,
         fallback_reason: fallbackReason || null,
       },
@@ -1269,6 +1322,12 @@ serve(async (req) => {
         intent: response.intent,
         confidence: response.confidence,
         safety_flags: response.safety_flags,
+        turn_goal: plannerGoal || null,
+        score_band: plannerScoreBand || null,
+        policy_mode: plannerPolicyMode || null,
+        cta_shown: Boolean(response.cta),
+        declined_priority_count: nextConversationState.declined_priority_ids.length,
+        repetition_guard_triggered: repetitionGuardTriggered,
         fallback_reason: fallbackReason || null,
         model_name: fallbackReason ? null : CHAT_MODEL_NAME,
       },
@@ -1283,6 +1342,9 @@ serve(async (req) => {
         trace_id: traceId,
         response_source: providerSource,
         degraded_reason: fallbackReason || undefined,
+        goal: plannerGoal,
+        score_band: plannerScoreBand,
+        policy_mode: plannerPolicyMode,
       },
     });
   }
