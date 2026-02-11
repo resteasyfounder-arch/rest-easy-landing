@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildRemySurfacePayload } from "./remyPayloadBuilder";
-import type { AssessmentRow, Schema } from "./remyPayloadBuilder";
+import { buildRemySurfacePayload } from "./remyPayloadBuilder.ts";
+import type { AssessmentRow, Schema } from "./remyPayloadBuilder.ts";
 
 const baseSchema: Schema = {
   sections: [
@@ -165,7 +165,7 @@ describe("remy payload smoke tests", () => {
     });
 
     expect(payload.nudge?.id).toBe("report:stale");
-    expect(payload.explanations.some((item) => item.id === "exp:report-stale")).toBe(true);
+    expect(payload.explanations.some((item: { id: string }) => item.id === "exp:report-stale")).toBe(true);
   });
 
   it("returns profile-surface nudge with profile return target", () => {
