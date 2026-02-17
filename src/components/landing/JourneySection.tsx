@@ -31,7 +31,7 @@ const journeySteps = [
     step: 3,
     title: "Receive Personalized Insights",
     description:
-      "Our AI analyzes your responses to generate a comprehensive readiness report. Understand your strengths, identify gaps, and get tailored recommendations.",
+      "Our specialized assistant, Remy, analyzes your responses to generate a comprehensive readiness report. Understand your strengths, identify gaps, and get tailored recommendations.",
     icon: Sparkles,
     cardTitle: "Personalized Insights",
     cardSubtitle: "AI-powered report generation",
