@@ -55,7 +55,7 @@ const Hero = () => {
             <HeroAnimatedItem delay={100} duration={700} movement={6}>
               <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
                 Get your affairs in order with{" "}
-                <span className="text-primary">Rest Assured</span>
+                <span className="text-primary">RestAssured</span>
               </h1>
             </HeroAnimatedItem>
 
