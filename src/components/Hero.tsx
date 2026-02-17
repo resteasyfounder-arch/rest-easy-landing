@@ -8,14 +8,14 @@ const HeroAnimatedItem = ({
   delay = 0,
   duration = 600,
   movement = 6,
-  className = "",
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  duration?: number;
-  movement?: number;
-  className?: string;
-}) => {
+  className = ""
+
+
+
+
+
+
+}: {children: React.ReactNode;delay?: number;duration?: number;movement?: number;className?: string;}) => {
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setIsVisible(true));
@@ -31,12 +31,12 @@ const HeroAnimatedItem = ({
         transitionDuration: `${duration}ms`,
         transitionDelay: `${delay}ms`,
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? "translateY(0)" : `translateY(${movement}px)`,
-      }}
-    >
+        transform: isVisible ? "translateY(0)" : `translateY(${movement}px)`
+      }}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 const Hero = () => {
@@ -55,7 +55,7 @@ const Hero = () => {
             <HeroAnimatedItem delay={100} duration={700} movement={6}>
               <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-semibold text-foreground leading-tight text-balance">
                 Get your affairs in order with{" "}
-                <span className="text-primary">Rest Easy</span>
+                <span className="text-primary">Rest Assured</span>
               </h1>
             </HeroAnimatedItem>
 
@@ -71,8 +71,8 @@ const Hero = () => {
                 <Button
                   size="lg"
                   className="group font-body text-base px-8 py-6 shadow-soft hover:shadow-elevated transition-all duration-150 active:scale-[0.98]"
-                  asChild
-                >
+                  asChild>
+
                   <a href="/login">
                     Log In
                     <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -82,8 +82,8 @@ const Hero = () => {
                   variant="outline"
                   size="lg"
                   className="font-body text-base px-8 py-6 transition-all duration-150 active:scale-[0.98]"
-                  asChild
-                >
+                  asChild>
+
                   <a href="/assessment">Free Findability Assessment</a>
                 </Button>
               </div>
@@ -113,13 +113,13 @@ const Hero = () => {
             <img
               src={heartLogo}
               alt="Rest Easy"
-              className="w-48 h-48 sm:w-64 sm:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96 object-contain animate-hero-heartbeat"
-            />
+              className="w-48 h-48 sm:w-64 sm:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96 object-contain animate-hero-heartbeat" />
+
           </HeroAnimatedItem>
         </div>
       </div>
-    </section>
-  );
+    </section>);
+
 };
 
 export default Hero;

@@ -7,22 +7,22 @@ import remyAvatar from "@/assets/remy-avatar.png";
 import { openRemyLauncher } from "@/lib/remyLauncherEvents";
 
 const capabilities = [
-  {
-    icon: Brain,
-    title: "Understands Your Journey",
-    description: "Knows your profile and tracks your progress.",
-  },
-  {
-    icon: MessageCircle,
-    title: "Explains in Plain Language",
-    description: "Clear answers about scores and next steps.",
-  },
-  {
-    icon: RefreshCw,
-    title: "Adapts as Life Changes",
-    description: "Adjusts recommendations as you evolve.",
-  },
-];
+{
+  icon: Brain,
+  title: "Understands Your Journey",
+  description: "Knows your profile and tracks your progress."
+},
+{
+  icon: MessageCircle,
+  title: "Explains in Plain Language",
+  description: "Clear answers about scores and next steps."
+},
+{
+  icon: RefreshCw,
+  title: "Adapts as Life Changes",
+  description: "Adjusts recommendations as you evolve."
+}];
+
 
 const RemySection = () => {
   const handleOpenRemy = () => {
@@ -35,8 +35,8 @@ const RemySection = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <AnimatedItem animation="fade-up" delay={0}>
-            <h2 className="font-display text-3xl lg:text-4xl font-semibold text-foreground mb-4">
-              Meet Remy — Your Personal Rest Easy Manager
+            <h2 className="font-display text-3xl lg:text-4xl font-semibold text-foreground mb-4">Meet Remy — Your Personal Rest Assured Manager
+
             </h2>
           </AnimatedItem>
           <AnimatedItem animation="fade-up" delay={100}>
@@ -57,8 +57,8 @@ const RemySection = () => {
                 <img
                   src={remyAvatar}
                   alt="Remy - Your Rest Easy Manager"
-                  className="w-16 h-16 rounded-full shadow-card animate-remy-float"
-                />
+                  className="w-16 h-16 rounded-full shadow-card animate-remy-float" />
+
                 <div>
                   <h3 className="font-display text-xl font-semibold text-foreground">
                     Hi, I'm Remy
@@ -71,8 +71,8 @@ const RemySection = () => {
 
               {/* Capabilities */}
               <div className="space-y-4">
-                {capabilities.map((capability) => (
-                  <div key={capability.title} className="flex items-start gap-3">
+                {capabilities.map((capability) =>
+                <div key={capability.title} className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <capability.icon className="w-4 h-4 text-primary" />
                     </div>
@@ -85,7 +85,7 @@ const RemySection = () => {
                       </p>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </AnimatedItem>
@@ -96,8 +96,8 @@ const RemySection = () => {
               icon={MessageCircle}
               title="Ask Remy Anything"
               subtitle="See how Remy helps you navigate your journey"
-              className="h-full"
-            >
+              className="h-full">
+
               <RemyChatDemo />
             </BentoCard>
           </AnimatedItem>
@@ -109,8 +109,8 @@ const RemySection = () => {
             <Button
               size="lg"
               className="font-body text-base px-8"
-              onClick={handleOpenRemy}
-            >
+              onClick={handleOpenRemy}>
+
               <MessageCircle className="w-5 h-5 mr-2" />
               Talk with Remy
             </Button>
@@ -120,8 +120,8 @@ const RemySection = () => {
           </div>
         </AnimatedItem>
       </div>
-    </section>
-  );
+    </section>);
+
 };
 
 export default RemySection;
