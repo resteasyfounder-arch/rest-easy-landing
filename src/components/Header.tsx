@@ -3,7 +3,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useActiveSection } from "@/hooks/useActiveSection";
-import logo from "@/assets/rest-easy-logo.png";
+import logo from "@/assets/rest-easy-heart.png";
 
 interface HeaderProps {
   isAuthenticated?: boolean;
