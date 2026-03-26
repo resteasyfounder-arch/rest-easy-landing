@@ -41,6 +41,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_data: {
+        Row: {
+          created_at: string
+          lead_source: string | null
+          lead_type: string | null
+          readiness_score: number
+          updated_at: string
+          user_id: string
+          user_name: string | null
+          vault_has_will: boolean
+        }
+        Insert: {
+          created_at?: string
+          lead_source?: string | null
+          lead_type?: string | null
+          readiness_score?: number
+          updated_at?: string
+          user_id: string
+          user_name?: string | null
+          vault_has_will?: boolean
+        }
+        Update: {
+          created_at?: string
+          lead_source?: string | null
+          lead_type?: string | null
+          readiness_score?: number
+          updated_at?: string
+          user_id?: string
+          user_name?: string | null
+          vault_has_will?: boolean
+        }
+        Relationships: []
+      }
       vault_document_exclusions: {
         Row: {
           created_at: string
