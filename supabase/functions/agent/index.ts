@@ -514,7 +514,7 @@ async function computeAssessmentState(
   // Calculate profile_answers from profile data
   const profileAnswers: Record<string, "yes" | "no"> = {};
   if (schema) {
-    for (const pq of schema.profile_questions) {
+    for (const pq of (schema.profile_questions || [])) {
       let value: unknown = undefined;
       
       if (profile[pq.field] !== undefined) {
@@ -579,8 +579,8 @@ async function computeAssessmentState(
   }
 
   // Calculate profile progress
-  const totalProfileQuestions = schema.profile_questions.length;
-  const answeredProfileQuestions = schema.profile_questions.filter((q) => {
+  const totalProfileQuestions = (schema.profile_questions || []).length;
+  const answeredProfileQuestions = (schema.profile_questions || []).filter((q: ProfileQuestion) => {
     if (profile[q.field] !== undefined) return true;
     
     for (const key of Object.keys(profile)) {
@@ -1324,7 +1324,8 @@ serve(async (req) => {
       .upsert(answerRows, { onConflict: "assessment_id,question_id" });
 
     if (answersError) {
-      return jsonResponse({ error: "Failed to save answers" }, 500);
+      console.error("[agent] Failed to save answers:", JSON.stringify(answersError));
+      return jsonResponse({ error: "Failed to save answers", detail: answersError.message }, 500);
     }
 
     // Update last_answer_at
